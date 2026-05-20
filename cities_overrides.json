@@ -1,0 +1,7 @@
+{
+  "_about": "Edit this file to manually add/remove cities on top of the GeoNames build. Re-run build_cities_json.py to apply. Keys are ISO 3166-1 alpha-2 country codes. Use exact-case strings as they will be matched against the address text (case-insensitive, with word boundaries).",
+  "add": {
+  },
+  "remove": {
+  }
+}

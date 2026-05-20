@@ -1,0 +1,44 @@
+# Source PDFs and extractor outputs (regenerable, large) — applied globally
+*.pdf
+*.csv
+csv/
+
+# Sidecar overflow dumps from the extractor
+*_511_overflow.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+app/.venv/
+.pytest_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts.bak
+
+# Logs
+log/
+*.log
+
+# GeoNames build artifacts
+geonames_tmp/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~

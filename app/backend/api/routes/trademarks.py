@@ -1,0 +1,61 @@
+"""Trademark search routes."""
+from __future__ import annotations
+import uuid
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..db import RecordType, Trademark, get_session
+from ..schemas import TrademarkListOut, TrademarkOut
+from ._filters import build_trademark_where
+
+
+router = APIRouter(prefix="/api/trademarks", tags=["trademarks"])
+
+
+@router.get("", response_model=TrademarkListOut)
+async def search(
+    q: Optional[str] = Query(None, description="Free-text — matches applicant name / mark sample / application number"),
+    country: Optional[str] = Query(None, min_length=2, max_length=2),
+    nice_class: Optional[List[str]] = Query(None, description="One or more Nice classes; repeat param to combine"),
+    record_type: Optional[RecordType] = None,
+    applicant_type: Optional[str] = Query(None, description="Personal | Company"),
+    year: Optional[int] = None,
+    month: Optional[int] = Query(None, ge=1, le=12),
+    gazette_id: Optional[uuid.UUID] = None,
+    ip_agency: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    session: AsyncSession = Depends(get_session),
+) -> TrademarkListOut:
+    where = build_trademark_where(
+        q=q, country=country, nice_class=nice_class, record_type=record_type,
+        applicant_type=applicant_type, year=year, month=month,
+        gazette_id=gazette_id, ip_agency=ip_agency,
+    )
+
+    base = select(Trademark)
+    cnt = select(func.count()).select_from(Trademark)
+    if where:
+        base = base.where(and_(*where))
+        cnt = cnt.where(and_(*where))
+    base = base.order_by(Trademark.publication_date_441.desc().nulls_last(), Trademark.id).limit(limit).offset(offset)
+
+    rows = (await session.execute(base)).scalars().all()
+    total = (await session.execute(cnt)).scalar_one()
+    return TrademarkListOut(
+        items=[TrademarkOut.model_validate(r) for r in rows],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/{trademark_id}", response_model=TrademarkOut)
+async def get_trademark(trademark_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> TrademarkOut:
+    r = await session.get(Trademark, trademark_id)
+    if r is None:
+        raise HTTPException(404, "Trademark not found")
+    return TrademarkOut.model_validate(r)
