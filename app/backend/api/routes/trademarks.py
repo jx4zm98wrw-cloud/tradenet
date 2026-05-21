@@ -1,7 +1,8 @@
 """Trademark search routes."""
+
 from __future__ import annotations
+
 import uuid
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, select
@@ -11,29 +12,38 @@ from ..db import RecordType, Trademark, get_session
 from ..schemas import TrademarkListOut, TrademarkOut
 from ._filters import build_trademark_where
 
-
-router = APIRouter(prefix="/api/trademarks", tags=["trademarks"])
+router = APIRouter(prefix="/api/v1/trademarks", tags=["trademarks"])
 
 
 @router.get("", response_model=TrademarkListOut)
 async def search(
-    q: Optional[str] = Query(None, description="Free-text — matches applicant name / mark sample / application number"),
-    country: Optional[str] = Query(None, min_length=2, max_length=2),
-    nice_class: Optional[List[str]] = Query(None, description="One or more Nice classes; repeat param to combine"),
-    record_type: Optional[RecordType] = None,
-    applicant_type: Optional[str] = Query(None, description="Personal | Company"),
-    year: Optional[int] = None,
-    month: Optional[int] = Query(None, ge=1, le=12),
-    gazette_id: Optional[uuid.UUID] = None,
-    ip_agency: Optional[str] = None,
+    q: str | None = Query(
+        None, description="Free-text — matches applicant name / mark sample / application number"
+    ),
+    country: str | None = Query(None, min_length=2, max_length=2),
+    nice_class: list[str] | None = Query(
+        None, description="One or more Nice classes; repeat param to combine"
+    ),
+    record_type: RecordType | None = None,
+    applicant_type: str | None = Query(None, description="Personal | Company"),
+    year: int | None = None,
+    month: int | None = Query(None, ge=1, le=12),
+    gazette_id: uuid.UUID | None = None,
+    ip_agency: str | None = None,
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> TrademarkListOut:
     where = build_trademark_where(
-        q=q, country=country, nice_class=nice_class, record_type=record_type,
-        applicant_type=applicant_type, year=year, month=month,
-        gazette_id=gazette_id, ip_agency=ip_agency,
+        q=q,
+        country=country,
+        nice_class=nice_class,
+        record_type=record_type,
+        applicant_type=applicant_type,
+        year=year,
+        month=month,
+        gazette_id=gazette_id,
+        ip_agency=ip_agency,
     )
 
     base = select(Trademark)
@@ -41,7 +51,11 @@ async def search(
     if where:
         base = base.where(and_(*where))
         cnt = cnt.where(and_(*where))
-    base = base.order_by(Trademark.publication_date_441.desc().nulls_last(), Trademark.id).limit(limit).offset(offset)
+    base = (
+        base.order_by(Trademark.publication_date_441.desc().nulls_last(), Trademark.id)
+        .limit(limit)
+        .offset(offset)
+    )
 
     rows = (await session.execute(base)).scalars().all()
     total = (await session.execute(cnt)).scalar_one()
@@ -54,7 +68,9 @@ async def search(
 
 
 @router.get("/{trademark_id}", response_model=TrademarkOut)
-async def get_trademark(trademark_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> TrademarkOut:
+async def get_trademark(
+    trademark_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+) -> TrademarkOut:
     r = await session.get(Trademark, trademark_id)
     if r is None:
         raise HTTPException(404, "Trademark not found")

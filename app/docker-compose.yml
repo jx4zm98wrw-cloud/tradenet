@@ -1,29 +1,36 @@
+# Local dev stack. For real environments, supply secrets via the orchestrator
+# (Kubernetes Secrets / AWS Parameter Store / Vault), not literal env values
+# in compose files. The ${VAR:-default} syntax means env vars from a `.env`
+# file (or the shell) override the bundled defaults.
+
 services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: tm
-      POSTGRES_PASSWORD: tm
-      POSTGRES_DB: tm
+      POSTGRES_USER: ${POSTGRES_USER:-tm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tm}
+      POSTGRES_DB: ${POSTGRES_DB:-tm}
     ports:
-      - "5435:5432"
+      - "${POSTGRES_PORT:-5435}:5432"
     volumes:
       - tm_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tm -d tm"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tm} -d ${POSTGRES_DB:-tm}"]
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     ports:
-      - "6380:6379"
+      - "${REDIS_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
 
 volumes:
   tm_pgdata:

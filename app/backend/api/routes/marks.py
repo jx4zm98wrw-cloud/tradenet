@@ -9,11 +9,12 @@
   - similar marks landing this period (mocked similarity until PR #5)
   - raw INID markers (extra_markers JSONB passthrough)
 """
+
 from __future__ import annotations
+
 import hashlib
 import uuid
-from datetime import date, datetime, timedelta
-from typing import List, Optional
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -22,21 +23,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import RecordType, Trademark, get_session
 from ..schemas import TrademarkOut
-from .today import DEMO_TODAY, OPPOSITION_WINDOW_DAYS, _opp_close_date
+from .today import DEMO_TODAY, _opp_close_date
 
-
-router = APIRouter(prefix="/api/marks", tags=["marks"])
+router = APIRouter(prefix="/api/v1/marks", tags=["marks"])
 
 
 # ===== Mark detail with derived fields =====
 
+
 class MarkDetailOut(BaseModel):
     mark: TrademarkOut
-    oppositionEnds: Optional[date]
-    oppositionDaysLeft: Optional[int]
+    oppositionEnds: date | None
+    oppositionDaysLeft: int | None
     oppositionOpen: bool
     statusLabel: str  # "Examination pending" | "Active registration" | "Lapsed" | "Pending publication"
-    statusTone: str   # "warn" | "ok" | "mute"
+    statusTone: str  # "warn" | "ok" | "mute"
 
 
 @router.get("/{id}", response_model=MarkDetailOut)
@@ -72,8 +73,9 @@ def _build_detail(m: Trademark) -> MarkDetailOut:
 
 # ===== Procedural timeline =====
 
+
 class TimelineEvent(BaseModel):
-    kind: str         # filed | formal | exam | published | opposition | registration | renewal
+    kind: str  # filed | formal | exam | published | opposition | registration | renewal
     date: date
     label: str
     body: str
@@ -82,74 +84,106 @@ class TimelineEvent(BaseModel):
     anchor: bool = False
 
 
-@router.get("/{id}/timeline", response_model=List[TimelineEvent])
-async def get_timeline(id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> List[TimelineEvent]:
+@router.get("/{id}/timeline", response_model=list[TimelineEvent])
+async def get_timeline(id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> list[TimelineEvent]:
     m = await session.get(Trademark, id)
     if m is None:
         raise HTTPException(404, "Mark not found")
     today = DEMO_TODAY
-    events: List[TimelineEvent] = []
+    events: list[TimelineEvent] = []
 
     # Pick the most reliable "filed" date we have.
     filed = m.submission_date or (m.publication_date_441 and _months_before(m.publication_date_441, 8))
     if filed:
-        events.append(TimelineEvent(
-            kind="filed", date=filed, done=True,
-            label="Application filed",
-            body=f"Filed at NOIP · App № {m.application_number or '—'}",
-        ))
+        events.append(
+            TimelineEvent(
+                kind="filed",
+                date=filed,
+                done=True,
+                label="Application filed",
+                body=f"Filed at NOIP · App № {m.application_number or '—'}",
+            )
+        )
         # Formal exam usually ~28 days later.
         formal = filed + timedelta(days=28)
-        events.append(TimelineEvent(
-            kind="formal", date=formal, done=formal <= today,
-            label="Formal examination passed",
-            body="Compliance with form requirements verified.",
-        ))
+        events.append(
+            TimelineEvent(
+                kind="formal",
+                date=formal,
+                done=formal <= today,
+                label="Formal examination passed",
+                body="Compliance with form requirements verified.",
+            )
+        )
 
     # Substantive exam — derive only if publication exists (i.e. application made it to publication).
     pub = m.publication_date_441 or m.publication_date_450
     if pub:
         exam = _months_before(pub, 3)
-        events.append(TimelineEvent(
-            kind="exam", date=exam, done=exam <= today,
-            label="Substantive examination",
-            body="No conflict with prior registrations found at first pass.",
-        ))
-        events.append(TimelineEvent(
-            kind="published", date=pub, done=pub <= today, anchor=True,
-            label="Published in gazette",
-            body=f"Published on page {m.application_number or '—'}. Opposition window opens.",
-        ))
+        events.append(
+            TimelineEvent(
+                kind="exam",
+                date=exam,
+                done=exam <= today,
+                label="Substantive examination",
+                body="No conflict with prior registrations found at first pass.",
+            )
+        )
+        events.append(
+            TimelineEvent(
+                kind="published",
+                date=pub,
+                done=pub <= today,
+                anchor=True,
+                label="Published in gazette",
+                body=f"Published on page {m.application_number or '—'}. Opposition window opens.",
+            )
+        )
 
     if m.record_type == RecordType.A and pub:
         closes = _opp_close_date(pub)
         is_current = closes >= today
-        events.append(TimelineEvent(
-            kind="opposition", date=closes,
-            done=closes < today, current=is_current,
-            label="Opposition window closes",
-            body="5 months from publication (Vietnam Article 112).",
-        ))
-        events.append(TimelineEvent(
-            kind="registration", date=pub + timedelta(days=300),
-            done=False,
-            label="Registration certificate (expected)",
-            body="Issued ~10 months after publication, absent opposition.",
-        ))
+        events.append(
+            TimelineEvent(
+                kind="opposition",
+                date=closes,
+                done=closes < today,
+                current=is_current,
+                label="Opposition window closes",
+                body="5 months from publication (Vietnam Article 112).",
+            )
+        )
+        events.append(
+            TimelineEvent(
+                kind="registration",
+                date=pub + timedelta(days=300),
+                done=False,
+                label="Registration certificate (expected)",
+                body="Issued ~10 months after publication, absent opposition.",
+            )
+        )
     elif m.record_type != RecordType.A:
         if m.registration_date_151:
-            events.append(TimelineEvent(
-                kind="registered", date=m.registration_date_151, done=True,
-                label="Registration certificate issued",
-                body=f"Cert № {m.certificate_number or '—'}. 10-year validity.",
-            ))
+            events.append(
+                TimelineEvent(
+                    kind="registered",
+                    date=m.registration_date_151,
+                    done=True,
+                    label="Registration certificate issued",
+                    body=f"Cert № {m.certificate_number or '—'}. 10-year validity.",
+                )
+            )
         if m.expiry_date_141 or m.expiry_date_181:
             ex = m.expiry_date_141 or m.expiry_date_181  # type: ignore[assignment]
-            events.append(TimelineEvent(
-                kind="renewal", date=ex, done=ex < today,
-                label="First renewal due",
-                body="Renewable indefinitely in 10-year increments.",
-            ))
+            events.append(
+                TimelineEvent(
+                    kind="renewal",
+                    date=ex,
+                    done=ex < today,
+                    label="First renewal due",
+                    body="Renewable indefinitely in 10-year increments.",
+                )
+            )
 
     return events
 
@@ -165,44 +199,57 @@ def _months_before(d: date, months: int) -> date:
 
 # ===== Co-marks (real, same applicant) =====
 
+
 class CoMark(BaseModel):
     id: uuid.UUID
     name: str
-    year: Optional[int]
-    classes: List[str]
+    year: int | None
+    classes: list[str]
 
 
-@router.get("/{id}/co-marks", response_model=List[CoMark])
-async def co_marks(id: uuid.UUID, limit: int = 6, session: AsyncSession = Depends(get_session)) -> List[CoMark]:
+@router.get("/{id}/co-marks", response_model=list[CoMark])
+async def co_marks(
+    id: uuid.UUID, limit: int = 6, session: AsyncSession = Depends(get_session)
+) -> list[CoMark]:
     m = await session.get(Trademark, id)
     if m is None or not m.applicant_name:
         return []
-    rows = (await session.execute(
-        select(Trademark)
-        .where(Trademark.applicant_name == m.applicant_name)
-        .where(Trademark.id != m.id)
-        .order_by(desc(Trademark.publication_date_441), desc(Trademark.year), Trademark.id)
-        .limit(limit)
-    )).scalars().all()
+    rows = (
+        (
+            await session.execute(
+                select(Trademark)
+                .where(Trademark.applicant_name == m.applicant_name)
+                .where(Trademark.id != m.id)
+                .order_by(desc(Trademark.publication_date_441), desc(Trademark.year), Trademark.id)
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
     return [
         CoMark(
             id=r.id,
             name=r.mark_sample or r.application_number or r.certificate_number or "—",
             year=r.year,
             classes=r.nice_classes or [],
-        ) for r in rows
+        )
+        for r in rows
     ]
 
 
 # ===== Similar marks (mocked similarity) =====
+
 
 class SimilarMark(BaseModel):
     mark: TrademarkOut
     score: float
 
 
-@router.get("/{id}/similar", response_model=List[SimilarMark])
-async def similar_marks(id: uuid.UUID, limit: int = 4, session: AsyncSession = Depends(get_session)) -> List[SimilarMark]:
+@router.get("/{id}/similar", response_model=list[SimilarMark])
+async def similar_marks(
+    id: uuid.UUID, limit: int = 4, session: AsyncSession = Depends(get_session)
+) -> list[SimilarMark]:
     m = await session.get(Trademark, id)
     if m is None:
         return []
@@ -214,11 +261,7 @@ async def similar_marks(id: uuid.UUID, limit: int = 4, session: AsyncSession = D
         hi = m.publication_date_441 + timedelta(days=60)
         pub_range = [Trademark.publication_date_441.between(lo, hi)]
 
-    q = (
-        select(Trademark)
-        .where(Trademark.id != m.id)
-        .where(Trademark.mark_sample.is_not(None))
-    )
+    q = select(Trademark).where(Trademark.id != m.id).where(Trademark.mark_sample.is_not(None))
     if m.nice_classes:
         q = q.where(Trademark.nice_classes.op("&&")(m.nice_classes))
     if pub_range:
@@ -236,6 +279,7 @@ async def similar_marks(id: uuid.UUID, limit: int = 4, session: AsyncSession = D
 
 
 # ===== Applicant portfolio stats (mostly real) =====
+
 
 class ApplicantStats(BaseModel):
     name: str
@@ -266,10 +310,11 @@ async def applicant_stats(id: uuid.UUID, session: AsyncSession = Depends(get_ses
 
 # ===== Raw INID markers passthrough =====
 
+
 class InidMarker(BaseModel):
     code: str
     label: str
-    value: Optional[str]
+    value: str | None
 
 
 INID_LABELS = {
@@ -300,8 +345,8 @@ INID_LABELS = {
 }
 
 
-@router.get("/{id}/inid-fields", response_model=List[InidMarker])
-async def inid_fields(id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> List[InidMarker]:
+@router.get("/{id}/inid-fields", response_model=list[InidMarker])
+async def inid_fields(id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> list[InidMarker]:
     m = await session.get(Trademark, id)
     if m is None:
         raise HTTPException(404, "Mark not found")
@@ -333,8 +378,7 @@ async def inid_fields(id: uuid.UUID, session: AsyncSession = Depends(get_session
         "831": m.territory_831,
     }
     return [
-        InidMarker(code=code, label=INID_LABELS.get(code, ""), value=v)
-        for code, v in fields.items() if v
+        InidMarker(code=code, label=INID_LABELS.get(code, ""), value=v) for code, v in fields.items() if v
     ]
 
 

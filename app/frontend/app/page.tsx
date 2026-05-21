@@ -13,18 +13,30 @@ import {
   ClassChip, SimilarityRing, ProgressBar,
 } from "@/components/ui";
 import { MarkSpecimen } from "@/components/specimen";
+import { markDisplay } from "@/lib/mark-display";
 import { Icon } from "@/components/icons";
 import {
   api, type Finding, type OppositionWindow, type Watchlist,
   type TodayDigest, type PipelineStats, countryDisplay,
 } from "@/lib/api";
 
-const RECENT_SEARCHES = [
-  { id: "s-1", q: "neur*",                      scope: "Class 5,10 · VN+SG+IN",      count: 24, when: "12 min ago", icon: "🔍" },
-  { id: "s-2", q: "image: NEUREX_logo.png",     scope: "Visual sim ≥ 0.75",          count: 7,  when: "1 hr ago",   icon: "📷" },
-  { id: "s-3", q: "applicant: Masan",           scope: "All classes · Last 90 days", count: 18, when: "yesterday",  icon: "👤" },
-  { id: "s-4", q: "vex*",                       scope: "Class 5 · Worldwide",        count: 11, when: "yesterday",  icon: "🔍" },
-];
+type RecentSearch = { id: string; q: string; scope: string; when: string; icon: string };
+
+function loadRecentSearches(): RecentSearch[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = JSON.parse(localStorage.getItem("tm:recent-searches") || "[]");
+    return raw.slice(0, 6).map((r: any, i: number) => ({
+      id: `s-${i}`,
+      q: r.q,
+      scope: r.scope ?? "",
+      when: r.when ? relTime(r.when) : "",
+      icon: r.q?.startsWith("image:") ? "📷" : r.q?.startsWith("applicant:") ? "👤" : "🔍",
+    }));
+  } catch {
+    return [];
+  }
+}
 
 export default function TodayPage() {
   const router = useRouter();
@@ -33,7 +45,10 @@ export default function TodayPage() {
   const [oppositions, setOpps] = React.useState<OppositionWindow[]>([]);
   const [watchlists, setWatchlists] = React.useState<Watchlist[]>([]);
   const [pipeline, setPipeline] = React.useState<PipelineStats | null>(null);
+  const [recent, setRecent] = React.useState<RecentSearch[]>([]);
   const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => { setRecent(loadRecentSearches()); }, []);
 
   React.useEffect(() => {
     Promise.all([
@@ -70,7 +85,7 @@ export default function TodayPage() {
       <section className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 pb-6 border-b border-line">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.12em] uppercase text-mute font-mono">
-            {todayLabel} · This week's digest
+            {todayLabel} · This week&apos;s digest
           </p>
           <h1 className="head-serif mt-2 text-[30px] leading-[1.25] tracking-[-0.015em] font-semibold">
             <span className="text-stamp">
@@ -167,25 +182,28 @@ export default function TodayPage() {
 
         <Card>
           <CardHead title="Your recent activity" sub="Searches you've run. Click to re-execute against the latest gazette." />
-          <ul className="divide-y divide-line">
-            {RECENT_SEARCHES.map((s) => (
-              <li
-                key={s.id}
-                onClick={() => router.push(`/search?q=${encodeURIComponent(s.q)}`)}
-                className="px-4 py-2.5 flex items-center gap-3 hover:bg-paper-2 cursor-pointer"
-              >
-                <span className="w-7 h-7 rounded grid place-items-center bg-paper-2 text-base">{s.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="font-mono text-[13px] truncate">{s.q}</div>
-                  <div className="text-[11px] text-mute truncate">{s.scope}</div>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="text-sm font-semibold tabular">{s.count}</div>
-                  <div className="text-[11px] text-mute">{s.when}</div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {recent.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-mute">
+              No recent searches. Open <span className="font-mono">⌘K</span> to start one.
+            </p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {recent.map((s) => (
+                <li
+                  key={s.id}
+                  onClick={() => router.push(`/search?q=${encodeURIComponent(s.q)}`)}
+                  className="px-4 py-2.5 flex items-center gap-3 hover:bg-paper-2 cursor-pointer"
+                >
+                  <span className="w-7 h-7 rounded grid place-items-center bg-paper-2 text-base">{s.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-mono text-[13px] truncate">{s.q}</div>
+                    <div className="text-[11px] text-mute truncate">{s.scope}</div>
+                  </div>
+                  <div className="text-[11px] text-mute shrink-0">{s.when}</div>
+                </li>
+              ))}
+            </ul>
+          )}
           <CardFoot>
             <span>Last 7 days</span>
             <LinkButton href="/search">View all →</LinkButton>
@@ -230,8 +248,8 @@ function Kpi({ label, value, sub, tone }: { label: string; value?: number; sub: 
 function FindingRow({ f, onClick }: { f: Finding; onClick: () => void }) {
   const m = f.mark;
   const d = countryDisplay(m.applicant_country_code);
-  const markText = m.mark_sample || m.applicant_name || "—";
-  const matchedClasses = new Set(["05"]); // mocked — design highlights class 5
+  const md = markDisplay(m);
+  const matchedClasses = new Set(f.matchedClasses ?? []);
   return (
     <li>
       <button
@@ -245,15 +263,16 @@ function FindingRow({ f, onClick }: { f: Finding; onClick: () => void }) {
             info={{
               style: "wordmark-sans-bold",
               color: "ink",
-              text: trimMark(markText),
+              text: md.text,
             }}
             fallbackKey={m.id}
             size="sm"
+            placeholder={md.isPlaceholder}
           />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm">{trimMark(markText)}</span>
+            <span className="font-semibold text-sm">{md.text}</span>
             <Pill tone={m.record_type === "A" ? "A" : "B"} size="sm">
               {m.record_type === "A" ? "A" : "B"}
             </Pill>

@@ -125,9 +125,9 @@ function ImageSearchInput() {
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold">NEUREX_specimen.png</div>
         <div className="text-xs text-mute">
-          312 × 84 · pHash <span className="font-mono">9b4a3f8e</span> · OCR'd "NEUREX"
+          312 × 84 · pHash <span className="font-mono">9b4a3f8e</span> · OCR&apos;d &ldquo;NEUREX&rdquo;
         </div>
-        <div className="text-xs text-mute mt-1">Matching by: visual (pHash), OCR'd text, Vienna code inference</div>
+        <div className="text-xs text-mute mt-1">Matching by: visual (pHash), OCR&apos;d text, Vienna code inference</div>
       </div>
       <div className="flex flex-col gap-1.5 shrink-0">
         <button className="text-xs px-2.5 h-7 border border-line bg-surface rounded hover:bg-paper-2">Replace</button>

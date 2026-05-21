@@ -5,9 +5,10 @@ in side-by-side". Until a real similarity engine exists, per-channel scores
 (phonetic / visual / class-overlap) are mocked except for class overlap, which
 is real Jaccard math. Composite weights are tunable per request.
 """
+
 from __future__ import annotations
+
 import hashlib
-from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -17,17 +18,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import Trademark, get_session
 from ..schemas import TrademarkOut
 
-
-router = APIRouter(prefix="/api/compare", tags=["compare"])
+router = APIRouter(prefix="/api/v1/compare", tags=["compare"])
 
 
 DEFAULT_WEIGHTS = {"phonetic": 0.4, "visual": 0.3, "classOverlap": 0.3}
 
 
 class CompareRequest(BaseModel):
-    markIds: List[str] = Field(min_length=2, max_length=3)
-    anchorId: Optional[str] = None
-    weights: Dict[str, float] = Field(default_factory=lambda: DEFAULT_WEIGHTS.copy())
+    markIds: list[str] = Field(min_length=2, max_length=3)
+    anchorId: str | None = None
+    weights: dict[str, float] = Field(default_factory=lambda: DEFAULT_WEIGHTS.copy())
 
 
 class PairScore(BaseModel):
@@ -36,15 +36,15 @@ class PairScore(BaseModel):
     visual: float
     classOverlap: float
     composite: float
-    verdict: str       # "Likely conflict" | "Possible conflict" | "Low risk"
-    verdictTone: str   # "stamp" | "warn" | "ok"
+    verdict: str  # "Likely conflict" | "Possible conflict" | "Low risk"
+    verdictTone: str  # "stamp" | "warn" | "ok"
 
 
 class CompareResponse(BaseModel):
     anchorId: str
-    marks: List[TrademarkOut]   # in input order
-    scores: List[PairScore]     # one per non-anchor mark, in input order
-    weights: Dict[str, float]
+    marks: list[TrademarkOut]  # in input order
+    scores: list[PairScore]  # one per non-anchor mark, in input order
+    weights: dict[str, float]
 
 
 @router.post("", response_model=CompareResponse)
@@ -57,9 +57,7 @@ async def compare(body: CompareRequest, session: AsyncSession = Depends(get_sess
     total = sum(weights.values()) or 1
     weights = {k: v / total for k, v in weights.items()}
 
-    rows = (await session.execute(
-        select(Trademark).where(Trademark.id.in_(body.markIds))
-    )).scalars().all()
+    rows = (await session.execute(select(Trademark).where(Trademark.id.in_(body.markIds)))).scalars().all()
     by_id = {str(m.id): m for m in rows}
     ordered = [by_id[mid] for mid in body.markIds if mid in by_id]
     if len(ordered) < 2:
@@ -70,7 +68,7 @@ async def compare(body: CompareRequest, session: AsyncSession = Depends(get_sess
     if anchor is None:
         raise HTTPException(400, "anchorId must be one of markIds")
 
-    scores: List[PairScore] = []
+    scores: list[PairScore] = []
     for m in ordered:
         if str(m.id) == str(anchor.id):
             continue
@@ -84,7 +82,7 @@ async def compare(body: CompareRequest, session: AsyncSession = Depends(get_sess
     )
 
 
-def _score_pair(anchor: Trademark, other: Trademark, w: Dict[str, float]) -> PairScore:
+def _score_pair(anchor: Trademark, other: Trademark, w: dict[str, float]) -> PairScore:
     # Class overlap = Jaccard over the anchor's classes (asymmetric — overlap
     # of OTHER classes against the anchor's full set).
     a_classes = set(anchor.nice_classes or [])
@@ -103,11 +101,7 @@ def _score_pair(anchor: Trademark, other: Trademark, w: Dict[str, float]) -> Pai
     h = int(hashlib.md5(seed.encode()).hexdigest()[:8], 16)
     visual = round(0.5 + (h % 350) / 1000.0, 2)
 
-    composite = (
-        w["phonetic"] * phon
-        + w["visual"] * visual
-        + w["classOverlap"] * class_score
-    )
+    composite = w["phonetic"] * phon + w["visual"] * visual + w["classOverlap"] * class_score
 
     if composite >= 0.75:
         verdict, tone = "Likely conflict", "stamp"

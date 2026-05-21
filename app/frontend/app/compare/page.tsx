@@ -11,6 +11,7 @@ import {
   Card, Button, Pill, Flag, ClassChip, SimilarityRing, PulseDot, LinkButton,
 } from "@/components/ui";
 import { MarkSpecimen } from "@/components/specimen";
+import { markDisplay } from "@/lib/mark-display";
 import { Icon } from "@/components/icons";
 import {
   api, countryDisplay, NICE_LABELS,
@@ -194,7 +195,7 @@ function ComparePage() {
           <CmpHeader>Procedural state</CmpHeader>
           <CmpRow label="Filed" n={N}>
             {data.marks.map((m) => (
-              <span key={m.id} className="font-mono text-[12.5px] tabular">{fmtShort(m.publication_date_441)}</span>
+              <span key={m.id} className="font-mono text-[12.5px] tabular">{fmtShort(m.submission_date)}</span>
             ))}
           </CmpRow>
           <CmpRow label="Published" n={N}>
@@ -327,6 +328,7 @@ function ScoreInline({ value }: { value: number }) {
 }
 
 function PlateCell({ mark, anchor }: { mark: Trademark; anchor: boolean }) {
+  const md = markDisplay(mark);
   return (
     <div className={`relative rounded-lg p-3 ${anchor ? "bg-stamp-2 border border-stamp-line" : ""}`}>
       {anchor && (
@@ -335,17 +337,13 @@ function PlateCell({ mark, anchor }: { mark: Trademark; anchor: boolean }) {
         </span>
       )}
       <MarkSpecimen
-        info={
-          mark.mark_sample
-            ? { style: "wordmark-sans-bold", color: anchor ? "stamp" : "ink", text: mark.mark_sample }
-            : undefined
-        }
-        fallbackText={mark.mark_sample ?? mark.applicant_name ?? "—"}
+        info={{ style: "wordmark-sans-bold", color: anchor ? "stamp" : "ink", text: md.text }}
         fallbackKey={mark.id}
         size="lg"
+        placeholder={md.isPlaceholder}
       />
       <div className="mt-2 flex items-center gap-2">
-        <strong className="text-[13.5px] truncate">{mark.mark_sample ?? "—"}</strong>
+        <strong className="text-[13.5px] truncate">{md.text}</strong>
         <Pill tone={mark.record_type === "A" ? "A" : "B"} size="sm">{mark.record_type === "A" ? "A" : "B"}</Pill>
       </div>
       <div className="text-[11.5px] text-mute truncate" title={mark.applicant_name ?? ""}>

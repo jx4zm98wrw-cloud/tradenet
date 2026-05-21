@@ -1,22 +1,24 @@
 """Gazette routes — upload PDFs, list status."""
-from __future__ import annotations
-import hashlib
-import shutil
-import uuid
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+import hashlib
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..auth import User, require_user
 from ..db import Gazette, GazetteStatus, GazetteType, get_session
+from ..rate_limit import limiter
 from ..schemas import GazetteListOut, GazetteOut
 from ..settings import get_settings
 
+router = APIRouter(prefix="/api/v1/gazettes", tags=["gazettes"])
 
-router = APIRouter(prefix="/api/gazettes", tags=["gazettes"])
+
+def _get_upload_limit() -> str:
+    return get_settings().rate_limit_upload
 
 
 def _gazette_out(g: Gazette) -> GazetteOut:
@@ -25,7 +27,7 @@ def _gazette_out(g: Gazette) -> GazetteOut:
     real OCR pipeline lands, ~1 in 4 gazettes gets a "needs review" warning."""
     h = int(g.sha256[:8], 16) if g.sha256 else 0
     confidence = round(0.78 + (h % 220) / 1000.0, 2)  # 0.78–1.00
-    flagged = (h % 50) if confidence < 0.85 else 0    # only flag below threshold
+    flagged = (h % 50) if confidence < 0.85 else 0  # only flag below threshold
     needs_review = flagged > 0
     out = GazetteOut.model_validate(g)
     out.ocr_confidence = confidence
@@ -34,8 +36,9 @@ def _gazette_out(g: Gazette) -> GazetteOut:
     return out
 
 
-def _parse_filename_meta(filename: str) -> tuple[GazetteType, Optional[int], Optional[int]]:
+def _parse_filename_meta(filename: str) -> "tuple[GazetteType, int | None, int | None]":
     import re
+
     m = re.match(r"^([ABab])_T(\d+)_(\d{4})", filename)
     letter = filename[:1].upper() if filename else "A"
     gtype = GazetteType.B if letter == "B" else GazetteType.A
@@ -45,9 +48,12 @@ def _parse_filename_meta(filename: str) -> tuple[GazetteType, Optional[int], Opt
 
 
 @router.post("", response_model=GazetteOut, status_code=status.HTTP_201_CREATED)
+@limiter.limit(_get_upload_limit)
 async def upload_gazette(
+    request: Request,  # required for slowapi
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(require_user),
 ) -> GazetteOut:
     """Upload a PDF — stores on disk, persists a Gazette row, enqueues ingest.
 
@@ -63,23 +69,40 @@ async def upload_gazette(
 
     settings = get_settings()
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
+    max_bytes = settings.max_upload_bytes
 
-    # Stream to disk under a temp name, hashing as we go.
+    # Stream to disk under a temp name, hashing as we go. Enforce the size cap
+    # while streaming so a malicious client can't exhaust disk before we react.
     tmp_id = uuid.uuid4().hex
     tmp_path = settings.upload_dir / f"{tmp_id}.pdf.part"
     sha = hashlib.sha256()
     size = 0
+    first_chunk: bytes | None = None
     try:
         with tmp_path.open("wb") as out:
             while True:
                 chunk = await file.read(1 << 20)
                 if not chunk:
                     break
+                if first_chunk is None:
+                    first_chunk = chunk[:8]
                 sha.update(chunk)
                 size += len(chunk)
+                if size > max_bytes:
+                    tmp_path.unlink(missing_ok=True)
+                    raise HTTPException(
+                        413,
+                        f"File exceeds {max_bytes // (1024 * 1024)} MB upload limit",
+                    )
                 out.write(chunk)
     finally:
         await file.close()
+
+    # Magic-byte check — PDFs start with "%PDF-". Cheap defense vs. polyglot
+    # files dressed up with a .pdf extension.
+    if not first_chunk or not first_chunk.startswith(b"%PDF-"):
+        tmp_path.unlink(missing_ok=True)
+        raise HTTPException(400, "File does not appear to be a PDF (missing %PDF- header)")
 
     digest = sha.hexdigest()
 
@@ -105,6 +128,7 @@ async def upload_gazette(
         storage_path=str(final_path),
         size_bytes=size,
         status=GazetteStatus.uploaded,
+        uploaded_by=user.id,
     )
     session.add(g)
     await session.commit()
@@ -115,9 +139,12 @@ async def upload_gazette(
     try:
         from redis import Redis
         from rq import Queue
+
         redis = Redis.from_url(settings.redis_url)
         Queue("ingest", connection=redis).enqueue(
-            "worker.ingest.ingest_pdf", str(g.id), job_timeout=3600,
+            "worker.ingest.ingest_pdf",
+            str(g.id),
+            job_timeout=3600,
         )
     except Exception:
         # Surface in error_message but don't fail the upload.
@@ -131,9 +158,9 @@ async def upload_gazette(
 
 @router.get("", response_model=GazetteListOut)
 async def list_gazettes(
-    status_filter: Optional[GazetteStatus] = None,
-    limit: int = 50,
-    offset: int = 0,
+    status_filter: GazetteStatus | None = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> GazetteListOut:
     q = select(Gazette)

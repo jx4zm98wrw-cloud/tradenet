@@ -1,0 +1,28 @@
+# Exclude build artifacts + dev tools from the runtime image.
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Don't ship dev deps or tests
+requirements-dev.txt
+tests/
+
+# Local venvs (in case dev runs build from this dir)
+.venv/
+venv/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Local secrets — never bake into images
+.env
+.env.*
+
+# Misc
+*.md

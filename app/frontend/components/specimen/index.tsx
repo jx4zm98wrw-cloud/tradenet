@@ -76,14 +76,17 @@ type MarkSpecimenProps = {
   frame?: boolean;
   plain?: boolean;
   className?: string;
+  /** True = derived label, not the real (540) wordmark. Renders a "PLACEHOLDER"
+   * watermark and uses faded ink so the user can tell at a glance. */
+  placeholder?: boolean;
 };
 
 export function MarkSpecimen({
-  info, fallbackText, fallbackKey, size = "md", frame = true, plain = false, className = "",
+  info, fallbackText, fallbackKey, size = "md", frame = true, plain = false, className = "", placeholder = false,
 }: MarkSpecimenProps) {
   const s: SpecimenInfo = info ?? {
     style: pickSpecimenStyle(fallbackKey ?? fallbackText ?? ""),
-    color: "ink",
+    color: placeholder ? "ink" : "ink",
     text: fallbackText ?? "—",
   };
   const dims = DIMENSIONS[size];
@@ -107,7 +110,7 @@ export function MarkSpecimen({
 
   if (plain) return <div className={className}>{inner}</div>;
   return (
-    <SpecimenPlate aspect={`${dims.w}/${dims.h}`} frame={frame} className={className}>
+    <SpecimenPlate aspect={`${dims.w}/${dims.h}`} frame={frame} className={className} placeholder={placeholder}>
       {inner}
     </SpecimenPlate>
   );
@@ -180,12 +183,13 @@ function renderMonogramCircle(s: SpecimenInfo) {
 /* ---- plate frame ---- */
 
 export function SpecimenPlate({
-  children, aspect = "8/5", frame = true, className = "",
+  children, aspect = "8/5", frame = true, className = "", placeholder = false,
 }: {
   children: React.ReactNode;
   aspect?: string;
   frame?: boolean;
   className?: string;
+  placeholder?: boolean;
 }) {
   return (
     <div
@@ -200,7 +204,18 @@ export function SpecimenPlate({
           <CornerTick pos="br" />
         </>
       )}
-      {children}
+      {/* Subdue the specimen content + watermark when it's a derived placeholder. */}
+      <div className={placeholder ? "opacity-50 grid place-items-center w-full h-full" : "grid place-items-center w-full h-full"}>
+        {children}
+      </div>
+      {placeholder && (
+        <div
+          className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[8px] font-mono tracking-[0.15em] uppercase text-mute pointer-events-none"
+          aria-label="Specimen image not yet extracted"
+        >
+          no specimen on file
+        </div>
+      )}
     </div>
   );
 }

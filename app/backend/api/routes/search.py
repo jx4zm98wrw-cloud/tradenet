@@ -5,10 +5,12 @@ semantic NLP) ships, scores are derived from how strongly the text mode matches:
 exact substring → 0.95, prefix3 → 0.82, anywhere else within the result set → 0.6
 plus a deterministic per-id jitter so the column stays stable across reloads.
 """
+
 from __future__ import annotations
+
 import hashlib
 import uuid
-from typing import List, Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -19,8 +21,7 @@ from ..db import RecordType, Trademark, get_session
 from ..schemas import TrademarkOut
 from ._filters import build_trademark_where
 
-
-router = APIRouter(prefix="/api/search", tags=["search"])
+router = APIRouter(prefix="/api/v1/search", tags=["search"])
 
 SearchMode = Literal["text", "phonetic", "image", "vienna"]
 
@@ -31,7 +32,7 @@ class ScoredMark(BaseModel):
 
 
 class SearchResultsOut(BaseModel):
-    items: List[ScoredMark]
+    items: list[ScoredMark]
     total: int
     limit: int
     offset: int
@@ -42,7 +43,7 @@ def _jitter(seed: str, lo: float = -0.04, hi: float = 0.04) -> float:
     return lo + (hi - lo) * (h % 1000) / 1000.0
 
 
-def _score(mark: Trademark, q: Optional[str], mode: SearchMode) -> float:
+def _score(mark: Trademark, q: str | None, mode: SearchMode) -> float:
     """Mocked similarity score in [0, 1]. Swap this function for a real engine."""
     base = 0.6
     if mode == "image":
@@ -51,9 +52,13 @@ def _score(mark: Trademark, q: Optional[str], mode: SearchMode) -> float:
         base = 0.74
     elif q:
         ql = q.lower()
-        bag = " ".join(
-            (mark.mark_sample or ""),
-        ).lower() + " " + (mark.applicant_name or "").lower()
+        bag = (
+            " ".join(
+                (mark.mark_sample or ""),
+            ).lower()
+            + " "
+            + (mark.applicant_name or "").lower()
+        )
         if (mark.mark_sample or "").lower() == ql:
             base = 0.98
         elif ql in (mark.mark_sample or "").lower():
@@ -68,18 +73,18 @@ def _score(mark: Trademark, q: Optional[str], mode: SearchMode) -> float:
 
 @router.get("/trademarks", response_model=SearchResultsOut)
 async def search_trademarks(
-    q: Optional[str] = Query(None),
+    q: str | None = Query(None),
     mode: SearchMode = Query("text"),
     threshold: float = Query(0.4, ge=0, le=1, description="Minimum similarity"),
-    country: Optional[str] = Query(None, min_length=2, max_length=2),
-    nice_class: Optional[List[str]] = Query(None),
+    country: str | None = Query(None, min_length=2, max_length=2),
+    nice_class: list[str] | None = Query(None),
     nice_class_mode: Literal["any", "all"] = Query("any"),
-    record_type: Optional[RecordType] = None,
-    applicant_type: Optional[str] = Query(None),
-    year: Optional[int] = None,
-    month: Optional[int] = Query(None, ge=1, le=12),
-    gazette_id: Optional[uuid.UUID] = None,
-    ip_agency: Optional[str] = Query(None),
+    record_type: RecordType | None = None,
+    applicant_type: str | None = Query(None),
+    year: int | None = None,
+    month: int | None = Query(None, ge=1, le=12),
+    gazette_id: uuid.UUID | None = None,
+    ip_agency: str | None = Query(None),
     sort: Literal["similarity", "publication-desc", "applicant-asc", "class-count"] = "similarity",
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -88,10 +93,15 @@ async def search_trademarks(
     # The shared WHERE builder uses ALL-class semantics (Trademark.nice_classes.contains([nc])).
     # For ANY semantics we run a separate where with array overlap.
     where = build_trademark_where(
-        q=q, country=country,
+        q=q,
+        country=country,
         nice_class=nice_class if nice_class_mode == "all" else None,
-        record_type=record_type, applicant_type=applicant_type,
-        year=year, month=month, gazette_id=gazette_id, ip_agency=ip_agency,
+        record_type=record_type,
+        applicant_type=applicant_type,
+        year=year,
+        month=month,
+        gazette_id=gazette_id,
+        ip_agency=ip_agency,
     )
     if nice_class and nice_class_mode == "any":
         where.append(Trademark.nice_classes.op("&&")(nice_class))

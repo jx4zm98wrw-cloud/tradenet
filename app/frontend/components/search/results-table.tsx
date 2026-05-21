@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { Pill, Flag, ClassChip, SimilarityRing } from "@/components/ui";
 import { MarkSpecimen } from "@/components/specimen";
+import { markDisplay } from "@/lib/mark-display";
 import { type ScoredMark } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 
@@ -35,6 +36,7 @@ export function ResultsTable({ results, selected, onToggle, highlightClasses = n
         <tbody className="divide-y divide-line text-sm">
           {results.map(({ mark: m, score }) => {
             const isSel = selected.has(m.id);
+            const md = markDisplay(m);
             return (
               <tr key={m.id} className={`${isSel ? "bg-stamp-2" : "hover:bg-paper-2"} cursor-pointer`}>
                 <td className="px-3 py-2" onClick={(e) => { e.stopPropagation(); onToggle(m.id); }}>
@@ -52,21 +54,17 @@ export function ResultsTable({ results, selected, onToggle, highlightClasses = n
                 <td className="px-3 py-2">
                   <Link href={`/marks/${m.id}`} className="block w-[90px]">
                     <MarkSpecimen
-                      info={
-                        m.mark_sample
-                          ? { style: "wordmark-sans-bold", color: "ink", text: m.mark_sample }
-                          : undefined
-                      }
-                      fallbackText={m.mark_sample ?? m.applicant_name ?? "—"}
+                      info={{ style: "wordmark-sans-bold", color: "ink", text: md.text }}
                       fallbackKey={m.id}
                       size="sm"
                       frame={false}
+                      placeholder={md.isPlaceholder}
                     />
                   </Link>
                 </td>
                 <td className="px-3 py-2">
                   <Link href={`/marks/${m.id}`} className="block">
-                    <div className="font-medium text-[13px] truncate">{m.mark_sample ?? "—"}</div>
+                    <div className="font-medium text-[13px] truncate">{md.text}</div>
                     <div className="text-[11.5px] text-mute truncate">{m.applicant_name}</div>
                   </Link>
                 </td>

@@ -1,17 +1,20 @@
 """Alembic environment — uses the sync DB URL from Settings and reads metadata from api.db."""
+
 from __future__ import annotations
+
 import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # Make `api.*` importable when running `alembic` from app/backend.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from api.db.models import Base  # noqa: E402
-from api.settings import get_settings  # noqa: E402
+from api.db.models import Base
+from api.settings import get_settings
 
 config = context.config
 

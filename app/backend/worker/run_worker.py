@@ -1,8 +1,11 @@
 """RQ worker entry point — listens on the `ingest` queue."""
+
 from __future__ import annotations
+
 import logging
 import os
 import sys
+
 from redis import Redis
 from rq import Queue, Worker
 

@@ -1,8 +1,15 @@
-from .models import Base, Gazette, Trademark, Watchlist, GazetteStatus, RecordType, GazetteType
-from .session import engine, async_session, get_session
+from .models import Base, Gazette, GazetteStatus, GazetteType, RecordType, Trademark, Watchlist
+from .session import async_session, engine, get_session
 
 __all__ = [
-    "Base", "Gazette", "Trademark", "Watchlist",
-    "GazetteStatus", "RecordType", "GazetteType",
-    "engine", "async_session", "get_session",
+    "Base",
+    "Gazette",
+    "GazetteStatus",
+    "GazetteType",
+    "RecordType",
+    "Trademark",
+    "Watchlist",
+    "async_session",
+    "engine",
+    "get_session",
 ]

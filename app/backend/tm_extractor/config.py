@@ -1,8 +1,9 @@
 """Configuration for the trademark extractor."""
+
 from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
@@ -12,13 +13,14 @@ class ExtractorConfig:
     `data_dir` must contain `cities_by_country.json`, `company_suffixes.json`, and
     optionally `cities_overrides.json`. The other directories are created on demand.
     """
+
     data_dir: Path
     input_dir: Path
     output_dir: Path
     log_dir: Path
 
     @classmethod
-    def from_root(cls, root: Path) -> "ExtractorConfig":
+    def from_root(cls, root: Path) -> ExtractorConfig:
         """Build config from a single project root that contains all subfolders."""
         root = Path(root).resolve()
         return cls(

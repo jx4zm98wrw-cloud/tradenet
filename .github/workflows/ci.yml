@@ -1,0 +1,113 @@
+# CI — lint, test, build. No untrusted GitHub event payloads are interpolated
+# into shell commands; the workflow only uses fixed strings and env vars from
+# the job's static `env:` block + service-container outputs.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (lint + test)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tm
+          POSTGRES_PASSWORD: tm
+          POSTGRES_DB: tm
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tm -d tm"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+
+    env:
+      TM_DATABASE_URL: postgresql+asyncpg://tm:tm@localhost:5432/tm
+      TM_DATABASE_URL_SYNC: postgresql+psycopg2://tm:tm@localhost:5432/tm
+      TM_REDIS_URL: redis://localhost:6379/0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: pip install -r app/backend/requirements-dev.txt
+
+      - name: Lint
+        working-directory: app/backend
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Migrate
+        working-directory: app/backend
+        run: alembic upgrade head
+
+      - name: Test
+        working-directory: app/backend
+        run: pytest tests/ -q
+
+  frontend:
+    name: Frontend (lint + build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: app/frontend/pnpm-lock.yaml
+
+      - name: Install
+        working-directory: app/frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        working-directory: app/frontend
+        run: pnpm lint
+
+      - name: Build
+        working-directory: app/frontend
+        run: pnpm build
+
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: app/frontend/pnpm-lock.yaml
+      - name: pnpm audit
+        working-directory: app/frontend
+        run: pnpm audit --prod --audit-level=high || true
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit -r app/backend/requirements.txt --strict || true

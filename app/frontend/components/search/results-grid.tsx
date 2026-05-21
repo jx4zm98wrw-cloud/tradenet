@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { Pill, Flag, ClassChip, SimilarityRing } from "@/components/ui";
 import { MarkSpecimen } from "@/components/specimen";
+import { markDisplay } from "@/lib/mark-display";
 import { countryDisplay, type ScoredMark } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 
@@ -24,6 +25,7 @@ export function ResultsGrid({ results, selected, onToggle, highlightClasses = ne
       {results.map(({ mark: m, score }) => {
         const isSel = selected.has(m.id);
         const d = countryDisplay(m.applicant_country_code);
+        const md = markDisplay(m);
         return (
           <article
             key={m.id}
@@ -47,14 +49,10 @@ export function ResultsGrid({ results, selected, onToggle, highlightClasses = ne
               </div>
               <Link href={`/marks/${m.id}`} className="block border-b border-line">
                 <MarkSpecimen
-                  info={
-                    m.mark_sample
-                      ? { style: "wordmark-sans-bold", color: "ink", text: m.mark_sample }
-                      : undefined
-                  }
-                  fallbackText={m.mark_sample ?? m.applicant_name ?? "—"}
+                  info={{ style: "wordmark-sans-bold", color: "ink", text: md.text }}
                   fallbackKey={m.id}
                   size="md"
+                  placeholder={md.isPlaceholder}
                   className="!rounded-none !border-0"
                 />
               </Link>
@@ -62,9 +60,7 @@ export function ResultsGrid({ results, selected, onToggle, highlightClasses = ne
             <div className="p-3 flex-1 flex flex-col gap-1.5">
               <Link href={`/marks/${m.id}`} className="block">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-semibold text-[13.5px] truncate">
-                    {m.mark_sample ?? m.applicant_name ?? "—"}
-                  </span>
+                  <span className="font-semibold text-[13.5px] truncate">{md.text}</span>
                   <Pill tone={m.record_type === "A" ? "A" : "B"} size="sm">
                     {m.record_type === "A" ? "A" : "B"}
                   </Pill>

@@ -4,20 +4,21 @@ The section dict uses WIPO marker codes as keys (e.g. "(111)", "(731)") plus
 derived columns ("Applicant Name", "Total Group", "Month", etc.). This module
 normalizes those into typed columns matching the ORM model.
 """
+
 from __future__ import annotations
+
 import re
 import uuid
-from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from datetime import date
+from typing import Any
 
 from api.db.models import RecordType, Trademark
-
 
 _DATE_DMY_RE = re.compile(r"^\s*(\d{1,2})[./](\d{1,2})[./](\d{4})\s*$")
 _DATE_MDY_RE = re.compile(r"^\s*(\d{1,2})/(\d{1,2})/(\d{4})\s*$")
 
 
-def _parse_date(value: Any) -> Optional[date]:
+def _parse_date(value: Any) -> date | None:
     """Section dicts come from the post-`reformat_date` pipeline which emits MM/DD/YYYY
     for date markers. Be lenient and accept DD/MM/YYYY too just in case.
     """
@@ -42,14 +43,14 @@ def _parse_date(value: Any) -> Optional[date]:
     return None
 
 
-def _str(value: Any) -> Optional[str]:
+def _str(value: Any) -> str | None:
     if value is None:
         return None
     s = str(value)
     return s if s != "" else None
 
 
-def _country_code(value: Any) -> Optional[str]:
+def _country_code(value: Any) -> str | None:
     """Coerce the extractor's `Applicant Country Code` to an ISO-2 or NULL.
 
     The library emits the literal string `"unknown"` when no ISO code was
@@ -65,7 +66,7 @@ def _country_code(value: Any) -> Optional[str]:
     return s.upper()[:2]
 
 
-def _int(value: Any) -> Optional[int]:
+def _int(value: Any) -> int | None:
     if value is None or value == "":
         return None
     try:
@@ -74,7 +75,7 @@ def _int(value: Any) -> Optional[int]:
         return None
 
 
-def _classes_to_array(raw: Any) -> Optional[List[str]]:
+def _classes_to_array(raw: Any) -> list[str] | None:
     """Parse the (511) raw text into a Nice-class array. Handles both
     "Nhóm 35: ...; Nhóm 41: ..." and bare "05, 12, 41" forms.
     """
@@ -93,7 +94,7 @@ def _classes_to_array(raw: Any) -> Optional[List[str]]:
     return out or None
 
 
-def _vienna_to_array(raw: Any) -> Optional[List[str]]:
+def _vienna_to_array(raw: Any) -> list[str] | None:
     if not raw:
         return None
     # Vienna codes are dotted numerics separated by ; or whitespace.
@@ -104,7 +105,7 @@ def _vienna_to_array(raw: Any) -> Optional[List[str]]:
 def section_to_trademark(
     gazette_id: uuid.UUID,
     record_type: RecordType,
-    section: Dict[str, Any],
+    section: dict[str, Any],
 ) -> Trademark:
     """Build a Trademark row from a tm_extractor section dict."""
     # The section dict still uses raw "(NNN)" keys (the rename to "NNN <desc>"
@@ -156,7 +157,7 @@ def section_to_trademark(
     )
 
 
-def infer_record_type(gazette_letter: str, section: Dict[str, Any]) -> RecordType:
+def infer_record_type(gazette_letter: str, section: dict[str, Any]) -> RecordType:
     if gazette_letter == "A":
         return RecordType.A
     # B-file: split by whether (116) is non-empty.

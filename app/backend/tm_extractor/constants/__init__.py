@@ -5,9 +5,15 @@ Split across submodules to keep individual files small and reviewable:
 - countries.py      — ISO 3166-1 alpha-2 country code → name
 - classifier.py     — VN surnames + company-suffix rules for applicant classification
 """
-from .markers import MarkerConfig, MARKERS, MARKER_CODES, MARKER_DESCRIPTIONS, PATTERNS, CSV_COLUMNS
+
+from .classifier import (
+    STRONG_COMPANY_SUFFIXES,
+    TYPO_TOLERANT_COMPANY_PATTERNS,
+    VN_SURNAMES,
+    VN_SURNAMES_UPPER,
+)
 from .countries import COUNTRY_CODES
-from .classifier import VN_SURNAMES, VN_SURNAMES_UPPER, STRONG_COMPANY_SUFFIXES, TYPO_TOLERANT_COMPANY_PATTERNS
+from .markers import CSV_COLUMNS, MARKER_CODES, MARKER_DESCRIPTIONS, MARKERS, PATTERNS, MarkerConfig
 
 
 class TrademarkConstants:
@@ -16,6 +22,7 @@ class TrademarkConstants:
     (`CITIES_BY_COUNTRY`, `CITY_PATTERNS`, `COMPANY_SUFFIXES`) now live on the
     PDFProcessor instance — they need a config to know where to read from.
     """
+
     MARKERS = MARKERS
     MARKER_CODES = MARKER_CODES
     MARKER_DESCRIPTIONS = MARKER_DESCRIPTIONS

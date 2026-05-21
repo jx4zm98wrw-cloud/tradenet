@@ -1,0 +1,108 @@
+/** Picks the best visual label for a mark.
+ *
+ * Real data status (2026-05): A-file applications have NO mark_sample (we
+ * only extract WIPO field 540 from B-file registrations), and no raster
+ * specimen images exist anywhere yet. This helper returns the best available
+ * stand-in plus an `isPlaceholder` flag so the UI can render placeholders
+ * with a subdued treatment + visible "no specimen" hint, instead of pretending
+ * a squeezed applicant-name is a real wordmark.
+ *
+ * Precedence:
+ *   1. imageUrl (real raster — not yet populated; future-proof)
+ *   2. mark_sample, 2–24 chars (real wordmark, B-files)
+ *   3. derived label from applicant_name with Vietnamese / Latin company
+ *      prefixes stripped
+ *   4. application / certificate / Madrid number tail
+ *   5. literal "—"
+ */
+import type { Trademark } from "./api";
+
+/** Common entity prefixes (VN + Latin); stripped when deriving display labels. */
+const ENTITY_PREFIXES: RegExp[] = [
+  /^c[ôo]ng\s+ty\s+c[ổo]\s+ph[ầa]n\s+t[ậa]p\s+[đd]o[àa]n\s+/i,
+  /^c[ôo]ng\s+ty\s+c[ổo]\s+ph[ầa]n\s+/i,
+  /^c[ôo]ng\s+ty\s+tnhh\s+(?:m[ộo]t\s+th[àa]nh\s+vi[êe]n\s+)?/i,
+  /^c[ôo]ng\s+ty\s+h[ợo]p\s+danh\s+/i,
+  /^c[ôo]ng\s+ty\s+/i,
+  /^t[ổo]ng\s+c[ôo]ng\s+ty\s+/i,
+  /^t[ậa]p\s+[đd]o[àa]n\s+/i,
+  /^doanh\s+nghi[ệe]p\s+(?:t[ưu]\s+nh[âa]n\s+)?/i,
+  /^x[íi]\s+nghi[ệe]p\s+/i,
+  /^h[ộo]\s+kinh\s+doanh\s+/i,
+  /^cty\.?\s+/i,
+  /^dntn\s+/i,
+  // Surnames stripped only for short personal names — handled later.
+];
+
+const TRAILING_SUFFIXES: RegExp[] = [
+  /,?\s+(?:co\.|company)\s*,?\s*ltd\.?$/i,
+  /,?\s+(?:co\.|company)\s*,?\s*l\.?l\.?c\.?$/i,
+  /,?\s+(?:pte\.|pty\.|pvt\.)\s*ltd\.?$/i,
+  /,?\s+inc\.?$/i, /,?\s+incorporated$/i,
+  /,?\s+ltd\.?$/i, /,?\s+limited$/i,
+  /,?\s+corp\.?$/i, /,?\s+corporation$/i,
+  /,?\s+gmbh$/i, /,?\s+ag$/i, /,?\s+s\.?a\.?$/i, /,?\s+s\.?a\.?s\.?$/i, /,?\s+s\.?r\.?l\.?$/i,
+  /,?\s+plc$/i, /,?\s+b\.?v\.?$/i, /,?\s+oy$/i, /,?\s+aps$/i,
+];
+
+function stripEntityPrefixes(name: string): string {
+  let s = name.trim();
+  for (let i = 0; i < 3; i++) {
+    const before = s;
+    for (const re of ENTITY_PREFIXES) s = s.replace(re, "").trim();
+    for (const re of TRAILING_SUFFIXES) s = s.replace(re, "").trim();
+    if (s === before) break;
+  }
+  return s.trim();
+}
+
+/** Compact a long applicant name into a wordmark-sized label.
+ * Returns the first ≤2 significant words after stripping entity prefixes.
+ * Caps at 16 chars; falls back to first 16 chars if no clean split found. */
+function compactApplicantName(name: string): string {
+  const stripped = stripEntityPrefixes(name);
+  if (!stripped) return name.slice(0, 16);
+  // For 1–3-word names: keep as-is if ≤16 chars.
+  if (stripped.length <= 16) return stripped;
+  // Otherwise take first two words.
+  const words = stripped.split(/\s+/).slice(0, 2).join(" ");
+  return (words.length <= 16 ? words : words.slice(0, 15) + "…").trim();
+}
+
+export type MarkDisplay = {
+  /** What to render inside the specimen plate. */
+  text: string;
+  /** True when `text` is a placeholder (no real wordmark / image). */
+  isPlaceholder: boolean;
+  /** Short identifier (app/cert/madrid #) shown as a sub-label on placeholders. */
+  identifier: string | null;
+};
+
+export function markDisplay(m: Pick<Trademark, "mark_sample" | "applicant_name" | "application_number" | "certificate_number" | "madrid_number">): MarkDisplay {
+  const id =
+    m.application_number ??
+    m.certificate_number ??
+    m.madrid_number ??
+    null;
+
+  // 1. Real wordmark in field 540
+  if (m.mark_sample) {
+    const t = m.mark_sample.trim();
+    if (t.length >= 2 && t.length <= 24) {
+      return { text: t, isPlaceholder: false, identifier: id };
+    }
+  }
+
+  // 2. Derived label from applicant name
+  if (m.applicant_name) {
+    const compact = compactApplicantName(m.applicant_name);
+    if (compact && compact.length >= 2) {
+      return { text: compact, isPlaceholder: true, identifier: id };
+    }
+  }
+
+  // 3. Fall back to identifier
+  if (id) return { text: id, isPlaceholder: true, identifier: null };
+
+  return { text: "—", isPlaceholder: true, identifier: null };
+}

@@ -18,7 +18,6 @@ COUNTRY_CODES = {
     "AW": "Aruba",
     "AX": "Åland Islands",
     "AZ": "Azerbaijan",
-    
     # B
     "BA": "Bosnia and Herzegovina",
     "BB": "Barbados",
@@ -41,7 +40,6 @@ COUNTRY_CODES = {
     "BW": "Botswana",
     "BY": "Belarus",
     "BZ": "Belize",
-    
     # C
     "CA": "Canada",
     "CC": "Cocos (Keeling) Islands",
@@ -62,7 +60,6 @@ COUNTRY_CODES = {
     "CX": "Christmas Island",
     "CY": "Cyprus",
     "CZ": "Czechia",
-    
     # D
     "DE": "Germany",
     "DJ": "Djibouti",
@@ -70,7 +67,6 @@ COUNTRY_CODES = {
     "DM": "Dominica",
     "DO": "Dominican Republic",
     "DZ": "Algeria",
-    
     # E
     "EC": "Ecuador",
     "EE": "Estonia",
@@ -79,7 +75,6 @@ COUNTRY_CODES = {
     "ER": "Eritrea",
     "ES": "Spain",
     "ET": "Ethiopia",
-    
     # F
     "FI": "Finland",
     "FJ": "Fiji",
@@ -87,7 +82,6 @@ COUNTRY_CODES = {
     "FM": "Micronesia",
     "FO": "Faroe Islands",
     "FR": "France",
-    
     # G
     "GA": "Gabon",
     "GB": "United Kingdom",
@@ -108,7 +102,6 @@ COUNTRY_CODES = {
     "GU": "Guam",
     "GW": "Guinea-Bissau",
     "GY": "Guyana",
-    
     # H
     "HK": "Hong Kong",
     "HM": "Heard Island and McDonald Islands",
@@ -116,7 +109,6 @@ COUNTRY_CODES = {
     "HR": "Croatia",
     "HT": "Haiti",
     "HU": "Hungary",
-    
     # I
     "ID": "Indonesia",
     "IE": "Ireland",
@@ -128,13 +120,11 @@ COUNTRY_CODES = {
     "IR": "Iran",
     "IS": "Iceland",
     "IT": "Italy",
-    
     # J
     "JE": "Jersey",
     "JM": "Jamaica",
     "JO": "Jordan",
     "JP": "Japan",
-    
     # K
     "KE": "Kenya",
     "KG": "Kyrgyzstan",
@@ -147,7 +137,6 @@ COUNTRY_CODES = {
     "KW": "Kuwait",
     "KY": "Cayman Islands",
     "KZ": "Kazakhstan",
-    
     # L
     "LA": "Laos",
     "LB": "Lebanon",
@@ -160,7 +149,6 @@ COUNTRY_CODES = {
     "LU": "Luxembourg",
     "LV": "Latvia",
     "LY": "Libya",
-    
     # M
     "MA": "Morocco",
     "MC": "Monaco",
@@ -185,7 +173,6 @@ COUNTRY_CODES = {
     "MX": "Mexico",
     "MY": "Malaysia",
     "MZ": "Mozambique",
-    
     # N
     "NA": "Namibia",
     "NC": "New Caledonia",
@@ -199,10 +186,8 @@ COUNTRY_CODES = {
     "NR": "Nauru",
     "NU": "Niue",
     "NZ": "New Zealand",
-    
     # O
     "OM": "Oman",
-    
     # P
     "PA": "Panama",
     "PE": "Peru",
@@ -218,17 +203,14 @@ COUNTRY_CODES = {
     "PT": "Portugal",
     "PW": "Palau",
     "PY": "Paraguay",
-    
     # Q
     "QA": "Qatar",
-    
     # R
     "RE": "Réunion",
     "RO": "Romania",
     "RS": "Serbia",
     "RU": "Russia",
     "RW": "Rwanda",
-    
     # S
     "SA": "Saudi Arabia",
     "SB": "Solomon Islands",
@@ -251,7 +233,6 @@ COUNTRY_CODES = {
     "SX": "Sint Maarten (Dutch part)",
     "SY": "Syria",
     "SZ": "Eswatini",
-    
     # T
     "TC": "Turks and Caicos Islands",
     "TD": "Chad",
@@ -269,7 +250,6 @@ COUNTRY_CODES = {
     "TV": "Tuvalu",
     "TW": "Taiwan",
     "TZ": "Tanzania",
-    
     # U
     "UA": "Ukraine",
     "UG": "Uganda",
@@ -277,7 +257,6 @@ COUNTRY_CODES = {
     "US": "United States",
     "UY": "Uruguay",
     "UZ": "Uzbekistan",
-    
     # V
     "VA": "Vatican City",
     "VC": "Saint Vincent and the Grenadines",
@@ -286,20 +265,16 @@ COUNTRY_CODES = {
     "VI": "U.S. Virgin Islands",
     "VN": "Vietnam",
     "VU": "Vanuatu",
-    
     # W
     "WF": "Wallis and Futuna",
     "WS": "Samoa",
-    
     # Y
     "YE": "Yemen",
     "YT": "Mayotte",
-    
     # Z
     "ZA": "South Africa",
     "ZM": "Zambia",
     "ZW": "Zimbabwe",
-    
     # Alternative codes
-    "UK": "United Kingdom"  # Alternative to GB
+    "UK": "United Kingdom",  # Alternative to GB
 }

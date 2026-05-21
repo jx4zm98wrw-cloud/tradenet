@@ -9,6 +9,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Card, Button, LinkButton, Pill, SimilarityRing, ClassChip } from "@/components/ui";
 import { MarkSpecimen } from "@/components/specimen";
+import { markDisplay } from "@/lib/mark-display";
 import { Icon } from "@/components/icons";
 import { api, type Trademark, type Watchlist, type WatchQuery } from "@/lib/api";
 import { formatNumber, relativeTime } from "@/lib/format";
@@ -121,31 +122,30 @@ function WatchCard({ w, findings, onDelete }: { w: Watchlist; findings: Trademar
           <p className="text-[12.5px] text-mute text-center py-6 px-4">No findings yet.</p>
         ) : (
           <ul className="divide-y divide-line">
-            {findings.map((t) => (
-              <li key={t.id}>
-                <Link href={`/marks/${t.id}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-paper-2">
-                  <div className="w-14 shrink-0">
-                    <MarkSpecimen
-                      info={
-                        t.mark_sample
-                          ? { style: "wordmark-sans-bold", color: "ink", text: t.mark_sample }
-                          : undefined
-                      }
-                      fallbackText={t.mark_sample ?? t.applicant_name ?? "—"}
-                      fallbackKey={t.id}
-                      size="sm"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-semibold truncate">{t.mark_sample ?? t.applicant_name ?? "—"}</div>
-                    <div className="text-[11px] text-mute truncate">{t.applicant_name}</div>
-                  </div>
-                  <div className="flex flex-wrap gap-1 shrink-0">
-                    {(t.nice_classes ?? []).slice(0, 3).map((c) => <ClassChip key={c} n={c} />)}
-                  </div>
-                </Link>
-              </li>
-            ))}
+            {findings.map((t) => {
+              const md = markDisplay(t);
+              return (
+                <li key={t.id}>
+                  <Link href={`/marks/${t.id}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-paper-2">
+                    <div className="w-14 shrink-0">
+                      <MarkSpecimen
+                        info={{ style: "wordmark-sans-bold", color: "ink", text: md.text }}
+                        fallbackKey={t.id}
+                        size="sm"
+                        placeholder={md.isPlaceholder}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-semibold truncate">{md.text}</div>
+                      <div className="text-[11px] text-mute truncate">{t.applicant_name}</div>
+                    </div>
+                    <div className="flex flex-wrap gap-1 shrink-0">
+                      {(t.nice_classes ?? []).slice(0, 3).map((c) => <ClassChip key={c} n={c} />)}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

@@ -1,14 +1,15 @@
 """PDF ingest job — runs tm_extractor and bulk-inserts trademark rows."""
+
 from __future__ import annotations
+
 import hashlib
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional, Tuple
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from api.db.models import Gazette, GazetteStatus, GazetteType, Trademark
@@ -17,14 +18,13 @@ from tm_extractor import ExtractorConfig, PDFProcessor
 
 from .mapper import infer_record_type, section_to_trademark
 
-
 logger = logging.getLogger("worker.ingest")
 
 
 _FILENAME_RE = re.compile(r"^([ABab])_T(\d+)_(\d{4})", re.IGNORECASE)
 
 
-def parse_filename_meta(filename: str) -> Tuple[GazetteType, Optional[int], Optional[int]]:
+def parse_filename_meta(filename: str) -> tuple[GazetteType, int | None, int | None]:
     """Extract gazette_type / issue_number / issue_year from a NOIP filename.
 
     Example: "A_T3_2026.pdf" -> (GazetteType.A, 3, 2026)
@@ -107,7 +107,7 @@ def ingest_pdf(gazette_id: str) -> dict:
 
         gazette.status = GazetteStatus.completed
         gazette.row_count = row_count
-        gazette.processed_at = datetime.now(timezone.utc)
+        gazette.processed_at = datetime.now(UTC)
         gazette.error_message = None
         session.add(gazette)
         session.commit()

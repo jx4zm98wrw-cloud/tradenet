@@ -1,0 +1,53 @@
+[project]
+name = "tm-backend"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+extend-exclude = ["alembic/versions", "scripts/smoke_ingest.py"]
+
+[tool.ruff.lint]
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # isort
+  "B",    # flake8-bugbear
+  "UP",   # pyupgrade
+  "SIM",  # flake8-simplify
+  "RUF",  # ruff-specific
+]
+ignore = [
+  "E501",   # line too long — covered by formatter
+  "E701",   # multiple statements on one line — clear style preference in compact assigns
+  "B008",   # function call in default argument — FastAPI Depends pattern
+  "SIM117", # nested with-statements — clearer than combined
+  "RUF003", # ambiguous unicode in comments — false positives on em/en dashes
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tm_extractor/**" = ["E741", "RUF001", "SIM102", "F841", "RUF012"]   # legacy parser; treated as vendored
+"tm_extractor/constants/__init__.py" = ["F401"]   # barrel re-export
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+disallow_untyped_defs = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+strict_optional = true
+exclude = "(alembic/|scripts/|tm_extractor/)"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+filterwarnings = [
+  "ignore::DeprecationWarning:passlib.*",
+]

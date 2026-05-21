@@ -13,13 +13,14 @@ import {
   ClassChip, ClassChipFull, SimilarityRing, PulseDot,
 } from "@/components/ui";
 import { MarkSpecimen } from "@/components/specimen";
+import { markDisplay } from "@/lib/mark-display";
 import { Icon } from "@/components/icons";
 import { Timeline } from "@/components/detail/timeline";
 import { OppositionBox } from "@/components/detail/opposition-box";
 import {
   api, countryDisplay, NICE_LABELS,
   type ApplicantStats, type CoMark, type InidMarker, type MarkDetail,
-  type SimilarMark, type TimelineEvent,
+  type SimilarMark, type TimelineEvent, type Trademark,
 } from "@/lib/api";
 import type { PillTone } from "@/components/ui";
 import { formatDate, formatNumber } from "@/lib/format";
@@ -58,6 +59,7 @@ export default function MarkDetailPage() {
   if (!detail) return <SkeletonShell />;
 
   const m = detail.mark;
+  const md = markDisplay(m);
   const idLabel = m.application_number || m.certificate_number || m.madrid_number || "—";
   const idKind = m.application_number ? "Application №" : m.certificate_number ? "Certificate №" : "Madrid №";
   const d = countryDisplay(m.applicant_country_code);
@@ -75,34 +77,24 @@ export default function MarkDetailPage() {
               <div>
                 <div>
                   <MarkSpecimen
-                    info={
-                      m.mark_sample
-                        ? { style: "wordmark-sans-bold", color: "ink", text: m.mark_sample }
-                        : undefined
-                    }
-                    fallbackText={m.mark_sample ?? m.applicant_name ?? "—"}
+                    info={{ style: "wordmark-sans-bold", color: "ink", text: md.text }}
                     fallbackKey={m.id}
                     size="lg"
+                    placeholder={md.isPlaceholder}
                   />
-                  <div className="mt-2 flex items-center justify-between text-[10.5px] font-mono tracking-[0.06em] uppercase text-mute">
-                    <span>WIPO INID code 540 · Reproduction of the mark</span>
-                    <span>pHash <span className="text-ink-2">9b4a3f8e</span></span>
+                  <div className="mt-2 text-[10.5px] font-mono tracking-[0.06em] uppercase text-mute">
+                    {md.isPlaceholder
+                      ? "Placeholder · WIPO field 540 not extracted"
+                      : "WIPO INID code 540 · Reproduction of the mark"}
                   </div>
                 </div>
-                <div className="mt-5 space-y-1">
-                  <ClaimRow label="Type of mark">Figurative wordmark</ClaimRow>
-                  <ClaimRow label="Color claim">Black on white · No color claimed</ClaimRow>
-                  <ClaimRow label="Transliteration">{m.mark_sample ?? "—"}</ClaimRow>
-                  <ClaimRow label="Disclaimer">
-                    No exclusive right is claimed in any descriptive portion apart from the mark as a whole.
-                  </ClaimRow>
-                </div>
+                <Claims mark={m} />
               </div>
 
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <h1 className="head-serif text-[26px] font-semibold tracking-tight leading-tight">
-                    {m.mark_sample ?? m.applicant_name ?? "—"}
+                    {md.text}
                   </h1>
                 </div>
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -134,9 +126,16 @@ export default function MarkDetailPage() {
                   {m.certificate_number && m.application_number && (
                     <KV label="Certificate №"><span className="font-mono">{m.certificate_number}</span></KV>
                   )}
+                  {m.submission_date && <KV label="Filed">{formatDate(m.submission_date)}</KV>}
                   <KV label="Published">{formatDate(m.publication_date_441 ?? m.publication_date_450)}</KV>
                   {m.registration_date_151 && <KV label="Registered">{formatDate(m.registration_date_151)}</KV>}
-                  <KV label="IP agent">{m.ip_agency ?? "—"}</KV>
+                  {(m.expiry_date_141 || m.expiry_date_181) && (
+                    <KV label="Expires">{formatDate(m.expiry_date_141 ?? m.expiry_date_181)}</KV>
+                  )}
+                  {(m.validity_171 || m.validity_176) && (
+                    <KV label="Validity">{m.validity_171 ?? m.validity_176}</KV>
+                  )}
+                  {m.ip_agency && <KV label="IP agent">{m.ip_agency}</KV>}
                 </dl>
 
                 <OppositionBox detail={detail} />
@@ -198,6 +197,7 @@ export default function MarkDetailPage() {
               >
                 {similar.map((s) => {
                   const anchorClasses = new Set(m.nice_classes ?? []);
+                  const smd = markDisplay(s.mark);
                   return (
                     <Link
                       key={s.mark.id}
@@ -206,18 +206,14 @@ export default function MarkDetailPage() {
                     >
                       <div className="w-20 shrink-0">
                         <MarkSpecimen
-                          info={
-                            s.mark.mark_sample
-                              ? { style: "wordmark-sans-bold", color: "ink", text: s.mark.mark_sample }
-                              : undefined
-                          }
-                          fallbackText={s.mark.mark_sample ?? s.mark.applicant_name ?? "—"}
+                          info={{ style: "wordmark-sans-bold", color: "ink", text: smd.text }}
                           fallbackKey={s.mark.id}
                           size="sm"
+                          placeholder={smd.isPlaceholder}
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-[13px] truncate">{s.mark.mark_sample ?? "—"}</div>
+                        <div className="font-semibold text-[13px] truncate">{smd.text}</div>
                         <div className="text-[11px] text-mute truncate">{s.mark.applicant_name}</div>
                         <div className="mt-1 flex items-center gap-1 flex-wrap">
                           <Flag code={s.mark.applicant_country_code ?? undefined} size={11} />
@@ -351,6 +347,26 @@ function Breadcrumb({ mark, onBack }: { mark: any; onBack: () => void }) {
         <Button variant="tiny">Tag</Button>
         {mark.record_type === "A" && <Button variant="tiny-primary">File opposition</Button>}
       </div>
+    </div>
+  );
+}
+
+function Claims({ mark: m }: { mark: Trademark }) {
+  // Only render rows where the gazette explicitly carried the data — no demo fillers.
+  const rows: { label: string; value: React.ReactNode }[] = [];
+  if (m.mark_status) rows.push({ label: "Status (551)", value: m.mark_status });
+  if (m.protected_colors) rows.push({ label: "Color claim (591)", value: m.protected_colors });
+  if (m.applicant_type) rows.push({ label: "Applicant type", value: m.applicant_type });
+  if (rows.length === 0) {
+    return (
+      <p className="mt-5 text-[12px] text-mute italic">
+        No claim text on file. Additional INID markers in the sidebar below.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-5 space-y-1">
+      {rows.map((r) => <ClaimRow key={r.label} label={r.label}>{r.value}</ClaimRow>)}
     </div>
   );
 }

@@ -5,11 +5,12 @@ only difference is that a facet endpoint excludes its own column from the
 filter set so users can see "if I switched/added this value, how many?" rather
 than seeing every alternative grayed out to zero.
 """
+
 from __future__ import annotations
-from typing import List, Optional
+
 from uuid import UUID
 
-from sqlalchemy import or_, func
+from sqlalchemy import func, or_
 from sqlalchemy.sql.elements import ColumnElement
 
 from ..db import RecordType, Trademark
@@ -17,23 +18,23 @@ from ..db import RecordType, Trademark
 
 def build_trademark_where(
     *,
-    q: Optional[str] = None,
-    country: Optional[str] = None,
-    nice_class: Optional[List[str]] = None,
-    record_type: Optional[RecordType] = None,
-    applicant_type: Optional[str] = None,
-    year: Optional[int] = None,
-    month: Optional[int] = None,
-    gazette_id: Optional[UUID] = None,
-    ip_agency: Optional[str] = None,
-    exclude: Optional[str] = None,
-) -> List[ColumnElement]:
+    q: str | None = None,
+    country: str | None = None,
+    nice_class: list[str] | None = None,
+    record_type: RecordType | None = None,
+    applicant_type: str | None = None,
+    year: int | None = None,
+    month: int | None = None,
+    gazette_id: UUID | None = None,
+    ip_agency: str | None = None,
+    exclude: str | None = None,
+) -> list[ColumnElement]:
     """Return a list of SQLAlchemy WHERE expressions for the given filters.
 
     Pass `exclude="<field>"` to skip one filter — used by facet endpoints so a
     selected value doesn't suppress its own facet's other options.
     """
-    where: List[ColumnElement] = []
+    where: list[ColumnElement] = []
     if q and exclude != "q":
         like = f"%{q.lower()}%"
         where.append(

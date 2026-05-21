@@ -7,6 +7,7 @@ Usage:
     processor = PDFProcessor(cfg)
     processor.process_file(Path("input/A_T1.pdf"))
 """
+
 from .config import ExtractorConfig
 from .constants import TrademarkConstants
 from .processor import PDFProcessor
