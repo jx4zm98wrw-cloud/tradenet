@@ -132,11 +132,17 @@ def _run_image_extraction(
 def _resolve_logo_path(
     section: dict, image_subdir_rel: str, image_root: Path
 ) -> str | None:
-    """Look up the extracted PNG for this section. Prefers (210), falls back to
-    (116) for Madrid entries. Returns the path relative to image_root (which
-    is mounted at /static/image/), or None if no logo file exists.
+    """Look up the extracted PNG for this section. Tries (210) (A-file
+    applications), (111) (B-file domestic VN registrations), and (116)
+    (B-file Madrid international registrations) in that order. Returns the
+    path relative to image_root (which is mounted at /static/image/), or
+    None if no logo file exists.
+
+    The standalone extractor names PNGs after whichever section-start
+    marker it found first; for B-files that's `(111)` or `(116)`, not
+    `(210)`, so omitting `(111)` here drops every domestic-only B row.
     """
-    for marker in ("(210)", "(116)"):
+    for marker in ("(210)", "(111)", "(116)"):
         v = section.get(marker)
         if not v:
             continue

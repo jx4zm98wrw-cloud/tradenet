@@ -29,9 +29,22 @@ from api.db.models import Gazette, Trademark
 from api.settings import get_settings
 
 
-def _resolve(image_root: Path, year: int, stem: str, application_no: str | None, madrid_no: str | None) -> str | None:
-    """Mirror of worker.ingest._resolve_logo_path, against DB columns."""
-    for ident in (application_no, madrid_no):
+def _resolve(
+    image_root: Path,
+    year: int,
+    stem: str,
+    application_no: str | None,
+    certificate_no: str | None,
+    madrid_no: str | None,
+) -> str | None:
+    """Mirror of worker.ingest._resolve_logo_path, against DB columns.
+
+    Tries (210) → (111) → (116). The standalone extractor names B-file PNGs
+    after whichever section-start marker it found first — `(111)` for domestic
+    VN registrations or `(116)` for Madrid — not `(210)`, so the resolver must
+    check (111) too.
+    """
+    for ident in (application_no, certificate_no, madrid_no):
         if not ident:
             continue
         ident = ident.strip()
@@ -74,7 +87,14 @@ def backfill(dry_run: bool, gazette_filename: str | None) -> None:
             updates = 0
             misses = 0
             for tm in rows:
-                rel = _resolve(image_root, year, stem, tm.application_number, tm.madrid_number)
+                rel = _resolve(
+                    image_root,
+                    year,
+                    stem,
+                    tm.application_number,
+                    tm.certificate_number,
+                    tm.madrid_number,
+                )
                 if rel is None:
                     misses += 1
                     continue
