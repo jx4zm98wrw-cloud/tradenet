@@ -54,7 +54,7 @@ export function ResultsTable({ results, selected, onToggle, highlightClasses = n
                 <td className="px-3 py-2">
                   <Link href={`/marks/${m.id}`} className="block w-[90px]">
                     <MarkSpecimen
-                      info={{ style: "wordmark-sans-bold", color: "ink", text: md.text }}
+                      info={{ style: "wordmark-sans-bold", color: "ink", text: md.text, imageUrl: md.imageUrl }}
                       fallbackKey={m.id}
                       size="sm"
                       frame={false}

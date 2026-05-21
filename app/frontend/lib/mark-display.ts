@@ -76,14 +76,25 @@ export type MarkDisplay = {
   isPlaceholder: boolean;
   /** Short identifier (app/cert/madrid #) shown as a sub-label on placeholders. */
   identifier: string | null;
+  /** URL of the extracted logo PNG when one is on file. Undefined otherwise,
+   * which signals the caller to fall back to the typographic specimen. */
+  imageUrl?: string;
 };
 
-export function markDisplay(m: Pick<Trademark, "mark_sample" | "applicant_name" | "application_number" | "certificate_number" | "madrid_number">): MarkDisplay {
+export function markDisplay(m: Pick<Trademark, "mark_sample" | "applicant_name" | "application_number" | "certificate_number" | "madrid_number" | "logo_path">): MarkDisplay {
   const id =
     m.application_number ??
     m.certificate_number ??
     m.madrid_number ??
     null;
+
+  // 0. Real raster logo extracted from the PDF — highest priority. Once present,
+  // it's a real specimen so isPlaceholder=false regardless of mark_sample.
+  if (m.logo_path) {
+    const url = `/static/image/${m.logo_path}`;
+    const label = m.mark_sample?.trim() || id || "";
+    return { text: label, isPlaceholder: false, identifier: id, imageUrl: url };
+  }
 
   // 1. Real wordmark in field 540
   if (m.mark_sample) {

@@ -77,7 +77,7 @@ export default function MarkDetailPage() {
               <div>
                 <div>
                   <MarkSpecimen
-                    info={{ style: "wordmark-sans-bold", color: "ink", text: md.text }}
+                    info={{ style: "wordmark-sans-bold", color: "ink", text: md.text, imageUrl: md.imageUrl }}
                     fallbackKey={m.id}
                     size="lg"
                     placeholder={md.isPlaceholder}
@@ -206,7 +206,7 @@ export default function MarkDetailPage() {
                     >
                       <div className="w-20 shrink-0">
                         <MarkSpecimen
-                          info={{ style: "wordmark-sans-bold", color: "ink", text: smd.text }}
+                          info={{ style: "wordmark-sans-bold", color: "ink", text: smd.text, imageUrl: smd.imageUrl }}
                           fallbackKey={s.mark.id}
                           size="sm"
                           placeholder={smd.isPlaceholder}

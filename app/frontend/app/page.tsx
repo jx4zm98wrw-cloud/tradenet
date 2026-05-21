@@ -264,6 +264,7 @@ function FindingRow({ f, onClick }: { f: Finding; onClick: () => void }) {
               style: "wordmark-sans-bold",
               color: "ink",
               text: md.text,
+              imageUrl: md.imageUrl,
             }}
             fallbackKey={m.id}
             size="sm"

@@ -49,7 +49,7 @@ export function ResultsGrid({ results, selected, onToggle, highlightClasses = ne
               </div>
               <Link href={`/marks/${m.id}`} className="block border-b border-line">
                 <MarkSpecimen
-                  info={{ style: "wordmark-sans-bold", color: "ink", text: md.text }}
+                  info={{ style: "wordmark-sans-bold", color: "ink", text: md.text, imageUrl: md.imageUrl }}
                   fallbackKey={m.id}
                   size="md"
                   placeholder={md.isPlaceholder}

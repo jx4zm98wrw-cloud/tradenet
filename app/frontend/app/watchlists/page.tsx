@@ -129,7 +129,7 @@ function WatchCard({ w, findings, onDelete }: { w: Watchlist; findings: Trademar
                   <Link href={`/marks/${t.id}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-paper-2">
                     <div className="w-14 shrink-0">
                       <MarkSpecimen
-                        info={{ style: "wordmark-sans-bold", color: "ink", text: md.text }}
+                        info={{ style: "wordmark-sans-bold", color: "ink", text: md.text, imageUrl: md.imageUrl }}
                         fallbackKey={t.id}
                         size="sm"
                         placeholder={md.isPlaceholder}
