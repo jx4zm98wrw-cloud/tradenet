@@ -1,10 +1,11 @@
 """Smoke test: insert a Gazette + run ingest synchronously on a chosen PDF.
 
+Requires the backend to be installed editable (`cd app/backend && pip install -e .`).
+
 Usage:
-    cd app/backend
     TM_DATABASE_URL_SYNC=postgresql+psycopg2://tm:tm@localhost:5435/tm \\
     TM_DATABASE_URL=postgresql+asyncpg://tm:tm@localhost:5435/tm \\
-    python scripts/smoke_ingest.py /abs/path/to/A_T2_2026.pdf
+    python -m scripts.smoke_ingest /abs/path/to/A_T2_2026.pdf
 """
 from __future__ import annotations
 import sys

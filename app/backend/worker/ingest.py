@@ -71,6 +71,10 @@ def _run_image_extraction(
         )
         return None
 
+    # Sole sys.path mutation in the backend — `Final_TRADEMARK_image_extractor_refine.py`
+    # lives at the project root, outside the installable `tm-backend` package, so it can't
+    # be reached by ordinary imports. Moving the extractor into the package would unify
+    # this; left as a deliberate exception per the integration commit.
     project_root = str(data_dir)
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
