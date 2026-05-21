@@ -6,6 +6,11 @@ csv/
 # Sidecar overflow dumps from the extractor
 *_511_overflow.txt
 
+# Image extractor outputs (regenerable, multi-GB)
+image/
+image_link/
+modified/
+
 # Python
 __pycache__/
 *.pyc

@@ -1,0 +1,22 @@
+base_directory: .
+
+max_workers: 1
+
+image_settings:
+  format: PNG
+  preserve_quality: true
+
+clustering:
+  enabled: true
+  cluster_threshold: 80
+  combine_threshold: 80
+
+pdf_types:
+  A:
+    identifier: A_
+    text_pattern: '\(210\)\s*([0-9][0-9A-Za-z\-]+)'
+    image_name_pattern: '\(210\)\s*([0-9][0-9A-Za-z\-]+)'
+  B:
+    identifier: B_
+    text_pattern: '\((?:210|116|111)\)\s*([0-9A-Za-z\-]+)'
+    image_name_pattern: '\((?:210|116|111)\)\s*([0-9A-Za-z\-]+)'
