@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+import string
 import sys
 import uuid
 from datetime import UTC, datetime
@@ -149,9 +150,14 @@ def _resolve_logo_path(
         ident = str(v).strip()
         if not ident:
             continue
-        rel = f"{image_subdir_rel}/{ident}.png"
-        if (image_root / rel).is_file():
-            return rel
+        # Exact match first; fall back to letter-suffix variants. WIPO Madrid
+        # modifications/renewals are published with suffixes A-Z on the base
+        # registration number (e.g. 0181946A.png for registration 0181946 —
+        # same legal mark, more recent specimen).
+        for suf in ("",) + tuple(string.ascii_uppercase):
+            rel = f"{image_subdir_rel}/{ident}{suf}.png"
+            if (image_root / rel).is_file():
+                return rel
     return None
 
 

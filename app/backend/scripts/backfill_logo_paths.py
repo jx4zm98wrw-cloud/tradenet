@@ -18,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import string
 import sys
 from collections import Counter
 from pathlib import Path
@@ -50,9 +51,12 @@ def _resolve(
         ident = ident.strip()
         if not ident:
             continue
-        rel = f"{year}/{stem}/{ident}.png"
-        if (image_root / rel).is_file():
-            return rel
+        # Exact match first; fall back to letter-suffix variants (WIPO Madrid
+        # modifications/renewals: 0181946 → 0181946A.png).
+        for suf in ("",) + tuple(string.ascii_uppercase):
+            rel = f"{year}/{stem}/{ident}{suf}.png"
+            if (image_root / rel).is_file():
+                return rel
     return None
 
 
