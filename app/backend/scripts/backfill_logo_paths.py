@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import re
 import string
 import sys
 from collections import Counter
@@ -29,6 +30,11 @@ from sqlalchemy.orm import sessionmaker
 
 from api.db.models import Gazette, Trademark
 from api.settings import get_settings
+
+# Allowlist matches worker.ingest._ID_SAFE_RE. Stops a crafted PDF whose
+# extracted (210)/(111)/(116) leaked path-traversal characters into the
+# DB from poisoning the backfill's filesystem lookups.
+_ID_SAFE_RE = re.compile(r"^[A-Za-z0-9\-]+$")
 
 
 def _resolve(
@@ -41,23 +47,29 @@ def _resolve(
 ) -> str | None:
     """Mirror of worker.ingest._resolve_logo_path, against DB columns.
 
-    Tries (210) → (111) → (116). The standalone extractor names B-file PNGs
-    after whichever section-start marker it found first — `(111)` for domestic
-    VN registrations or `(116)` for Madrid — not `(210)`, so the resolver must
-    check (111) too.
+    Tries (210) → (111) → (116). Suffix-variant fallback is restricted to
+    `madrid_no` (matches the WIPO Madrid convention; A/B/C/D suffixes on a
+    base registration denote modifications, not unrelated marks).
     """
-    for ident in (application_no, certificate_no, madrid_no):
-        if not ident:
+    candidates = (
+        (application_no, False),
+        (certificate_no, False),
+        (madrid_no, True),  # try A-Z suffix variants
+    )
+    for raw, try_suffix in candidates:
+        if not raw:
             continue
-        ident = ident.strip()
-        if not ident:
+        ident = raw.strip()
+        if not ident or not _ID_SAFE_RE.match(ident):
             continue
-        # Exact match first; fall back to letter-suffix variants (WIPO Madrid
-        # modifications/renewals: 0181946 → 0181946A.png).
-        for suf in ("", *string.ascii_uppercase):
-            rel = f"{year}/{stem}/{ident}{suf}.png"
-            if (image_root / rel).is_file():
-                return rel
+        rel = f"{year}/{stem}/{ident}.png"
+        if (image_root / rel).is_file():
+            return rel
+        if try_suffix:
+            for suf in string.ascii_uppercase:
+                rel = f"{year}/{stem}/{ident}{suf}.png"
+                if (image_root / rel).is_file():
+                    return rel
     return None
 
 
