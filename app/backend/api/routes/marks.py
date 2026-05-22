@@ -38,6 +38,12 @@ class MarkDetailOut(BaseModel):
     oppositionOpen: bool
     statusLabel: str  # "Examination pending" | "Active registration" | "Lapsed" | "Pending publication"
     statusTone: str  # "warn" | "ok" | "mute"
+    # Goods-and-services text extracted from the (511) field. Kept off the
+    # base TrademarkOut so it doesn't bloat list/search responses — average
+    # 371 bytes / max 107 KB per row. Only the single-mark detail endpoint
+    # surfaces it. Empty for Madrid rows where the gazette only printed a
+    # bare class-number list.
+    raw_511_text: str | None = None
 
 
 @router.get("/{id}", response_model=MarkDetailOut)
@@ -68,6 +74,7 @@ def _build_detail(m: Trademark) -> MarkDetailOut:
         oppositionOpen=opp_open,
         statusLabel=status_label,
         statusTone=status_tone,
+        raw_511_text=m.raw_511_text,
     )
 
 
@@ -92,7 +99,10 @@ async def get_timeline(id: uuid.UUID, session: AsyncSession = Depends(get_sessio
     today = DEMO_TODAY
     events: list[TimelineEvent] = []
 
-    # Pick the most reliable "filed" date we have.
+    # Pick the most reliable "filed" date we have. submission_date is real
+    # (from the gazette's (220) field); the publication-derived fallback is a
+    # synthetic estimate used only when (220) is absent.
+    filed_observed = m.submission_date is not None
     filed = m.submission_date or (m.publication_date_441 and _months_before(m.publication_date_441, 8))
     if filed:
         events.append(
@@ -101,18 +111,24 @@ async def get_timeline(id: uuid.UUID, session: AsyncSession = Depends(get_sessio
                 date=filed,
                 done=True,
                 label="Application filed",
-                body=f"Filed at NOIP · App № {m.application_number or '—'}",
+                body=(
+                    f"Filed at NOIP · App № {m.application_number or '—'}"
+                    if filed_observed
+                    else "Filing date estimated from publication (8 months prior)."
+                ),
             )
         )
-        # Formal exam usually ~28 days later.
+        # Formal exam usually ~28 days later. We don't observe the formal-exam
+        # event directly; the timeline shows it for context. The successful
+        # outcome is implied only when later publication is recorded.
         formal = filed + timedelta(days=28)
         events.append(
             TimelineEvent(
                 kind="formal",
                 date=formal,
                 done=formal <= today,
-                label="Formal examination passed",
-                body="Compliance with form requirements verified.",
+                label="Formal examination",
+                body="Date estimated (~28 days after filing, Vietnam standard). Outcome not in gazette.",
             )
         )
 
@@ -126,8 +142,16 @@ async def get_timeline(id: uuid.UUID, session: AsyncSession = Depends(get_sessio
                 date=exam,
                 done=exam <= today,
                 label="Substantive examination",
-                body="No conflict with prior registrations found at first pass.",
+                body="Date estimated (~3 months before publication). Successful outcome implied by publication.",
             )
+        )
+        # The "Opposition window opens" copy is only meaningful for A-file
+        # applications. B-file (registration / Madrid) publications don't
+        # open an opposition window in the same sense.
+        pub_body = (
+            f"Published in gazette · App № {m.application_number or '—'}. Opposition window opens."
+            if m.record_type == RecordType.A
+            else "Published in gazette."
         )
         events.append(
             TimelineEvent(
@@ -136,7 +160,7 @@ async def get_timeline(id: uuid.UUID, session: AsyncSession = Depends(get_sessio
                 done=pub <= today,
                 anchor=True,
                 label="Published in gazette",
-                body=f"Published on page {m.application_number or '—'}. Opposition window opens.",
+                body=pub_body,
             )
         )
 
@@ -159,7 +183,7 @@ async def get_timeline(id: uuid.UUID, session: AsyncSession = Depends(get_sessio
                 date=pub + timedelta(days=300),
                 done=False,
                 label="Registration certificate (expected)",
-                body="Issued ~10 months after publication, absent opposition.",
+                body="Estimated ~10 months after publication if no opposition is filed.",
             )
         )
     elif m.record_type != RecordType.A:

@@ -187,6 +187,10 @@ export type MarkDetail = {
   oppositionOpen: boolean;
   statusLabel: string;
   statusTone: "warn" | "ok" | "mute";
+  // (511) goods-and-services text from the gazette. "Nhóm N: …" per-class
+  // format for VN A-files + B-domestic; bare class list ("05, 12.") for
+  // Madrid B. Empty when the row was published without a (511) value.
+  raw_511_text: string | null;
 };
 
 export type TimelineEvent = {

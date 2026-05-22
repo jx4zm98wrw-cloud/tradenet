@@ -22,17 +22,20 @@ def _get_upload_limit() -> str:
 
 
 def _gazette_out(g: Gazette) -> GazetteOut:
-    """GazetteOut with mocked OCR metrics. Deterministic per sha256 so a
-    given gazette consistently flags or doesn't across reloads. Until the
-    real OCR pipeline lands, ~1 in 4 gazettes gets a "needs review" warning."""
-    h = int(g.sha256[:8], 16) if g.sha256 else 0
-    confidence = round(0.78 + (h % 220) / 1000.0, 2)  # 0.78–1.00
-    flagged = (h % 50) if confidence < 0.85 else 0  # only flag below threshold
-    needs_review = flagged > 0
+    """GazetteOut. The OCR metrics (`ocr_confidence`, `flagged_row_count`,
+    `needs_review`) are left at their schema defaults (None / None / False)
+    until a real OCR pipeline lands and the worker populates them per row.
+
+    The previous implementation derived md5-based pseudo-random values from
+    the gazette's sha256, which the admin UI then rendered as
+    `OCR confidence 0.83 — N rows flagged for review`. A reviewer would
+    treat that as actionable QA data — but the numbers were fabricated.
+    Showing nothing is more honest than showing a fake number.
+    """
     out = GazetteOut.model_validate(g)
-    out.ocr_confidence = confidence
-    out.flagged_row_count = flagged
-    out.needs_review = needs_review
+    out.ocr_confidence = None
+    out.flagged_row_count = None
+    out.needs_review = False
     return out
 
 
