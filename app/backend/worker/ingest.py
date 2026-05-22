@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
+import string
+import sys
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -52,6 +54,109 @@ def _sync_session() -> Session:
     return sessionmaker(bind=engine, expire_on_commit=False, future=True)()
 
 
+def _run_image_extraction(
+    pdf_path: Path,
+    output_stem: str,
+    year: int | None,
+    gazette_type: GazetteType,
+    data_dir: Path,
+) -> Path | None:
+    """Best-effort logo extraction. Returns the absolute path of the per-PDF
+    image directory on success, None on failure. Failures are logged at WARNING
+    level so they don't fail the surrounding CSV ingest — rows still land in
+    the DB with logo_path=NULL.
+    """
+    if year is None:
+        logger.warning("Gazette has no issue_year; skipping image extraction for %s", pdf_path.name)
+        return None
+
+    # Sole sys.path mutation in the backend — `Final_TRADEMARK_image_extractor_refine.py`
+    # lives at the project root, outside the installable `tm-backend` package, so it can't
+    # be reached by ordinary imports. Moving the extractor into the package would unify
+    # this; left as a deliberate exception per the integration commit.
+    project_root = str(data_dir)
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
+    try:
+        import yaml  # noqa: I001 — yaml import is conditional on extractor being available
+
+        from Final_TRADEMARK_image_extractor_refine import (
+            PDFProcessor as ImageExtractor,
+            ProcessingPaths as ImagePaths,
+        )
+    except Exception as e:
+        logger.warning("Image extractor not importable from %s: %s", project_root, e)
+        return None
+
+    cfg_path = data_dir / "config_image_extractor.yaml"
+    if not cfg_path.exists():
+        logger.warning("Missing %s; skipping image extraction", cfg_path)
+        return None
+    with cfg_path.open() as f:
+        image_cfg = yaml.safe_load(f) or {}
+
+    year_str = str(year)
+    image_dir = data_dir / "image" / year_str / output_stem
+    modified_dir = data_dir / "modified" / year_str / output_stem
+    image_link_dir = data_dir / "image_link" / year_str
+    for d in (image_dir, modified_dir, image_link_dir):
+        d.mkdir(parents=True, exist_ok=True)
+
+    # ProcessingPaths wants the working_dir + per-type roots; we bypass its
+    # single-PDF wrapper to keep control over output directory names (which
+    # would otherwise be derived from the digest-prefixed storage filename).
+    image_paths = ImagePaths(
+        working_dir=data_dir,
+        input_dir=pdf_path.parent,
+        image_dir=data_dir / "image" / year_str,
+        modified_dir=data_dir / "modified" / year_str,
+        image_link_dir=image_link_dir,
+    )
+    extractor = ImageExtractor(image_paths, image_cfg, processing_mode="auto")
+    pdf_type = "B" if gazette_type == GazetteType.B else "A"
+
+    try:
+        modified_pdf = extractor._modify_pdf(pdf_path, modified_dir, pdf_type)
+        extractor._extract_images(modified_pdf, image_dir, pdf_type)
+        extractor._create_image_link_csv(output_stem, image_dir, image_link_dir, year_folder=None)
+    except Exception as e:
+        logger.warning("Image extraction failed for %s: %s", pdf_path.name, e)
+        return None
+
+    logger.info("Image extraction completed for %s (%s)", pdf_path.name, image_dir)
+    return image_dir
+
+
+def _resolve_logo_path(section: dict, image_subdir_rel: str, image_root: Path) -> str | None:
+    """Look up the extracted PNG for this section. Tries (210) (A-file
+    applications), (111) (B-file domestic VN registrations), and (116)
+    (B-file Madrid international registrations) in that order. Returns the
+    path relative to image_root (which is mounted at /static/image/), or
+    None if no logo file exists.
+
+    The standalone extractor names PNGs after whichever section-start
+    marker it found first; for B-files that's `(111)` or `(116)`, not
+    `(210)`, so omitting `(111)` here drops every domestic-only B row.
+    """
+    for marker in ("(210)", "(111)", "(116)"):
+        v = section.get(marker)
+        if not v:
+            continue
+        ident = str(v).strip()
+        if not ident:
+            continue
+        # Exact match first; fall back to letter-suffix variants. WIPO Madrid
+        # modifications/renewals are published with suffixes A-Z on the base
+        # registration number (e.g. 0181946A.png for registration 0181946 —
+        # same legal mark, more recent specimen).
+        for suf in ("", *string.ascii_uppercase):
+            rel = f"{image_subdir_rel}/{ident}{suf}.png"
+            if (image_root / rel).is_file():
+                return rel
+    return None
+
+
 def ingest_pdf(gazette_id: str) -> dict:
     """Run extraction for an existing `gazettes` row and write `trademarks` rows.
 
@@ -87,6 +192,22 @@ def ingest_pdf(gazette_id: str) -> dict:
         processor = PDFProcessor(cfg)
 
         letter = "B" if gazette.gazette_type == GazetteType.B else "A"
+
+        # Image extraction — best-effort, runs before the CSV loop so logos
+        # are on disk when the mapper looks them up per-section. The output
+        # subdir uses the original (un-digested) filename stem so it stays
+        # human-readable and stable across re-ingests of the same PDF.
+        output_stem = Path(gazette.filename).stem
+        _run_image_extraction(
+            pdf_path=pdf_path,
+            output_stem=output_stem,
+            year=gazette.issue_year,
+            gazette_type=gazette.gazette_type,
+            data_dir=settings.data_dir,
+        )
+        image_root = settings.data_dir / "image"
+        image_subdir_rel = f"{gazette.issue_year}/{output_stem}" if gazette.issue_year else None
+
         batch: list[Trademark] = []
         row_count = 0
         BATCH_SIZE = 200
@@ -94,7 +215,10 @@ def ingest_pdf(gazette_id: str) -> dict:
         # so the filename's first letter is the digest, not A/B.
         for section in processor.extract_records(pdf_path, gazette_type=letter):
             rt = infer_record_type(letter, section)
-            batch.append(section_to_trademark(gazette.id, rt, section))
+            logo_path = (
+                _resolve_logo_path(section, image_subdir_rel, image_root) if image_subdir_rel else None
+            )
+            batch.append(section_to_trademark(gazette.id, rt, section, logo_path=logo_path))
             if len(batch) >= BATCH_SIZE:
                 session.add_all(batch)
                 session.commit()

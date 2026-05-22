@@ -174,6 +174,10 @@ class Trademark(Base):
     mark_sample: Mapped[str | None] = mapped_column(Text, nullable=True)  # (540) — case preserved
     mark_status: Mapped[str | None] = mapped_column(Text, nullable=True)  # (551)
     protected_colors: Mapped[str | None] = mapped_column(Text, nullable=True)  # (591)
+    # Path to the extracted logo PNG, relative to the static root.
+    # Populated by the worker once the image extractor has run (Phase 2);
+    # remains NULL for rows ingested before image extraction.
+    logo_path: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Priority / related
     priority_300: Mapped[str | None] = mapped_column(Text, nullable=True)  # (300)

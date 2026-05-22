@@ -106,8 +106,15 @@ def section_to_trademark(
     gazette_id: uuid.UUID,
     record_type: RecordType,
     section: dict[str, Any],
+    logo_path: str | None = None,
 ) -> Trademark:
-    """Build a Trademark row from a tm_extractor section dict."""
+    """Build a Trademark row from a tm_extractor section dict.
+
+    `logo_path` is the relative path of the extracted logo PNG under
+    `<data_dir>/image/`, e.g. ``"2026/A_T2_2026/4-2026-00001.png"``. Pass
+    None when no logo was extracted for this row — the column stays NULL
+    and the frontend falls back to mark_sample text rendering.
+    """
     # The section dict still uses raw "(NNN)" keys (the rename to "NNN <desc>"
     # happens inside create_csv, after this function would have run).
     s = section
@@ -154,6 +161,7 @@ def section_to_trademark(
         gazette_ref_field=_str(s.get("Gazette")),
         date_combined=_str(s.get("DateCombined_441_450")),
         extra_markers=None,
+        logo_path=logo_path,
     )
 
 

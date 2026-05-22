@@ -61,6 +61,8 @@ docker compose up -d       # postgres on :5435, redis on :6380
 cd app
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements-dev.txt
+pip install -e backend           # editable install of the `tm-backend` package
+                                 # (puts api/, worker/, scripts/ on sys.path)
 
 cd backend
 export $(grep -v '^#' ../.env | xargs)

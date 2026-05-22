@@ -50,6 +50,9 @@ class TrademarkOut(BaseModel):
     nice_classes: list[str] | None
     nice_total: int | None
     mark_sample: str | None
+    # Relative path to the extracted logo PNG (under /static/). NULL when no
+    # logo was extracted for this row — frontend should fall back to mark_sample.
+    logo_path: str | None = None
     applicant_name: str | None
     applicant_country_code: str | None
     applicant_city: str | None

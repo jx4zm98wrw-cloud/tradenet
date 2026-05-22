@@ -12,15 +12,10 @@ point at a docker-compose-spawned Postgres dedicated to CI.
 from __future__ import annotations
 
 import os
-import sys
 from collections.abc import AsyncIterator
-from pathlib import Path
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-
-BACKEND = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(BACKEND))
 
 os.environ.setdefault("TM_DATABASE_URL", "postgresql+asyncpg://tm:tm@localhost:5435/tm")
 os.environ.setdefault("TM_DATABASE_URL_SYNC", "postgresql+psycopg2://tm:tm@localhost:5435/tm")

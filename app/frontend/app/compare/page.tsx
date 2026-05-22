@@ -337,7 +337,7 @@ function PlateCell({ mark, anchor }: { mark: Trademark; anchor: boolean }) {
         </span>
       )}
       <MarkSpecimen
-        info={{ style: "wordmark-sans-bold", color: anchor ? "stamp" : "ink", text: md.text }}
+        info={{ style: "wordmark-sans-bold", color: anchor ? "stamp" : "ink", text: md.text, imageUrl: md.imageUrl }}
         fallbackKey={mark.id}
         size="lg"
         placeholder={md.isPlaceholder}

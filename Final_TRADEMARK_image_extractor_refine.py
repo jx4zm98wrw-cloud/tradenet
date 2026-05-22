@@ -352,7 +352,7 @@ class ImageProcessor:
                 clusters.append([(rect, img_bytes)])
                 logger.debug(f"New cluster created for image at ({center_x:.0f}, {center_y:.0f})")
         
-        logger.info(f"Clustered {len(images)} images into {len(clusters)} groups")
+        logger.debug(f"Clustered {len(images)} images into {len(clusters)} groups")
         return clusters
     
     @staticmethod

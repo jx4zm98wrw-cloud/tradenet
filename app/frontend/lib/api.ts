@@ -33,6 +33,10 @@ export type Trademark = {
   nice_classes: string[] | null;
   nice_total: number | null;
   mark_sample: string | null;
+  /** Path relative to /static/image/ of the extracted logo PNG, or null when
+   * no logo was extracted (text-only mark, extraction skipped, or pre-Phase-2
+   * row). Frontend prepends "/static/image/" to form the URL. */
+  logo_path: string | null;
   applicant_name: string | null;
   applicant_country_code: string | null;
   applicant_city: string | null;

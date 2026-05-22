@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-import sys
 from logging.config import fileConfig
-from pathlib import Path
 
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-
-# Make `api.*` importable when running `alembic` from app/backend.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 from api.db.models import Base
 from api.settings import get_settings
 

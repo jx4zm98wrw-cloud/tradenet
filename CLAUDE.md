@@ -4,33 +4,81 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Python tool (`TM_csv_builder.py`) that extracts Vietnamese trademark gazette data from NOIP (IP Vietnam) PDF publications into per-PDF CSVs. Two gazette types in the same codebase: **A** (applications, section starts at `(210)`) and **B** (registrations, section starts at `(111)` or `(116)`, including Madrid international registrations). Type is inferred from the filename's first letter (case-insensitive).
+Project began as a single Python tool (`TM_csv_builder.py`) extracting Vietnamese trademark gazette data from NOIP (IP Vietnam) PDF publications into per-PDF CSVs. It has since grown into a workbench: **FastAPI + Postgres + RQ worker + Next.js 15 frontend**, with the original CSV parser vendored into `app/backend/tm_extractor/` and a separate logo extractor wired in via the worker.
+
+Two gazette types share the parsing pipeline: **A** (applications, section starts at `(210)`) and **B** (registrations, section starts at `(111)` or `(116)`, including Madrid international registrations). Type is inferred from the filename's first letter (case-insensitive).
+
+## Project layout
+
+```
+claude_csvbuilder/
+├── app/
+│   ├── backend/                    Installable Python package `tm-backend`
+│   │   ├── api/                    FastAPI app + SQLAlchemy models
+│   │   ├── worker/                 RQ jobs (ingest pipeline lives here)
+│   │   ├── tm_extractor/           Vendored CSV parser (was TM_csv_builder.py)
+│   │   ├── alembic/                Migrations
+│   │   ├── scripts/                One-off scripts (smoke_ingest.py)
+│   │   ├── tests/                  pytest suite (httpx + ASGI)
+│   │   ├── pyproject.toml          Lint, type-check, package config
+│   │   ├── requirements.txt        Pinned runtime deps (includes pymupdf etc. for the image extractor)
+│   │   └── Dockerfile              Multi-stage prod build (PYTHONPATH-based)
+│   ├── frontend/                   Next.js 15 (App Router) + Tailwind
+│   ├── docker-compose.yml          Local dev stack (postgres :5435, redis :6380)
+│   └── README.md                   Setup + dev workflow
+├── Final_TRADEMARK_image_extractor_refine.py   Standalone logo extractor (project root, lazy-imported by worker)
+├── config_image_extractor.yaml     Standalone extractor config
+├── input/                          Source PDFs
+├── csv/                            Legacy CSV outputs (still produced by tm_extractor for parity)
+├── image/<year>/<pdf_stem>/        Extracted logo PNGs (served at /static/image/)
+├── modified/<year>/<pdf_stem>/     Blank-page-stripped PDFs the extractor works on
+├── image_link/<year>/              Per-PDF image-link CSVs from the extractor
+├── log/                            Rotating processing log (1 MB × 5)
+├── TM_csv_builder.py               Original standalone CSV builder (still runnable; kept for parity)
+├── TM_csv_builder_legacy.py        Earlier snapshot of the standalone builder
+├── cities_by_country.json          { ISO2: [city, …] } (~10 MB, ~525K names)
+├── cities_overrides.json           Manual add/remove patches applied over the GeoNames build
+└── company_suffixes.json           ~500 curated company-indicator tokens
+```
 
 ## Run
+
+### Full dev stack (FastAPI + worker + frontend)
+
+```bash
+docker compose -f app/docker-compose.yml up -d            # postgres :5435, redis :6380
+python3 -m venv app/.venv && source app/.venv/bin/activate
+pip install -r app/backend/requirements-dev.txt
+pip install -e app/backend                                # installs the `tm-backend` package
+cd app/backend && alembic upgrade head
+uvicorn api.main:app --reload --port 8000                 # backend
+# in another terminal:
+cd app/frontend && pnpm install && pnpm dev               # frontend on :3000
+```
+
+`pip install -e app/backend` puts `api`, `worker`, `tm_extractor`, and `scripts` on `sys.path` — replaces what used to be ad-hoc `sys.path.insert` calls in `tests/conftest.py` and `alembic/env.py`. The Docker image still uses `PYTHONPATH=/srv/backend` (frozen-build artifact, not a dev environment).
+
+Smoke-test one PDF through the worker synchronously:
+```bash
+cd app/backend
+TM_DATABASE_URL_SYNC=postgresql+psycopg2://tm:tm@localhost:5435/tm \
+TM_DATABASE_URL=postgresql+asyncpg://tm:tm@localhost:5435/tm \
+python -m scripts.smoke_ingest /abs/path/to/A_T2_2026.pdf
+```
+
+### Legacy single-script flow (CSV only, no DB/UI)
 
 ```bash
 python3 TM_csv_builder.py
 ```
 
-Interactive prompt — `1` processes all PDFs in `input/`, `2` accepts comma-separated indices. No build, lint, or test harness.
+Interactive prompt — `1` processes all PDFs in `input/`, `2` accepts comma-separated indices. Dependencies (no requirements.txt): `pdfplumber pandas numpy colorama tqdm`.
 
-Dependencies (manual install, no requirements.txt):
-```
-pdfplumber pandas numpy colorama tqdm
-```
+Useful when you just want CSVs of the same gazette content without standing up the full stack.
 
-## Paths
+## Data files
 
-Self-contained — `WORKING_DIR = Path(__file__).resolve().parent`. Inputs, outputs, logs, and data files all sit alongside `TM_csv_builder.py`:
-
-- `input/` — source PDFs (filename prefix `A` / `B` selects gazette schema)
-- `csv/` — one output CSV per processed PDF, UTF-8-with-BOM
-- `log/processing.log` — rotating log (1 MB × 5)
-- `cities_by_country.json` — `{ISO2: [city, ...]}`, ~10 MB, ~525K Latin-script city names (built from GeoNames; see "Data files" below)
-- `cities_overrides.json` — manual `add`/`remove` patches applied on top of the GeoNames build (survives every rebuild)
-- `company_suffixes.json` — ~500 curated company-indicator tokens (Vietnamese + international)
-
-Missing data files don't crash the script — they log an error and degrade gracefully.
+Inputs and outputs live at the project root (alongside the legacy script, since the worker resolves `data_dir` to the project root via `api.settings.Settings.data_dir`). Missing data files don't crash either entrypoint — they log an error and degrade gracefully.
 
 ## Architecture
 
@@ -72,6 +120,15 @@ Missing data files don't crash the script — they log an error and degrade grac
 - pdfplumber isn't thread-safe.
 - `self.first_date` lives on the `PDFProcessor` instance and is reset per file — concurrent execution would interleave reads/writes and corrupt date fields across PDFs.
 
+### Worker + image extractor (web stack only)
+
+`app/backend/worker/ingest.py:ingest_pdf` orchestrates one PDF through:
+1. `_run_image_extraction` lazy-imports `Final_TRADEMARK_image_extractor_refine.py` from the project root, runs `_modify_pdf` (blank-page removal via PyMuPDF) → `_extract_images` (per-sector PNGs into `image/<year>/<stem>/`) → `_create_image_link_csv`. Failures degrade to `logo_path = NULL`; the CSV ingest still proceeds.
+2. The tm_extractor parser produces sections (same logic as the legacy script).
+3. `mapper.section_to_trademark` materializes a `Trademark` row; `_resolve_logo_path(section, image_subdir, image_root)` checks for `image/<year>/<stem>/<(210) or (116)>.png` and stores the path **relative** in `trademarks.logo_path`.
+
+The standalone extractor is the sole `sys.path.insert` in the backend (it lives outside the package, at the project root). FastAPI mounts `data_dir/image` at `/static/image/`; Next.js proxies `/static/*` to the backend. `markDisplay()` on the frontend prepends `/static/image/` to `logo_path` and feeds it to every `MarkSpecimen` call site.
+
 ## Data files
 
 ### `cities_by_country.json`
@@ -100,7 +157,7 @@ Manual additions/removals (e.g., to fix a misclassified town) go in `cities_over
 
 ~500 Latin-script tokens. Sorted, deduped (case-insensitive via NFC+casefold), mojibake-free. Includes English forms (LTD, INC, COMPANY, …), continental European (GMBH, S.A., SARL, SPA, S.R.O., Sp. z o.o., …), Vietnamese (CÔNG TY, TỔNG CÔNG TY, …), Russian transliterations (OBSHCHESTVO, OOO, …), Chinese pinyin (GONGSI, YOUXIAN), Japanese romanized (SHADANHOJIN, …), and institutional words (UNIVERSITY, INSTITUTE, BANK, FOUNDATION, …).
 
-Curated `STRONG_COMPANY_SUFFIXES` and `TYPO_TOLERANT_COMPANY_PATTERNS` live inline in `TM_csv_builder.py` — these win over the VN-surname signal in classification.
+Curated `STRONG_COMPANY_SUFFIXES` and `TYPO_TOLERANT_COMPANY_PATTERNS` live in `app/backend/tm_extractor/constants/classifier.py` (barrel-exported through `tm_extractor/constants/__init__.py`) — these win over the VN-surname signal in classification.
 
 ## When changing extraction logic
 

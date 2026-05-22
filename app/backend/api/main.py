@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 import sentry_sdk
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
@@ -110,6 +111,14 @@ def create_app() -> FastAPI:
     app.include_router(compare.router)
     app.include_router(watchlists.router)
     app.include_router(admin.router)
+
+    # ---- Static files (extracted trademark logos) ----
+    # Served under /static/image/<year>/<pdf_stem>/<id>.png. Trademark rows
+    # carry logo_path relative to <data_dir>/image, e.g. "2026/A_T2_2026/4-2026-00001.png".
+    # The image/ directory may be absent in fresh checkouts — mount lazily.
+    image_root = settings.data_dir / "image"
+    if image_root.is_dir():
+        app.mount("/static/image", StaticFiles(directory=image_root), name="static-image")
 
     # ---- Health probes ----
     @app.get("/health", tags=["meta"])

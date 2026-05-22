@@ -1,10 +1,11 @@
 """Smoke test: insert a Gazette + run ingest synchronously on a chosen PDF.
 
+Requires the backend to be installed editable (`cd app/backend && pip install -e .`).
+
 Usage:
-    cd app/backend
     TM_DATABASE_URL_SYNC=postgresql+psycopg2://tm:tm@localhost:5435/tm \\
     TM_DATABASE_URL=postgresql+asyncpg://tm:tm@localhost:5435/tm \\
-    python scripts/smoke_ingest.py /abs/path/to/A_T2_2026.pdf
+    python -m scripts.smoke_ingest /abs/path/to/A_T2_2026.pdf
 """
 from __future__ import annotations
 import sys
@@ -38,6 +39,12 @@ def main(pdf_path: Path) -> None:
             existing.row_count = 0
             existing.error_message = None
             existing.processed_at = None
+            # Re-point storage_path to the PDF the user just handed us. The
+            # original Gazette may have been ingested via the upload pipeline
+            # (digest-prefixed temp file under upload_dir that's since been
+            # cleaned up); for a smoke re-ingest we want the in-repo input/
+            # copy.
+            existing.storage_path = str(pdf_path.resolve())
             s.add(existing)
             s.commit()
             gid = existing.id
