@@ -7,6 +7,8 @@ import re
 
 from colorama import Fore, Style
 
+from .constants import TrademarkConstants
+
 
 def parse_applicant_field(applicant_text: str) -> tuple[list[str], list[str]]:
     applicant_names: list[str] = []
@@ -20,11 +22,25 @@ def parse_applicant_field(applicant_text: str) -> tuple[list[str], list[str]]:
     if m_num:
         applicant_text = m_num.group(1).strip()
     try:
-        match = re.match(r"(.+?)\s*\(([A-Z]{2})\)\s*(.+)", applicant_text)
-        if match:
-            name, _, address = match.groups()
+        # Split name vs address at the first VALID ISO 3166-1 alpha-2 code.
+        # Matching the first parenthesized "(XX)" catches city abbreviations
+        # like (GZ) Guangzhou or (MI) Milan embedded in company names,
+        # truncating the name and leaking it into the address. Mirror the
+        # valid-code filter that processor.extract_applicant_details uses
+        # for the country-code field so both fields stay consistent.
+        valid_match = next(
+            (
+                m
+                for m in re.finditer(r"\(([A-Z]{2})\)", applicant_text)
+                if m.group(1) in TrademarkConstants.COUNTRY_CODES
+            ),
+            None,
+        )
+        if valid_match:
+            name = applicant_text[: valid_match.start()].rstrip()
+            address = applicant_text[valid_match.end() :].lstrip()
             address = re.split(r"\s+\d+\.\s", address, maxsplit=1)[0]
-            applicant_names.append(name.strip())
+            applicant_names.append(name)
             applicant_addresses.append(address.strip())
         else:
             applicants = re.split(r"\d+\.\s|\n", applicant_text)

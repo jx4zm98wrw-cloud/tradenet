@@ -383,19 +383,23 @@ class PDFProcessor:
                     section["Applicant Country Code"] = country_code or "Unknown"
                 section["Applicant City"] = ""
                 cc = section["Applicant Country Code"]
-                # For multi-applicant rows (e.g. "1. NAME1 ... 2. NAME2 ..."), we
-                # already truncated the parsed name/address to the FIRST applicant
-                # via parse_applicant_field — apply the same truncation here so the
-                # city matcher doesn't pick up a city from the SECOND applicant.
-                first_applicant_text = re.sub(r"\s+\d+\.\s+.*$", "", applicant_text, flags=re.DOTALL)
+                # Match cities only inside the parsed address. Searching the
+                # whole applicant text catches personal-name tokens that
+                # collide with city names — e.g. "Hồng Lĩnh" is both a city
+                # in Hà Tĩnh province AND a common Vietnamese middle name,
+                # and would otherwise be picked up from "NGUYỄN THỊ HỒNG
+                # LĨNH (VN) ...". parse_applicant_field already truncates
+                # to the first applicant, so the multi-applicant defense
+                # the old code did via regex is no longer needed here.
+                address_text = str(section.get("Applicant Address", ""))
                 pat = self.city_patterns.get(cc) if cc != "Unknown" else None
-                if pat is not None:
+                if pat is not None and address_text:
                     # One combined alternation regex per country; cities listed longest-first so
                     # Python's leftmost-first alternation gives the longest match. With cleaned
                     # data (no provinces / sub-city units), the city sits at the address tail —
                     # take the LATEST match.
                     last = None
-                    for m in pat.finditer(first_applicant_text):
+                    for m in pat.finditer(address_text):
                         last = m
                     if last is not None:
                         section["Applicant City"] = last.group(0)
@@ -403,7 +407,7 @@ class PDFProcessor:
                 # city matched, fall back to the "tỉnh <Province>" province name
                 # which always appears at the address tail in VN gazette format.
                 if section["Applicant City"] == "" and cc == "VN":
-                    m_tinh = re.search(r"tỉnh\s+([^,]+)", first_applicant_text, re.IGNORECASE)
+                    m_tinh = re.search(r"tỉnh\s+([^,]+)", address_text, re.IGNORECASE)
                     if m_tinh:
                         section["Applicant City"] = m_tinh.group(1).strip().rstrip(".").strip()
             if "(740)" in section:
