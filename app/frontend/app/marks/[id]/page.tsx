@@ -25,6 +25,25 @@ import {
 import type { PillTone } from "@/components/ui";
 import { formatDate, formatNumber } from "@/lib/format";
 
+/** Parse the (511) raw text into a per-class map. VN A-files and B-domestic
+ * publish goods/services as "Nhóm 01: …. Nhóm 02: …." where each "Nhóm N:"
+ * starts a new class block; the description runs until the next "Nhóm N:"
+ * marker or end of text. Madrid B-files publish only a bare class list
+ * ("05, 12.") with no per-class descriptions — we return an empty map and
+ * the caller renders the whole block as a single paragraph. Keys are
+ * zero-padded to match nice_classes ("01" not "1"). */
+function parseGoodsServices(raw: string | null): Map<string, string> {
+  const out = new Map<string, string>();
+  if (!raw) return out;
+  const re = /Nhóm\s+(\d+)\s*:\s*([\s\S]*?)(?=\s*Nhóm\s+\d+\s*:|$)/g;
+  for (const m of raw.matchAll(re)) {
+    const key = m[1].padStart(2, "0");
+    const desc = m[2].trim();
+    if (desc) out.set(key, desc);
+  }
+  return out;
+}
+
 export default function MarkDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -163,17 +182,44 @@ export default function MarkDetailPage() {
                   </>
                 }
               />
-              <div className="px-5 py-4 space-y-3">
-                {m.nice_classes.map((c) => (
-                  <div key={c} className="grid gap-3" style={{ gridTemplateColumns: "200px 1fr" }}>
-                    <div><ClassChipFull n={c} /></div>
-                    <p className="text-[13px] text-ink-2 leading-relaxed">
-                      Goods/services in Nice class {String(parseInt(c, 10))} ({NICE_LABELS[c] || "—"}) — full text
-                      extracted from the gazette entry.
-                    </p>
+              {(() => {
+                const perClass = parseGoodsServices(detail.raw_511_text);
+                const hasPerClassText = perClass.size > 0;
+                return (
+                  <div className="px-5 py-4 space-y-3">
+                    {hasPerClassText
+                      ? m.nice_classes!.map((c) => (
+                          <div
+                            key={c}
+                            className="grid gap-3"
+                            style={{ gridTemplateColumns: "200px 1fr" }}
+                          >
+                            <div>
+                              <ClassChipFull n={c} />
+                            </div>
+                            <p className="text-[13px] text-ink-2 leading-relaxed whitespace-pre-wrap">
+                              {perClass.get(c) ??
+                                `Nice class ${parseInt(c, 10)} (${NICE_LABELS[c] || "—"}) — no per-class text in source.`}
+                            </p>
+                          </div>
+                        ))
+                      : (
+                        <>
+                          <div className="flex flex-wrap gap-2">
+                            {m.nice_classes!.map((c) => (
+                              <ClassChipFull key={c} n={c} />
+                            ))}
+                          </div>
+                          {detail.raw_511_text && (
+                            <p className="text-[13px] text-ink-2 leading-relaxed whitespace-pre-wrap">
+                              {detail.raw_511_text}
+                            </p>
+                          )}
+                        </>
+                      )}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </Card>
           )}
 

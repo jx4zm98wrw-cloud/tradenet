@@ -38,6 +38,12 @@ class MarkDetailOut(BaseModel):
     oppositionOpen: bool
     statusLabel: str  # "Examination pending" | "Active registration" | "Lapsed" | "Pending publication"
     statusTone: str  # "warn" | "ok" | "mute"
+    # Goods-and-services text extracted from the (511) field. Kept off the
+    # base TrademarkOut so it doesn't bloat list/search responses — average
+    # 371 bytes / max 107 KB per row. Only the single-mark detail endpoint
+    # surfaces it. Empty for Madrid rows where the gazette only printed a
+    # bare class-number list.
+    raw_511_text: str | None = None
 
 
 @router.get("/{id}", response_model=MarkDetailOut)
@@ -68,6 +74,7 @@ def _build_detail(m: Trademark) -> MarkDetailOut:
         oppositionOpen=opp_open,
         statusLabel=status_label,
         statusTone=status_tone,
+        raw_511_text=m.raw_511_text,
     )
 
 
