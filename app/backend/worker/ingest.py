@@ -67,9 +67,7 @@ def _run_image_extraction(
     the DB with logo_path=NULL.
     """
     if year is None:
-        logger.warning(
-            "Gazette has no issue_year; skipping image extraction for %s", pdf_path.name
-        )
+        logger.warning("Gazette has no issue_year; skipping image extraction for %s", pdf_path.name)
         return None
 
     # Sole sys.path mutation in the backend — `Final_TRADEMARK_image_extractor_refine.py`
@@ -130,9 +128,7 @@ def _run_image_extraction(
     return image_dir
 
 
-def _resolve_logo_path(
-    section: dict, image_subdir_rel: str, image_root: Path
-) -> str | None:
+def _resolve_logo_path(section: dict, image_subdir_rel: str, image_root: Path) -> str | None:
     """Look up the extracted PNG for this section. Tries (210) (A-file
     applications), (111) (B-file domestic VN registrations), and (116)
     (B-file Madrid international registrations) in that order. Returns the
@@ -154,7 +150,7 @@ def _resolve_logo_path(
         # modifications/renewals are published with suffixes A-Z on the base
         # registration number (e.g. 0181946A.png for registration 0181946 —
         # same legal mark, more recent specimen).
-        for suf in ("",) + tuple(string.ascii_uppercase):
+        for suf in ("", *string.ascii_uppercase):
             rel = f"{image_subdir_rel}/{ident}{suf}.png"
             if (image_root / rel).is_file():
                 return rel
@@ -210,9 +206,7 @@ def ingest_pdf(gazette_id: str) -> dict:
             data_dir=settings.data_dir,
         )
         image_root = settings.data_dir / "image"
-        image_subdir_rel = (
-            f"{gazette.issue_year}/{output_stem}" if gazette.issue_year else None
-        )
+        image_subdir_rel = f"{gazette.issue_year}/{output_stem}" if gazette.issue_year else None
 
         batch: list[Trademark] = []
         row_count = 0
@@ -222,13 +216,9 @@ def ingest_pdf(gazette_id: str) -> dict:
         for section in processor.extract_records(pdf_path, gazette_type=letter):
             rt = infer_record_type(letter, section)
             logo_path = (
-                _resolve_logo_path(section, image_subdir_rel, image_root)
-                if image_subdir_rel
-                else None
+                _resolve_logo_path(section, image_subdir_rel, image_root) if image_subdir_rel else None
             )
-            batch.append(
-                section_to_trademark(gazette.id, rt, section, logo_path=logo_path)
-            )
+            batch.append(section_to_trademark(gazette.id, rt, section, logo_path=logo_path))
             if len(batch) >= BATCH_SIZE:
                 session.add_all(batch)
                 session.commit()

@@ -15,6 +15,7 @@ Usage:
     python -m scripts.backfill_logo_paths --dry-run   # show counts, don't write
     python -m scripts.backfill_logo_paths --gazette A_T1_2026.pdf  # one file
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,7 +24,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from sqlalchemy import create_engine, select, update
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from api.db.models import Gazette, Trademark
@@ -53,7 +54,7 @@ def _resolve(
             continue
         # Exact match first; fall back to letter-suffix variants (WIPO Madrid
         # modifications/renewals: 0181946 → 0181946A.png).
-        for suf in ("",) + tuple(string.ascii_uppercase):
+        for suf in ("", *string.ascii_uppercase):
             rel = f"{year}/{stem}/{ident}{suf}.png"
             if (image_root / rel).is_file():
                 return rel
@@ -84,9 +85,13 @@ def backfill(dry_run: bool, gazette_filename: str | None) -> None:
             year = g.issue_year
             assert year is not None  # filtered above
 
-            rows = s.execute(
-                select(Trademark).where(Trademark.gazette_id == g.id, Trademark.logo_path.is_(None))
-            ).scalars().all()
+            rows = (
+                s.execute(
+                    select(Trademark).where(Trademark.gazette_id == g.id, Trademark.logo_path.is_(None))
+                )
+                .scalars()
+                .all()
+            )
 
             updates = 0
             misses = 0
@@ -109,9 +114,7 @@ def backfill(dry_run: bool, gazette_filename: str | None) -> None:
             totals["scanned"] += len(rows)
             totals["matched"] += updates
             totals["unmatched"] += misses
-            print(
-                f"  {g.filename:30s} scanned={len(rows):6d}  matched={updates:6d}  unmatched={misses:6d}"
-            )
+            print(f"  {g.filename:30s} scanned={len(rows):6d}  matched={updates:6d}  unmatched={misses:6d}")
 
         if not dry_run:
             s.commit()
