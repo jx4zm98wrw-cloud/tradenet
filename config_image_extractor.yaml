@@ -12,11 +12,15 @@ clustering:
   combine_threshold: 80
 
 pdf_types:
+  # Whitespace inside the marker (\s*) tolerates pdfplumber/fitz splitting
+  # "(210)" across kerned spans into "( 210 )" when the joined-line text
+  # is rebuilt. Without this, the affected sectors get no label and the
+  # logo PNG is saved as "unknown_*" and discarded.
   A:
     identifier: A_
-    text_pattern: '\(210\)\s*([0-9][0-9A-Za-z\-]+)'
-    image_name_pattern: '\(210\)\s*([0-9][0-9A-Za-z\-]+)'
+    text_pattern: '\(\s*210\s*\)\s*([0-9][0-9A-Za-z\-]+)'
+    image_name_pattern: '\(\s*210\s*\)\s*([0-9][0-9A-Za-z\-]+)'
   B:
     identifier: B_
-    text_pattern: '\((?:210|116|111)\)\s*([0-9A-Za-z\-]+)'
-    image_name_pattern: '\((?:210|116|111)\)\s*([0-9A-Za-z\-]+)'
+    text_pattern: '\(\s*(?:210|116|111)\s*\)\s*([0-9A-Za-z\-]+)'
+    image_name_pattern: '\(\s*(?:210|116|111)\s*\)\s*([0-9A-Za-z\-]+)'

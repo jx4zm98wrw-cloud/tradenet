@@ -107,24 +107,16 @@ import os
 # MuPDF (C library) writes directly to file descriptor 2 (stderr), bypassing
 # Python's sys.stderr. We must redirect at OS level before importing fitz.
 
-print("🔇 Suppressing MuPDF error output...")
-
-# Save original stderr
+# The fd2 dance is transient: save fd 2, redirect to /dev/null only for the
+# duration of `import fitz`, then restore. No global state mutation leaks
+# out, so this is safe to run on every import (worker or standalone).
 _stderr_backup = os.dup(2)
-
-# Redirect stderr to /dev/null
 _devnull_fd = os.open(os.devnull, os.O_WRONLY)
 os.dup2(_devnull_fd, 2)
-
-# Import PyMuPDF (MuPDF now writes to /dev/null)
 import fitz
-
-# Restore stderr for Python logging
 os.dup2(_stderr_backup, 2)
 os.close(_devnull_fd)
 os.close(_stderr_backup)
-
-print("✓ MuPDF errors suppressed. Python logging enabled.")
 # ============================================================================
 
 # Continue with normal imports
@@ -172,8 +164,12 @@ if hasattr(sys, 'stderr'):
         def flush(self):
             self.stream.flush()
     
-    # Uncomment to suppress MuPDF warnings:
-    sys.stderr = MuPDFErrorFilter(sys.stderr)
+    # Install the filter only when running as a script. Globally wrapping
+    # sys.stderr at import time would mutate the worker process's stderr for
+    # the lifetime of the worker, with a small chance of swallowing
+    # unrelated log lines that happen to start with "MuPDF error:".
+    if __name__ == "__main__":
+        sys.stderr = MuPDFErrorFilter(sys.stderr)
 
 def auto_confirm_prompt(question: str, timeout: int = 15, default: bool = True) -> bool:
     """Ask yes/no question with auto-answer after timeout."""
@@ -1041,11 +1037,16 @@ class PDFProcessor:
                         continue
 
                     for rect_idx, rect in enumerate(rects):
-                        # nearest label whose y <= image.y0 + small tolerance
-                        # (labels are y-ascending; advance until label.y exceeds image.y)
+                        # Nearest label whose y <= image.y0 + tolerance.
+                        # Standard gazette layout puts the marker line 10-15
+                        # px ABOVE its logo, but the marker's baseline y can
+                        # land slightly below the rect top depending on font
+                        # metrics. +20 gives slack without bleeding into the
+                        # NEXT sector's marker (sector spacing is typically
+                        # 80+ px, gated by the cluster_threshold in YAML).
                         best: Optional[str] = None
                         for y_lbl, ident in labels:
-                            if y_lbl <= rect.y0 + 5:
+                            if y_lbl <= rect.y0 + 20:
                                 best = ident
                             else:
                                 break
