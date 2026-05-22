@@ -39,6 +39,12 @@ def main(pdf_path: Path) -> None:
             existing.row_count = 0
             existing.error_message = None
             existing.processed_at = None
+            # Re-point storage_path to the PDF the user just handed us. The
+            # original Gazette may have been ingested via the upload pipeline
+            # (digest-prefixed temp file under upload_dir that's since been
+            # cleaned up); for a smoke re-ingest we want the in-repo input/
+            # copy.
+            existing.storage_path = str(pdf_path.resolve())
             s.add(existing)
             s.commit()
             gid = existing.id

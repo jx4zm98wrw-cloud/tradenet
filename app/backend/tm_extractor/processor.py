@@ -67,8 +67,11 @@ class PDFProcessor:
         midx = page.width / 2
         # In 2-column pages no word crosses the page midpoint (clean gutter).
         # In 1-column pages text flows across mid, so many words straddle it.
+        # Some 2-column B-pages have a handful of crossers (long dates, Vienna
+        # codes spanning a frame, headers), so use a ratio test, not an absolute
+        # cutoff: >10% of words crossing mid → real single-column page.
         crossing = sum(1 for w in words if w["x0"] < midx and (w["x0"] + w["width"]) > midx)
-        if crossing > 2:
+        if crossing > max(10, 0.10 * len(words)):
             return page.extract_text() or ""
         # 2-column path — find (111) and (116) markers in the left column as entry starts
         entry_starts = sorted(w["top"] for w in words if w["text"] in ("(111)", "(116)") and w["x0"] < midx)
