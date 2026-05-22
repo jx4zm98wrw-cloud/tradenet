@@ -441,28 +441,30 @@ class ImageProcessor:
         """Merge two images based on their actual spatial positions."""
         try:
             combined_rect = rect1 | rect2
-            canvas_width = int(combined_rect.x1 - combined_rect.x0)
-            canvas_height = int(combined_rect.y1 - combined_rect.y0)
+            # Use rounding + min-1 so sub-pixel scanlines (PDF rasters split
+            # into 0.8px-tall slices) don't truncate to zero-height canvas
+            # rows. Without this, stacking 111 scanlines into one logo
+            # produced a 1×N degenerate canvas and combine_images silently
+            # dropped 110 of the slices.
+            canvas_width = max(1, round(combined_rect.x1 - combined_rect.x0))
+            canvas_height = max(1, round(combined_rect.y1 - combined_rect.y0))
             mode = 'RGBA' if image1.mode == 'RGBA' or image2.mode == 'RGBA' else 'RGB'
             img1 = image1.convert(mode) if image1.mode != mode else image1
             img2 = image2.convert(mode) if image2.mode != mode else image2
             combined_image = Image.new(mode, (canvas_width, canvas_height), (255, 255, 255, 0) if mode == 'RGBA' else (255, 255, 255))
-            img1_x = int(rect1.x0 - combined_rect.x0)
-            img1_y = int(rect1.y0 - combined_rect.y0)
-            img2_x = int(rect2.x0 - combined_rect.x0)
-            img2_y = int(rect2.y0 - combined_rect.y0)
-            img1_width = int(rect1.x1 - rect1.x0)
-            img1_height = int(rect1.y1 - rect1.y0)
-            img2_width = int(rect2.x1 - rect2.x0)
-            img2_height = int(rect2.y1 - rect2.y0)
+            img1_x = max(0, round(rect1.x0 - combined_rect.x0))
+            img1_y = max(0, round(rect1.y0 - combined_rect.y0))
+            img2_x = max(0, round(rect2.x0 - combined_rect.x0))
+            img2_y = max(0, round(rect2.y0 - combined_rect.y0))
+            img1_width = max(1, round(rect1.x1 - rect1.x0))
+            img1_height = max(1, round(rect1.y1 - rect1.y0))
+            img2_width = max(1, round(rect2.x1 - rect2.x0))
+            img2_height = max(1, round(rect2.y1 - rect2.y0))
 
-            if min(img1_width, img1_height, img2_width, img2_height, canvas_width, canvas_height) < 1:
-                logger.warning(
-                    f"_merge_images: degenerate rect, skipping merge "
-                    f"(img1={img1_width}x{img1_height} @ {rect1}, "
-                    f"img2={img2_width}x{img2_height} @ {rect2})"
-                )
-                return image1, rect1
+            # No degenerate guard here — max(1, …) above ensures every
+            # dimension is at least 1 px. The prior `min(...) < 1` short-
+            # circuit returned image1 alone while combine_images still
+            # marked image2 as merged, silently dropping it.
 
             if img1.size != (img1_width, img1_height):
                 img1 = img1.resize((img1_width, img1_height), Image.Resampling.LANCZOS)
@@ -764,48 +766,74 @@ class PDFProcessor:
             return pdf_path
 
     def _process_text(self, page: fitz.Page, new_page: fitz.Page, pattern: str) -> None:
-        """Process text for a page using the provided regex pattern."""
+        """Process text for a page using the provided regex pattern.
+
+        The old implementation inserted every match at the block's bbox top,
+        which placed markers far above their real position when a block
+        spanned many lines (e.g., (732) applicant text from y=194 down to
+        y=400 with the next sector's (111) at line y=337 — the marker
+        ended up at y=194). That broke the y-binding in _save_page_images.
+
+        Naively switching to per-line matching breaks the regex when fitz
+        splits "(111) 1746424" across two "line" objects at the same y
+        (one for "(111)", one for "1746424") — neither line alone matches
+        the pattern.
+
+        Hybrid approach: join the block's line texts (preserving line
+        boundaries via an offset table), run the regex on the joined text,
+        and for each match place the inserted marker at the LINE the
+        match's start position lies in.
+        """
         text_dict: Dict[str, Any] = page.get_text("dict")  # type: ignore
         text_instances: List[Any] = text_dict.get("blocks", [])
         keep_pattern = re.compile(pattern)
-        
+
         for block in text_instances:
             if not isinstance(block, dict):
                 continue
-                
-            if block.get('type') == 0:
-                full_text = ""
-                lines = block.get('lines', [])
-                
-                for line in lines:
-                    if not isinstance(line, dict):
-                        continue
-                    
-                    spans = line.get('spans', [])
-                    line_texts = []
-                    
-                    for span in spans:
-                        if isinstance(span, dict):
-                            span_text = span.get('text', '')
-                            if span_text:
-                                line_texts.append(str(span_text))
-                    
-                    if line_texts:
-                        full_text += " ".join(line_texts) + " "
-                
-                filtered_parts = []
-                for match in keep_pattern.finditer(full_text):
-                    for group in match.groups():
-                        if group:
-                            filtered_parts.append(match.group(0))
-                            break
-                
-                if filtered_parts:
-                    filtered_text = " ".join(filtered_parts)
-                    bbox = block.get('bbox', [0, 0, 0, 0])
-                    if isinstance(bbox, (list, tuple)) and len(bbox) >= 2:
-                        new_page.insert_text((bbox[0], bbox[1]),  # type: ignore
-                                           filtered_text.strip(), fontsize=12)  # type: ignore
+            if block.get('type') != 0:
+                continue
+
+            # Collect line texts + bbox; build joined block text with an
+            # offset table mapping each position in the joined string back
+            # to its source line.
+            line_meta: List[Tuple[int, int, float, float]] = []  # (start, end, y, x)
+            joined_parts: List[str] = []
+            pos = 0
+            for line in block.get('lines', []):
+                if not isinstance(line, dict):
+                    continue
+                lt = " ".join(
+                    str(s.get('text', ''))
+                    for s in line.get('spans', [])
+                    if isinstance(s, dict) and s.get('text')
+                )
+                bbox = line.get('bbox', [0, 0, 0, 0])
+                if not isinstance(bbox, (list, tuple)) or len(bbox) < 2:
+                    continue
+                line_meta.append((pos, pos + len(lt), float(bbox[1]), float(bbox[0])))
+                joined_parts.append(lt)
+                pos += len(lt) + 1  # +1 for the separating space in " ".join
+
+            if not line_meta:
+                continue
+
+            joined = " ".join(joined_parts)
+
+            for match in keep_pattern.finditer(joined):
+                if not any(g for g in match.groups()):
+                    continue
+                # Find which source line this match's first char lies in.
+                start = match.start()
+                line_y = line_meta[0][2]
+                line_x = line_meta[0][3]
+                for s, e, y, x in line_meta:
+                    if s <= start <= e:
+                        line_y = y
+                        line_x = x
+                        break
+                new_page.insert_text((line_x, line_y),  # type: ignore
+                                     match.group(0).strip(), fontsize=12)  # type: ignore
 
     def _process_images(self, page: fitz.Page, new_page: fitz.Page) -> None:
         """Process and combine images on the page using spatial clustering."""
@@ -844,12 +872,20 @@ class PDFProcessor:
                     img_bytes_data = img_bytes.getvalue()
                     processed_img.close()
                     
+                    page_w = page.rect.width
                     for rect in rects:
-                        # Skip sub-pixel rects — these are usually thin horizontal-rule
-                        # decorations PyMuPDF surfaces as 0-height "images" and otherwise
-                        # generate noisy degenerate-rect WARNINGs at merge time.
-                        if (rect.x1 - rect.x0) < 1.0 or (rect.y1 - rect.y0) < 1.0:
+                        w = rect.x1 - rect.x0
+                        h = rect.y1 - rect.y0
+                        # Skip true point rects (both dims sub-pixel).
+                        if w < 0.5 and h < 0.5:
                             logger.debug(f"Skipping degenerate rect for xref {xref}: {rect}")
+                            continue
+                        # Skip page-wide thin strips — these are the horizontal-rule
+                        # decorations between sectors. Width > 50% of page is the
+                        # distinguishing feature: real logos (even scanline-encoded
+                        # rasters) span only the logo's width, never the gutter.
+                        if h < 1.0 and w > 0.5 * page_w:
+                            logger.debug(f"Skipping page-wide divider for xref {xref}: {rect}")
                             continue
                         image_data.append((rect, img_bytes_data))
                         logger.debug(f"Image {xref} found at position ({rect.x0:.0f}, {rect.y0:.0f})")
