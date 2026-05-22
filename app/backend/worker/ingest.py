@@ -62,9 +62,16 @@ def _run_image_extraction(
     data_dir: Path,
 ) -> Path | None:
     """Best-effort logo extraction. Returns the absolute path of the per-PDF
-    image directory on success, None on failure. Failures are logged at WARNING
-    level so they don't fail the surrounding CSV ingest — rows still land in
-    the DB with logo_path=NULL.
+    image directory on success, None on failure. CSV ingest continues either
+    way — rows just get logo_path=NULL when extraction failed.
+
+    Logging policy (post-audit):
+      - WARNING for known degrade-paths: missing config file, missing year,
+        extractor module not importable.
+      - ERROR (with exc_info) for unexpected failures: extractor crashed
+        mid-PDF, unexpected import error. These indicate a real problem
+        worth investigating; the row count of NULL logo_path values on the
+        gazette is the operator's smoke signal.
     """
     if year is None:
         logger.warning("Gazette has no issue_year; skipping image extraction for %s", pdf_path.name)
@@ -85,8 +92,16 @@ def _run_image_extraction(
             PDFProcessor as ImageExtractor,
             ProcessingPaths as ImagePaths,
         )
-    except Exception as e:
+    except (ImportError, ModuleNotFoundError) as e:
+        # Genuine "extractor not installed / file moved" — degrade to no-logo.
         logger.warning("Image extractor not importable from %s: %s", project_root, e)
+        return None
+    except Exception:
+        # Anything else (SyntaxError on a hand-edit, AttributeError on a
+        # renamed symbol, third-party RuntimeError at module init) is a real
+        # programming error masquerading as "extractor missing." Surface it
+        # so the operator can see what broke.
+        logger.exception("Unexpected error importing image extractor from %s", project_root)
         return None
 
     cfg_path = data_dir / "config_image_extractor.yaml"
@@ -120,12 +135,34 @@ def _run_image_extraction(
         modified_pdf = extractor._modify_pdf(pdf_path, modified_dir, pdf_type)
         extractor._extract_images(modified_pdf, image_dir, pdf_type)
         extractor._create_image_link_csv(output_stem, image_dir, image_link_dir, year_folder=None)
-    except Exception as e:
-        logger.warning("Image extraction failed for %s: %s", pdf_path.name, e)
+    except Exception:
+        # The extractor crashed mid-PDF. Partial output may already be on disk
+        # (some PNGs in image_dir, modified PDF half-written). Log at ERROR with
+        # exc_info so an operator can correlate it with the resulting NULL
+        # logo_path rows. CSV ingest still proceeds — see ingest_pdf's caller.
+        logger.exception(
+            "Image extraction failed mid-PDF for %s (partial output may be in %s)",
+            pdf_path.name,
+            image_dir,
+        )
         return None
 
-    logger.info("Image extraction completed for %s (%s)", pdf_path.name, image_dir)
+    extracted_pngs = sum(1 for _ in image_dir.glob("*.png"))
+    logger.info(
+        "Image extraction completed for %s (%s, %d PNGs)",
+        pdf_path.name,
+        image_dir,
+        extracted_pngs,
+    )
     return image_dir
+
+
+# Identifier values come from the PDF text layer (extracted by the parser
+# from raw bytes that a third party authored). An allowlist on this value
+# stops a crafted PDF from poisoning trademarks.logo_path with a
+# path-traversal string. Matches the extractor's own image_name_pattern
+# in config_image_extractor.yaml: alphanumerics + dash.
+_ID_SAFE_RE = re.compile(r"^[A-Za-z0-9\-]+$")
 
 
 def _resolve_logo_path(section: dict, image_subdir_rel: str, image_root: Path) -> str | None:
@@ -138,22 +175,30 @@ def _resolve_logo_path(section: dict, image_subdir_rel: str, image_root: Path) -
     The standalone extractor names PNGs after whichever section-start
     marker it found first; for B-files that's `(111)` or `(116)`, not
     `(210)`, so omitting `(111)` here drops every domestic-only B row.
+
+    Letter-suffix fallback (e.g. 0181946 → 0181946A.png) applies ONLY to
+    (116) Madrid: WIPO publishes modifications/renewals of a base Madrid
+    registration with A-Z suffixes. (210)/(111) numbers have a different
+    structure (4-YYYY-NNNN / 7-digit certificate) and an `A` suffix on
+    one of those would be an unrelated mark, not the same registration.
     """
     for marker in ("(210)", "(111)", "(116)"):
         v = section.get(marker)
         if not v:
             continue
         ident = str(v).strip()
-        if not ident:
+        if not ident or not _ID_SAFE_RE.match(ident):
             continue
-        # Exact match first; fall back to letter-suffix variants. WIPO Madrid
-        # modifications/renewals are published with suffixes A-Z on the base
-        # registration number (e.g. 0181946A.png for registration 0181946 —
-        # same legal mark, more recent specimen).
-        for suf in ("", *string.ascii_uppercase):
-            rel = f"{image_subdir_rel}/{ident}{suf}.png"
-            if (image_root / rel).is_file():
-                return rel
+        # Exact name first.
+        rel = f"{image_subdir_rel}/{ident}.png"
+        if (image_root / rel).is_file():
+            return rel
+        # Madrid-only suffix variants.
+        if marker == "(116)":
+            for suf in string.ascii_uppercase:
+                rel = f"{image_subdir_rel}/{ident}{suf}.png"
+                if (image_root / rel).is_file():
+                    return rel
     return None
 
 
