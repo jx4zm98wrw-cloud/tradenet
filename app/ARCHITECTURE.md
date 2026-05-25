@@ -48,6 +48,11 @@ country codes, classifier rules), `data_loaders.py` (cities/suffixes JSON).
 The legacy CLI is preserved as `TM_csv_builder_legacy.py` at the repo root
 for byte-identical reference output.
 
+The image extractor lives separately at the repo root as
+`Final_TRADEMARK_image_extractor_refine.py` (lazy-imported by
+`worker/ingest.py` via a single `sys.path.insert`). It uses PyMuPDF for
+blank-page removal + image-rect extraction and produces per-sector PNGs.
+
 ### `api/`
 HTTP layer. Routes are thin — input validation via Pydantic, business logic
 in `_filters.py` shared helpers, persistence via SQLAlchemy async session.
@@ -103,11 +108,22 @@ parent process can't safely `fork()`. `worker/run_worker.py` sets
 Linux is unaffected.
 
 ### Mark specimens (placeholder vs. real)
-The (540) WIPO field carries the wordmark, but only B-files (registrations)
-have it; A-files (applications) don't. Until raster image extraction lands,
-`markDisplay(mark)` falls back to a derived label from `applicant_name` with
-Vietnamese entity prefixes stripped, and the specimen frame renders in a
-visibly-subdued placeholder mode.
+Two sources fill the specimen frame, picked in order:
+1. **Extracted logo PNG** — `Final_TRADEMARK_image_extractor_refine.py` carves
+   per-sector PNGs into `image/<year>/<stem>/`, the worker's `_resolve_logo_path`
+   probes `(210) → (111) → (116)` (plus Madrid letter-suffix variants) and
+   writes the relative path to `trademarks.logo_path`. `_save_page_images`
+   is label-aware: when clustering merges image rects across sector
+   boundaries, it splits the merged image at interior marker y-positions.
+2. **(540) wordmark text** — only B-files (registrations) carry it; A-files
+   (applications) don't.
+
+When both are missing (~0.015% of rows — gazette pages with no figurative
+metadata AND no transcribed wordmark), `markDisplay(mark)` falls back to a
+derived label from `applicant_name` with Vietnamese entity prefixes
+stripped, and the specimen frame renders in a visibly-subdued placeholder
+mode. Coverage on the 2026 gazette set: 99.985% combined, all 4 A-files at
+100% combined.
 
 ### Similarity engine (the load-bearing TODO)
 All scoring (phonetic, visual, class overlap, composite) flows through small

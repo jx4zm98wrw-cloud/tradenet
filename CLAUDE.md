@@ -123,9 +123,9 @@ Inputs and outputs live at the project root (alongside the legacy script, since 
 ### Worker + image extractor (web stack only)
 
 `app/backend/worker/ingest.py:ingest_pdf` orchestrates one PDF through:
-1. `_run_image_extraction` lazy-imports `Final_TRADEMARK_image_extractor_refine.py` from the project root, runs `_modify_pdf` (blank-page removal via PyMuPDF) → `_extract_images` (per-sector PNGs into `image/<year>/<stem>/`) → `_create_image_link_csv`. Failures degrade to `logo_path = NULL`; the CSV ingest still proceeds.
+1. `_run_image_extraction` lazy-imports `Final_TRADEMARK_image_extractor_refine.py` from the project root, runs `_modify_pdf` (blank-page removal via PyMuPDF) → `_extract_images` (per-sector PNGs into `image/<year>/<stem>/`) → `_create_image_link_csv`. Failures degrade to `logo_path = NULL`; the CSV ingest still proceeds. `_save_page_images` detects when the clustering step has merged image rects across sector boundaries (rect contains additional marker label y-positions past the +20 best-tolerance band) and splits the merged image at each interior boundary, saving per-label crops — without this, adjacent-sector logos within `cluster_threshold=80px` of each other would collapse into a single PNG assigned to only the topmost sector.
 2. The tm_extractor parser produces sections (same logic as the legacy script).
-3. `mapper.section_to_trademark` materializes a `Trademark` row; `_resolve_logo_path(section, image_subdir, image_root)` checks for `image/<year>/<stem>/<(210) or (116)>.png` and stores the path **relative** in `trademarks.logo_path`.
+3. `mapper.section_to_trademark` materializes a `Trademark` row; `_resolve_logo_path(section, image_subdir, image_root)` probes `image/<year>/<stem>/<(210)>.png` → `<(111)>.png` → `<(116)>.png` in that order and stores the first hit's path **relative** in `trademarks.logo_path`. Madrid `(116)` lookups also try letter-suffix variants `<id>A.png` through `<id>Z.png` for WIPO modifications/renewals; `(210)` and `(111)` use exact match only.
 
 The standalone extractor is the sole `sys.path.insert` in the backend (it lives outside the package, at the project root). FastAPI mounts `data_dir/image` at `/static/image/`; Next.js proxies `/static/*` to the backend. `markDisplay()` on the frontend prepends `/static/image/` to `logo_path` and feeds it to every `MarkSpecimen` call site.
 
@@ -172,6 +172,7 @@ These are PDF-source-level artifacts that no parser can fix without external dat
 
 - **~14 B rows have a Madrid registration number in `(732)`**, e.g. `"(732) 1529250 (DE) Jack Wolfskin …"` — the NOIP PDF itself transcribed a previous-registration cross-reference into the (732) line.
 - **~7 B rows have only an address fragment in `(732)`** (e.g., `"503-ho, Gasan Hanwha BizMetro 2nd, …"`) — the company name simply isn't in the PDF text layer (likely rasterized image area).
-- **~18 VN rows have no `Applicant City`** — both the city matcher and the `tỉnh X` province fallback found nothing. Mostly truncated addresses.
+- **~31 VN rows have no `Applicant City`** — both the city matcher and the `tỉnh X` province fallback found nothing. Mostly truncated addresses. (Was ~18 before the 2026-05-25 fix that narrowed the city-matcher corpus from full applicant text to the parsed address only — the higher count is the real residual; the old number was inflated by false-positive city matches from personal-name fragments like `Hồng Lĩnh`.)
+- **7 B rows have neither a logo PNG nor `(540)` text** (CARMEDA, ALLM, CASTROL, TOPPAN HOLDINGS, TOPGOLF CALLAWAY, EGIS, TOTO). The gazette page has no figurative-element metadata at all — no Vienna `(531)`, no protected colors `(591)`, no transcribed wordmark. Unrecoverable without re-OCRing the original NOIP PDF pages.
 
-Total residual error rate: ~0.05% of rows across all files.
+Combined-mark coverage (logo OR `(540)`): **99.985%** across 46,758 rows over 8 gazettes (4 A-files at 100.00%, B-files 99.92-100%). Applicant-data residuals are separate from mark-display residuals and add ~0.1% more rows with degraded fields.
