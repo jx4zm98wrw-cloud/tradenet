@@ -1037,7 +1037,7 @@ class PDFProcessor:
                         continue
 
                     for rect_idx, rect in enumerate(rects):
-                        # Nearest label whose y <= image.y0 + tolerance.
+                        # Nearest label whose y <= rect.y0 + tolerance.
                         # Standard gazette layout puts the marker line 10-15
                         # px ABOVE its logo, but the marker's baseline y can
                         # land slightly below the rect top depending on font
@@ -1050,20 +1050,50 @@ class PDFProcessor:
                                 best = ident
                             else:
                                 break
-                        identifier_raw = best if best is not None else f"unknown_{page_num}_{img_index}_{rect_idx}"
 
-                        key = (identifier_raw, xref)
-                        if key in saved_keys:
-                            continue
-                        saved_keys.add(key)
-                        count_per_id[identifier_raw] = count_per_id.get(identifier_raw, 0) + 1
-                        identifier = identifier_raw if count_per_id[identifier_raw] == 1 \
-                            else f"{identifier_raw}_{count_per_id[identifier_raw]}"
+                        # Interior labels: marker y-positions that fall
+                        # STRICTLY inside the rect, past the best-tolerance
+                        # band. Their presence means _modify_pdf's clustering
+                        # merged image rects across sector boundaries
+                        # (adjacent sectors' logos within cluster_threshold
+                        # of each other). To recover per-sector logos we
+                        # split the merged image at each interior label's
+                        # y-position rather than dropping all-but-one sector.
+                        interior_labels = [
+                            (y_lbl, ident)
+                            for y_lbl, ident in labels
+                            if rect.y0 + 20 < y_lbl < rect.y1
+                        ]
 
-                        if identifier_raw.startswith("unknown_"):
-                            logger.warning(f"Skipping image with no matching identifier: {identifier}")
-                            continue
+                        # Build the (identifier, page_y0, page_y1) slices.
+                        # Single-sector rects produce one slice covering the
+                        # whole rect — flow is unchanged from the original.
+                        # Multi-sector rects produce one slice per covered
+                        # label. If `best` exists, it owns the top portion
+                        # from rect.y0 to the first interior label; if not,
+                        # the area above the first interior label has no
+                        # owning sector and is dropped.
+                        if interior_labels:
+                            ordered: List[Tuple[float, str]] = []
+                            if best is not None:
+                                ordered.append((rect.y0, best))
+                            ordered.extend(interior_labels)
+                            slices: List[Tuple[str, float, float]] = []
+                            for i, (y_label, ident) in enumerate(ordered):
+                                sy0 = y_label
+                                sy1 = ordered[i + 1][0] if i + 1 < len(ordered) else rect.y1
+                                slices.append((ident, sy0, sy1))
+                        else:
+                            ident_single = (
+                                best
+                                if best is not None
+                                else f"unknown_{page_num}_{img_index}_{rect_idx}"
+                            )
+                            slices = [(ident_single, rect.y0, rect.y1)]
 
+                        # Decode the source image once. For single-slice
+                        # rects we save it directly; for multi-slice rects
+                        # we crop each slice's pixel sub-region.
                         processed_img = ImageProcessor.process_image_safely(
                             base_image["image"],
                             max_size if not preserve_quality else None,
@@ -1073,18 +1103,58 @@ class PDFProcessor:
                             logger.warning(f"Could not process image xref {xref} on page {page_num}")
                             continue
 
-                        image_path = output_dir / f"{identifier}.{image_format.lower()}"
                         try:
-                            if image_format.upper() == 'PNG':
-                                processed_img.save(image_path, image_format, compress_level=1)
-                            elif image_format.upper() in ['JPEG', 'JPG']:
-                                processed_img.save(image_path, 'JPEG', quality=95, subsampling=0)
-                            else:
-                                processed_img.save(image_path, image_format)
-                            self.stats.total_images += 1
-                            logger.info(f"Extracted and saved image: {image_path}")
-                        except Exception as save_error:
-                            logger.error(f"Error saving image {identifier}: {save_error}")
+                            img_w, img_h = processed_img.size
+                            rect_h_pts = rect.y1 - rect.y0
+                            # Sub-images thinner than this are rendering
+                            # artifacts (e.g., a label sitting one or two
+                            # px above the rect bottom) — drop them rather
+                            # than emit a useless sliver.
+                            MIN_SLICE_PX = 20
+
+                            for slice_idx, (identifier_raw, sy0, sy1) in enumerate(slices):
+                                if identifier_raw.startswith("unknown_"):
+                                    logger.warning(
+                                        f"Skipping image with no matching identifier: {identifier_raw}"
+                                    )
+                                    continue
+
+                                px_y0 = max(0, int((sy0 - rect.y0) / rect_h_pts * img_h))
+                                px_y1 = min(img_h, int((sy1 - rect.y0) / rect_h_pts * img_h))
+                                if px_y1 - px_y0 < MIN_SLICE_PX:
+                                    continue
+
+                                key = (identifier_raw, xref, slice_idx)
+                                if key in saved_keys:
+                                    continue
+                                saved_keys.add(key)
+                                count_per_id[identifier_raw] = count_per_id.get(identifier_raw, 0) + 1
+                                identifier = (
+                                    identifier_raw
+                                    if count_per_id[identifier_raw] == 1
+                                    else f"{identifier_raw}_{count_per_id[identifier_raw]}"
+                                )
+
+                                img_to_save = (
+                                    processed_img.crop((0, px_y0, img_w, px_y1))
+                                    if len(slices) > 1
+                                    else processed_img
+                                )
+                                image_path = output_dir / f"{identifier}.{image_format.lower()}"
+                                try:
+                                    if image_format.upper() == 'PNG':
+                                        img_to_save.save(image_path, image_format, compress_level=1)
+                                    elif image_format.upper() in ['JPEG', 'JPG']:
+                                        img_to_save.save(image_path, 'JPEG', quality=95, subsampling=0)
+                                    else:
+                                        img_to_save.save(image_path, image_format)
+                                    self.stats.total_images += 1
+                                    logger.info(f"Extracted and saved image: {image_path}")
+                                except Exception as save_error:
+                                    logger.error(f"Error saving image {identifier}: {save_error}")
+                                finally:
+                                    if len(slices) > 1:
+                                        img_to_save.close()
                         finally:
                             processed_img.close()
                 except Exception as e:
