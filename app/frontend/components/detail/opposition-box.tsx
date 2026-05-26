@@ -2,9 +2,7 @@
 
 import { Button } from "@/components/ui";
 import { type MarkDetail } from "@/lib/api";
-
-const fmtShort = (iso?: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "—";
+import { formatDateShort } from "@/lib/format";
 
 export function OppositionBox({ detail }: { detail: MarkDetail }) {
   const opp = detail.oppositionDaysLeft;
@@ -35,8 +33,8 @@ export function OppositionBox({ detail }: { detail: MarkDetail }) {
         />
       </div>
       <div className="mt-1.5 flex items-start justify-between text-[10.5px] font-mono text-mute">
-        <span>Published<br />{fmtShort(detail.mark.publication_date_441 ?? detail.mark.publication_date_450)}</span>
-        <span className="text-right">Window closes<br />{fmtShort(detail.oppositionEnds)}</span>
+        <span>Published<br />{formatDateShort(detail.mark.publication_date_441 ?? detail.mark.publication_date_450)}</span>
+        <span className="text-right">Window closes<br />{formatDateShort(detail.oppositionEnds)}</span>
       </div>
       <p className="mt-3 text-[11px] text-mute leading-relaxed">
         Under Vietnam Article 112: opposition window = 5 months from publication date. After this date, only invalidation proceedings remain.
