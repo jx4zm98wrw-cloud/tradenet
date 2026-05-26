@@ -8,6 +8,7 @@ import re
 import string
 import uuid
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -47,10 +48,25 @@ def sha256_file(path: Path, chunk_size: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
-def _sync_session() -> Session:
+@lru_cache(maxsize=1)
+def _session_factory() -> sessionmaker[Session]:
+    """Cache the engine + sessionmaker at module scope.
+
+    Previously this module created a new engine per RQ job, leaking the
+    connection pool (5 connections per engine, never disposed). Under
+    sustained job throughput this exhausted postgres' max_connections.
+
+    The engine itself is created lazily on first call (not at import time)
+    so the API process, which imports `worker.ingest` indirectly via
+    routes, doesn't open a sync DB connection it never uses.
+    """
     settings = get_settings()
     engine = create_engine(settings.database_url_sync, future=True)
-    return sessionmaker(bind=engine, expire_on_commit=False, future=True)()
+    return sessionmaker(bind=engine, expire_on_commit=False, future=True)
+
+
+def _sync_session() -> Session:
+    return _session_factory()()
 
 
 def _run_image_extraction(
