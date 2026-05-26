@@ -15,9 +15,10 @@ from pathlib import Path
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
+from api._filename import parse_filename_meta
 from api.db.models import Gazette, GazetteStatus, Trademark
 from api.settings import get_settings
-from worker.ingest import ingest_pdf, parse_filename_meta, sha256_file
+from worker.ingest import ingest_pdf, sha256_file
 
 
 def main(pdf_path: Path) -> None:

@@ -23,23 +23,6 @@ from .mapper import infer_record_type, section_to_trademark
 logger = logging.getLogger("worker.ingest")
 
 
-_FILENAME_RE = re.compile(r"^([ABab])_T(\d+)_(\d{4})", re.IGNORECASE)
-
-
-def parse_filename_meta(filename: str) -> tuple[GazetteType, int | None, int | None]:
-    """Extract gazette_type / issue_number / issue_year from a NOIP filename.
-
-    Example: "A_T3_2026.pdf" -> (GazetteType.A, 3, 2026)
-    Falls back to type-only when the issue/year pattern doesn't match.
-    """
-    letter = filename[:1].upper() if filename else "A"
-    gazette_type = GazetteType.B if letter == "B" else GazetteType.A
-    m = _FILENAME_RE.match(filename)
-    if m:
-        return gazette_type, int(m.group(2)), int(m.group(3))
-    return gazette_type, None, None
-
-
 def sha256_file(path: Path, chunk_size: int = 1 << 20) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:

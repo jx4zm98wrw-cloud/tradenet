@@ -8,8 +8,9 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Upl
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .._filename import parse_filename_meta
 from ..auth import User, require_user
-from ..db import Gazette, GazetteStatus, GazetteType, get_session
+from ..db import Gazette, GazetteStatus, get_session
 from ..rate_limit import limiter
 from ..schemas import GazetteListOut, GazetteOut
 from ..settings import get_settings
@@ -37,17 +38,6 @@ def _gazette_out(g: Gazette) -> GazetteOut:
     out.flagged_row_count = None
     out.needs_review = False
     return out
-
-
-def _parse_filename_meta(filename: str) -> "tuple[GazetteType, int | None, int | None]":
-    import re
-
-    m = re.match(r"^([ABab])_T(\d+)_(\d{4})", filename)
-    letter = filename[:1].upper() if filename else "A"
-    gtype = GazetteType.B if letter == "B" else GazetteType.A
-    if m:
-        return gtype, int(m.group(2)), int(m.group(3))
-    return gtype, None, None
 
 
 @router.post("", response_model=GazetteOut, status_code=status.HTTP_201_CREATED)
@@ -120,7 +110,7 @@ async def upload_gazette(
     final_path = settings.upload_dir / f"{digest[:16]}_{safe_name}"
     tmp_path.rename(final_path)
 
-    gazette_type, issue_num, issue_year = _parse_filename_meta(safe_name)
+    gazette_type, issue_num, issue_year = parse_filename_meta(safe_name)
     g = Gazette(
         id=uuid.uuid4(),
         filename=safe_name,
