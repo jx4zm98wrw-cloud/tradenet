@@ -382,7 +382,7 @@ export default function MarkDetailPage() {
                     >
                       {f.label}
                     </div>
-                    <div className="text-ink-2 break-words mt-0.5">{f.value}</div>
+                    <InidValue code={f.code} value={f.value} />
                   </li>
                 ))}
               </ul>
@@ -397,6 +397,34 @@ export default function MarkDetailPage() {
 /* =========================================================================== */
 /* Small subcomponents                                                          */
 /* =========================================================================== */
+
+/** Render a single INID-marker value. For most codes this is just the raw
+ * string. For (511) Nice classification, the gazette publishes
+ * "Nhóm 25: …. Nhóm 28: …." as one long run-on line; split it so each
+ * group renders on its own paragraph for legibility. The same Nhóm parser
+ * already used by the main Goods & services panel is reused here so the
+ * two surfaces never diverge. */
+function InidValue({ code, value }: { code: string; value: string | null }) {
+  if (!value) return null;
+  if (code === "511") {
+    const perClass = parseGoodsServices(value);
+    if (perClass.size > 1) {
+      return (
+        <div className="text-ink-2 break-words mt-0.5 space-y-1.5">
+          {Array.from(perClass.entries()).map(([cls, desc]) => (
+            <div key={cls}>
+              <span className="font-mono font-semibold text-[11px] text-ink-2 mr-1">
+                Nhóm {Number(cls)}:
+              </span>
+              {desc}
+            </div>
+          ))}
+        </div>
+      );
+    }
+  }
+  return <div className="text-ink-2 break-words mt-0.5">{value}</div>;
+}
 
 function Breadcrumb({ mark, onBack }: { mark: Trademark; onBack: () => void }) {
   return (
