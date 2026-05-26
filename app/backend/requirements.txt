@@ -46,3 +46,13 @@ prometheus-fastapi-instrumentator==7.0.0
 
 # === File handling ===
 python-magic==0.4.27
+
+# === Similarity engine (api.similarity) ===
+# Phonetic + string similarity: Jaro-Winkler + Metaphone via jellyfish — the
+# trademark industry's standard pair (Cohen-Ravikumar-Fienberg 2003). Pure C,
+# no extra runtime deps. Perceptual visual hashing for logo comparison via
+# imagehash on the existing Pillow install — extracted PNGs already live in
+# the data dir, so pHash compares the actual specimens rather than wordmark
+# text alone.
+jellyfish==1.1.3
+imagehash==4.3.2
