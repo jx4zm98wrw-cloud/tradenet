@@ -43,8 +43,21 @@ def _jitter(seed: str, lo: float = -0.04, hi: float = 0.04) -> float:
     return lo + (hi - lo) * (h % 1000) / 1000.0
 
 
-def _score(mark: Trademark, q: str | None, mode: SearchMode) -> float:
-    """Mocked similarity score in [0, 1]. Swap this function for a real engine."""
+def _score(mark: Trademark, q: str | None, mode: SearchMode, has_vienna: bool = False) -> float:
+    """Mocked similarity score in [0, 1]. Swap this function for a real engine.
+
+    When the user hasn't supplied a similarity *target* — no text query in
+    text/phonetic mode, no codes in Vienna mode — the threshold slider is
+    conceptually irrelevant (nothing to be "similar" to). Return 1.0 so the
+    row passes regardless of where the slider sits; otherwise filter-only
+    searches (country=GB&nice_class=41&...) silently return zero rows
+    even though the header reports a non-zero filter-match count.
+    """
+    # Filter-only search: no target supplied → similarity threshold doesn't apply.
+    if mode in ("text", "phonetic") and not q:
+        return 1.0
+    if mode == "vienna" and not has_vienna:
+        return 1.0
     base = 0.6
     if mode == "image":
         base = 0.78  # all results "match" the uploaded image at varying strength
@@ -145,7 +158,8 @@ async def search_trademarks(
     rows = list((await session.execute(stmt.limit(fetch_limit))).scalars().all())
     total = (await session.execute(cnt_stmt)).scalar_one()
 
-    scored = [(m, _score(m, q, mode)) for m in rows]
+    has_vienna = bool(norm_vienna)
+    scored = [(m, _score(m, q, mode, has_vienna=has_vienna)) for m in rows]
     scored = [(m, s) for (m, s) in scored if s >= threshold]
     if sort == "similarity":
         scored.sort(key=lambda x: (-x[1], str(x[0].id)))
