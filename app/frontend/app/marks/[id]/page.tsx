@@ -372,9 +372,15 @@ export default function MarkDetailPage() {
               <ul className="px-5 pb-4 space-y-2 text-[12px]">
                 {inid.map((f) => (
                   <li key={f.code} className="border-l-2 border-line pl-2">
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-mono font-bold text-[11px] text-stamp">({f.code})</span>
-                      <span className="text-mute">{f.label}</span>
+                    {/* INID code (111/151/etc.) is kept as a hover-tooltip
+                     * for power users cross-referencing the gazette PDF,
+                     * but hidden from the visual layout — the label alone
+                     * communicates what the field is. */}
+                    <div
+                      className="text-mute"
+                      title={`WIPO INID code (${f.code})`}
+                    >
+                      {f.label}
                     </div>
                     <div className="text-ink-2 break-words mt-0.5">{f.value}</div>
                   </li>
