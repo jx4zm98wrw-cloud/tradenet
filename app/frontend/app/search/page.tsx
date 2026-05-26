@@ -94,7 +94,27 @@ function SearchPage() {
   // Fetch results.
   React.useEffect(() => {
     setLoading(true);
-    api.scoredSearch({ ...filters, mode, threshold, nice_class_mode: niceMode, sort })
+    // In Vienna mode, the textbox value (filters.q) holds comma/space-separated
+    // Vienna codes like "26.1.1, 5.3.13". The backend has a dedicated
+    // vienna_codes parameter that does array-overlap matching against
+    // Trademark.vienna_codes — much faster + more accurate than a substring
+    // search through the same q field. Parse + send as the typed array; the
+    // backend also normalises leading zeros (01.01 -> 1.1).
+    const isVienna = mode === "vienna";
+    const viennaCodes = isVienna ? parseViennaCodes(filters.q ?? "") : undefined;
+    const params = {
+      ...filters,
+      // Drop q in Vienna mode — codes ARE the query; q would do a fruitless
+      // substring search on applicant_name etc.
+      q: isVienna ? undefined : filters.q,
+      vienna_codes: viennaCodes && viennaCodes.length > 0 ? viennaCodes : undefined,
+      vienna_codes_mode: "any" as const,
+      mode,
+      threshold,
+      nice_class_mode: niceMode,
+      sort,
+    };
+    api.scoredSearch(params)
       .then((r) => { setResults(r); setError(null); })
       .catch((e) => setError(e.message ?? String(e)))
       .finally(() => setLoading(false));
@@ -132,8 +152,8 @@ function SearchPage() {
     updateUrl({ ...filters, offset: next });
   }
 
-  function submitSearch() {
-    const q = searchText.trim();
+  function submitSearch(override?: string) {
+    const q = (override ?? searchText).trim();
     setFilter({ q: q || undefined });
     if (q) recordRecent({ q, scope: buildScopeLabel(filters) });
   }
@@ -398,6 +418,17 @@ function buildChips(filters: Params, setFilter: (p: Partial<Params>) => void, ni
   }
   if (filters.ip_agency) chips.push({ key: "agent", label: `Agent: ${filters.ip_agency}`, onRemove: () => setFilter({ ip_agency: undefined }) });
   return chips;
+}
+
+/** Split the Vienna-mode textbox value into individual codes.
+ * Splits on commas, semicolons, or whitespace. The backend rejects
+ * anything that doesn't match `NN[.NN[.NN]]` so we don't need to
+ * pre-validate — we just hand it the rough tokens. */
+function parseViennaCodes(input: string): string[] {
+  return input
+    .split(/[,;\s]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 }
 
 function buildScopeLabel(filters: Params): string {

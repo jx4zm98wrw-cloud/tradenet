@@ -66,6 +66,10 @@ export type SearchParams = {
   q?: string;
   country?: string;
   nice_class?: string[];
+  /** Figurative-element codes ((531) in WIPO INID terminology). The backend
+   * accepts either NN.NN or NN.NN.NN form and normalises leading zeros, so
+   * `01.01` and `1.1` match the same rows. */
+  vienna_codes?: string[];
   record_type?: string;
   applicant_type?: string;
   year?: number;
@@ -183,6 +187,7 @@ export type ScoredSearchParams = SearchParams & {
   mode?: SearchMode;
   threshold?: number;
   nice_class_mode?: NiceMode;
+  vienna_codes_mode?: NiceMode;
   sort?: SortKey;
 };
 

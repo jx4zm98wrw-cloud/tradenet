@@ -22,7 +22,10 @@ type Props = {
   onModeChange: (m: SearchMode) => void;
   query: string;
   onQueryChange: (q: string) => void;
-  onSubmit: () => void;
+  /** Submit the current query. Optional `override` parameter lets callers
+   * (Vienna quick-picks) submit a value they just synthesized in the same
+   * tick, sidestepping the searchText useState closure. */
+  onSubmit: (override?: string) => void;
   threshold: number;
   onThresholdChange: (t: number) => void;
   niceMode: NiceMode;
@@ -42,7 +45,15 @@ export function QueryBand(p: Props) {
           ) : (
             <>
               <TextSearchInput mode={p.mode} value={p.query} onChange={p.onQueryChange} onSubmit={p.onSubmit} />
-              {p.mode === "vienna" && <ViennaQuickPicks onAdd={(code) => p.onQueryChange(appendCode(p.query, code))} />}
+              {p.mode === "vienna" && (
+                <ViennaQuickPicks
+                  onAdd={(code) => {
+                    const next = appendCode(p.query, code);
+                    p.onQueryChange(next);
+                    p.onSubmit(next);  // pass directly; avoids the closure-staleness on searchText
+                  }}
+                />
+              )}
             </>
           )}
         </div>
@@ -268,11 +279,6 @@ function ViennaQuickPicks({ onAdd }: { onAdd: (code: string) => void }) {
             <span className="text-mute group-hover:text-stamp">{p.label}</span>
           </button>
         ))}
-      </div>
-      <div className="border-t border-line bg-warn-2 text-[11px] text-ink-2 px-3 py-1.5">
-        <strong className="text-warn">Engine pending:</strong>{" "}
-        Vienna lookups are staged for the next release. Picking codes
-        builds a valid query but won&apos;t return matched marks yet.
       </div>
     </div>
   );
