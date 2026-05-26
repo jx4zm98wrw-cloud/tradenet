@@ -387,6 +387,72 @@ def test_phash_visual_does_satisfy_conjunction_guard() -> None:
         vienna_o=0.0,
         visual_confidence="phash",
     )
-    # composite = 0.4*0.30 + 0.25*0.85 + 0.2*1.0 + 0 = 0.533
-    # max_sig = max(0.30, 0.85) = 0.85 ≥ 0.50 → Possible conflict.
+    # mark_score = 0.4*0.30 + 0.25*0.85 = 0.333
+    # mark_strength = 0.85 (phash, max counts) → goods_factor = 1.0
+    # composite = 0.333 + 0.2 = 0.533 ≥ 0.50, mark_strength ≥ 0.50 → Possible.
+    assert c.verdict == "Possible conflict"
+
+
+def test_class_overlap_alone_cannot_inflate_composite() -> None:
+    """The user's complaint that drove this fix: OMBRES TENDRES vs
+    MAYBELLINE SPOT RESCUE scored 45% composite because class overlap
+    (1.0) added its full 0.20 weight to the composite even though the
+    marks themselves are visually and phonetically distinct.
+
+    With the goods-dampener, mark_strength of 0.38 (Jaro-Winkler
+    baseline noise from shared common letters) pulls goods_factor down
+    to ~0.20 → class contributes only ~0.04 instead of 0.20, so the
+    composite reflects only the (irreducible) JW baseline noise — well
+    under 0.30.
+    """
+    c = composite_score(
+        phonetic=0.38,
+        visual=0.38,
+        class_o=1.0,
+        vienna_o=0.0,
+        visual_confidence="typographic",
+    )
+    # mark_score = 0.4*0.38 + 0.25*0.38 = 0.247
+    # mark_strength = 0.38 (typographic, phonetic only)
+    # goods_factor = (0.38 - 0.30) / 0.40 = 0.20
+    # composite = 0.247 + 0.20 * 0.20 = 0.287
+    assert c.composite < 0.30, (
+        f"two visibly distinct multi-word marks sharing only Nice class "
+        f"should land well below 30%, not at the previous 45%. got {c.composite}"
+    )
+    assert c.verdict == "Low risk"
+
+
+def test_goods_dampener_does_not_break_real_conflicts() -> None:
+    """MONTINIS vs MONTANIS sharing class 30 (sweets) — the dampener
+    must NOT demote this. mark_strength ≥ 0.7 → goods contribute fully,
+    composite stays in 'Likely conflict' territory."""
+    c = composite_score(
+        phonetic=0.945,
+        visual=0.921,
+        class_o=1.0,
+        vienna_o=0.0,
+        visual_confidence="typographic",
+    )
+    # mark_strength = 0.945 (phonetic, typographic) → goods_factor = 1.0 capped
+    # mark_score = 0.4*0.945 + 0.25*0.921 = 0.608
+    # composite = 0.608 + 0.2 = 0.808
+    assert c.composite >= 0.70
+    assert c.verdict == "Likely conflict"
+
+
+def test_goods_dampener_preserves_pharma_shared_dominant_word() -> None:
+    """LIPITOR EXTRA vs LIPITAR PLUS — shared dominant pharma brand,
+    descriptive suffixes vary. mark_strength ≈ 0.56 → goods_factor ≈ 0.64
+    → enough goods contribution to keep this in 'Possible conflict'."""
+    c = composite_score(
+        phonetic=0.557,
+        visual=0.675,
+        class_o=1.0,
+        vienna_o=0.0,
+        visual_confidence="typographic",
+    )
+    # mark_strength = 0.557, goods_factor = (0.557-0.3)/0.4 = 0.643
+    # mark_score = 0.4*0.557 + 0.25*0.675 = 0.392
+    # composite = 0.392 + 0.2 * 0.643 = 0.521 → Possible
     assert c.verdict == "Possible conflict"

@@ -363,54 +363,76 @@ def composite_score(
     weights: dict[str, float] | None = None,
     visual_confidence: VisualConfidence = "phash",
 ) -> CompositeScore:
-    """Weighted sum + verdict, with examiner-grade conjunction guards.
+    """Composite conflict score + verdict.
 
-    The numeric composite is a straight weighted sum across the four
-    signals. The *verdict* requires:
-      1. The composite to clear the band's threshold, AND
-      2. At least one of {phonetic, visual} to clear a minimum strength
-         (i.e. there's *some* sight-or-sound similarity, not just class
-         overlap), AND
-      3. Some class proximity (marks in unrelated classes don't confuse
-         consumers regardless of similarity).
+    The composite is a sum of two contributions:
+      - mark_score    = w_phon * phonetic + w_vis * visual   (the sight-or-sound axis)
+      - goods_score   = w_class * class_o + w_vienna * vienna_o   (the goods-relatedness axis)
 
-    `visual_confidence` matters for guard (2):
-      - When the visual signal came from a real pHash comparison on
-        extracted PNG specimens (`'phash'`), it's an *independent*
-        signal from phonetic — `max(phonetic, visual)` is the right
-        check.
-      - When the visual signal is a typographic JW fallback
-        (`'typographic'`), it's measuring the same wordmark text the
-        phonetic raw component already used. Letting it independently
-        satisfy the conjunction guard is double-counting. For OMBRES
-        TENDRES vs PRETTY PEONY the visual typographic JW spikes to
-        0.56 while phonetic stays at 0.48 — without this fix the
-        verdict would be 'Possible conflict' even though no examiner
-        would call those two multi-word cosmetic marks confusable.
-        So in typographic mode, only phonetic can satisfy the guard.
-      - When there's no visual signal at all (`'none'`), the same logic:
-        phonetic is the only sight-or-sound axis we can judge by.
+    They are NOT simply added with full weight. Trademark confusion
+    requires similar marks AND related goods, multiplicatively — Apple
+    Records vs Apple Computer (1976) had identical marks but unrelated
+    goods → zero confusion. The symmetric case must hold: same goods
+    + clearly different marks → minimal conflict score.
 
-    This matches how examiners think: confusion = similar marks IN
-    related goods, not "any signal high enough."
+    So `goods_score` is dampened by mark strength. With no real
+    sight-or-sound signal the goods axis contributes ~0 (class overlap
+    alone can't carry a "conflict score"). At mark_strength ≥ 0.7 the
+    goods axis contributes fully.
 
-    Bands:
-      Likely:   composite >= 0.70, sight_or_sound >= 0.70, class >= 0.30
-      Possible: composite >= 0.50, sight_or_sound >= 0.50, class >= 0.20
+      composite = mark_score + goods_score * min(1, mark_strength / 0.7)
+
+    `mark_strength` uses the same rule as the conjunction guard:
+      - `'phash'` visual: max(phonetic, visual) — they're independent signals.
+      - `'typographic'` / `'none'`: phonetic only — typographic visual is
+        JW on the same wordmark text the phonetic raw saw, not independent.
+
+    Verdict bands (applied after the math above):
+      Likely:   composite >= 0.70, mark_strength >= 0.70, class >= 0.30
+      Possible: composite >= 0.50, mark_strength >= 0.50, class >= 0.20
       else:     Low risk
+
+    Conjunction guards (the mark_strength + class_o clauses) remain
+    because the dampener fixes the numeric composite but not the
+    verdict on edge cases. A pair with mark_strength 0.49 and class
+    overlap 1.0 might still produce a composite ~0.5 from the
+    dampener; the guard pins it as Low risk for examiner-grade
+    consistency.
+
+    Why this matters in practice — OMBRES TENDRES vs MAYBELLINE SPOT
+    RESCUE was scoring 0.447 because class overlap added its full
+    0.20 weight even though the marks themselves are clearly
+    different. The dampener reduces that to ~0.36 — still nonzero
+    (the marks DO share class-3 cosmetics, and JW always returns
+    some baseline overlap for similar-length strings), but no longer
+    visually misleading.
     """
     w = weights or DEFAULT_WEIGHTS
-    composite = round(
-        w["phonetic"] * phonetic + w["visual"] * visual + w["class"] * class_o + w["vienna"] * vienna_o,
-        3,
-    )
-    # Conjunction guard: pHash visual counts as independent evidence
-    # of similarity; typographic / none does not (it's derived from the
-    # same wordmark text the phonetic raw component already saw).
-    max_sig = max(phonetic, visual) if visual_confidence == "phash" else phonetic
 
-    if composite >= 0.70 and max_sig >= 0.70 and class_o >= 0.30:
+    mark_score = w["phonetic"] * phonetic + w["visual"] * visual
+    goods_score = w["class"] * class_o + w["vienna"] * vienna_o
+
+    # Conjunction signal: pHash visual is independent evidence; typographic
+    # / none is just JW on the wordmark text and shouldn't double-count.
+    mark_strength = max(phonetic, visual) if visual_confidence == "phash" else phonetic
+
+    # Goods-dampener ramp:
+    #   mark_strength <= 0.30  → goods contribute 0 (Jaro-Winkler baseline
+    #                            noise; no real mark similarity to amplify)
+    #   0.30 < mark_strength < 0.70 → linear ramp 0 → 1
+    #   mark_strength >= 0.70  → goods contribute fully
+    #
+    # The 0.30 floor matters: JW returns ~0.30–0.45 for *any* two
+    # similar-length strings just from shared common letters
+    # (OMBRES TENDRES vs MAYBELLINE SPOT RESCUE scores phonetic 0.38
+    # purely from that effect). Without the floor, class overlap would
+    # still inflate the composite even though the marks are clearly
+    # different. The floor cuts JW noise out of the goods contribution.
+    goods_factor = max(0.0, min(1.0, (mark_strength - 0.30) / 0.40))
+    composite = round(mark_score + goods_score * goods_factor, 3)
+
+    if composite >= 0.70 and mark_strength >= 0.70 and class_o >= 0.30:
         return CompositeScore(composite, "Likely conflict", "stamp")
-    if composite >= 0.50 and max_sig >= 0.50 and class_o >= 0.20:
+    if composite >= 0.50 and mark_strength >= 0.50 and class_o >= 0.20:
         return CompositeScore(composite, "Possible conflict", "warn")
     return CompositeScore(composite, "Low risk", "ok")
