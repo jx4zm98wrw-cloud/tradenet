@@ -6,6 +6,7 @@ selected this value, how many results would I get" rather than zero.
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, desc, func, select
@@ -18,17 +19,20 @@ from .stats import NICE_LABELS, CountBucket
 router = APIRouter(prefix="/api/v1/facets", tags=["facets"])
 
 
-# Shared Query() filter signature — keep in sync with /api/trademarks search().
+# Shared Query() filter signature — keep in sync with /api/search/trademarks.
 def _filter_params(
     q: str | None = Query(None),
     country: str | None = Query(None, min_length=2, max_length=2),
     nice_class: list[str] | None = Query(None),
     record_type: RecordType | None = None,
     applicant_type: str | None = Query(None),
+    applicant: str | None = Query(None),
     year: int | None = None,
     month: int | None = Query(None, ge=1, le=12),
     gazette_id: uuid.UUID | None = None,
     ip_agency: str | None = Query(None),
+    grant_date_from: date | None = Query(None),
+    grant_date_to: date | None = Query(None),
 ):
     return dict(
         q=q,
@@ -36,10 +40,13 @@ def _filter_params(
         nice_class=nice_class,
         record_type=record_type,
         applicant_type=applicant_type,
+        applicant=applicant,
         year=year,
         month=month,
         gazette_id=gazette_id,
         ip_agency=ip_agency,
+        grant_date_from=grant_date_from,
+        grant_date_to=grant_date_to,
     )
 
 
@@ -85,3 +92,59 @@ async def facet_nice_classes(
         stmt = stmt.where(and_(*where))
     rows = (await session.execute(stmt)).all()
     return [CountBucket(key=cls, label=NICE_LABELS.get(cls, ""), count=n) for cls, n in rows]
+
+
+@router.get("/applicants", response_model=list[CountBucket])
+async def facet_applicants(
+    filters: dict = Depends(_filter_params),
+    limit: int = Query(20, ge=1, le=300),
+    session: AsyncSession = Depends(get_session),
+) -> list[CountBucket]:
+    """Top applicant names under the current filter set (excluding the
+    applicant filter itself), ordered by mark count.
+
+    Used by the sidebar's "Applicant" facet group. Applicant names that
+    only show up once or twice are pushed down the list naturally —
+    most users want to filter by the big repeat applicants (CHANEL,
+    L'OREAL, CÔNG TY CỔ PHẦN …).
+    """
+    where = build_trademark_where(**filters, exclude="applicant")
+    stmt = (
+        select(Trademark.applicant_name, func.count())
+        .where(Trademark.applicant_name.is_not(None))
+        .group_by(Trademark.applicant_name)
+        .order_by(desc(func.count()))
+        .limit(limit)
+    )
+    if where:
+        stmt = stmt.where(and_(*where))
+    rows = (await session.execute(stmt)).all()
+    return [CountBucket(key=name, count=n) for name, n in rows]
+
+
+@router.get("/ip-agencies", response_model=list[CountBucket])
+async def facet_ip_agencies(
+    filters: dict = Depends(_filter_params),
+    limit: int = Query(20, ge=1, le=300),
+    session: AsyncSession = Depends(get_session),
+) -> list[CountBucket]:
+    """Top IP-agency / law-firm names under the current filter set,
+    excluding the ip_agency filter itself.
+
+    The DB stores the agency name as free text from the gazette's
+    (740) marker, so two slightly different spellings of the same firm
+    will appear as separate buckets — acceptable for a facet picker
+    where the user picks the exact spelling they want to match.
+    """
+    where = build_trademark_where(**filters, exclude="ip_agency")
+    stmt = (
+        select(Trademark.ip_agency, func.count())
+        .where(Trademark.ip_agency.is_not(None))
+        .group_by(Trademark.ip_agency)
+        .order_by(desc(func.count()))
+        .limit(limit)
+    )
+    if where:
+        stmt = stmt.where(and_(*where))
+    rows = (await session.execute(stmt)).all()
+    return [CountBucket(key=name, count=n) for name, n in rows]

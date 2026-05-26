@@ -8,6 +8,7 @@ than seeing every alternative grayed out to zero.
 
 from __future__ import annotations
 
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import func, or_
@@ -75,10 +76,13 @@ def build_trademark_where(
     vienna_codes: list[str] | None = None,
     record_type: RecordType | None = None,
     applicant_type: str | None = None,
+    applicant: str | None = None,
     year: int | None = None,
     month: int | None = None,
     gazette_id: UUID | None = None,
     ip_agency: str | None = None,
+    grant_date_from: date | None = None,
+    grant_date_to: date | None = None,
     exclude: str | None = None,
 ) -> list[ColumnElement]:
     """Return a list of SQLAlchemy WHERE expressions for the given filters.
@@ -116,6 +120,12 @@ def build_trademark_where(
         where.append(Trademark.record_type == record_type)
     if applicant_type and exclude != "applicant_type":
         where.append(Trademark.applicant_type == applicant_type)
+    if applicant and exclude != "applicant":
+        # Substring + case-insensitive — applicant names vary widely
+        # (e.g. "ZOTT SE & CO. KG" vs "Zott SE", "L'OREAL" vs "L'Oréal").
+        # Frontend supplies either a full-name pick from the facet list or
+        # a free-text fragment; both go through the same ILIKE.
+        where.append(Trademark.applicant_name.ilike(f"%{applicant.lower()}%"))
     if year is not None and exclude != "year":
         where.append(Trademark.year == year)
     if month is not None and exclude != "month":
@@ -124,4 +134,12 @@ def build_trademark_where(
         where.append(Trademark.gazette_id == gazette_id)
     if ip_agency and exclude != "ip_agency":
         where.append(Trademark.ip_agency.ilike(f"%{ip_agency.lower()}%"))
+    # Grant date = INID (151), the date the registration certificate was
+    # issued. Only B-files (domestic + Madrid registrations) carry this;
+    # A-files have NULL here, so they're naturally excluded from any
+    # grant-date filter.
+    if grant_date_from is not None and exclude != "grant_date":
+        where.append(Trademark.registration_date_151 >= grant_date_from)
+    if grant_date_to is not None and exclude != "grant_date":
+        where.append(Trademark.registration_date_151 <= grant_date_to)
     return where

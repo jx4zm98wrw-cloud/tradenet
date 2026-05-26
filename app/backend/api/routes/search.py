@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
@@ -138,10 +139,13 @@ async def search_trademarks(
     vienna_codes_mode: Literal["any", "all"] = Query("any"),
     record_type: RecordType | None = None,
     applicant_type: str | None = Query(None),
+    applicant: str | None = Query(None),
     year: int | None = None,
     month: int | None = Query(None, ge=1, le=12),
     gazette_id: uuid.UUID | None = None,
     ip_agency: str | None = Query(None),
+    grant_date_from: date | None = Query(None),
+    grant_date_to: date | None = Query(None),
     sort: Literal["similarity", "publication-desc", "applicant-asc", "class-count"] = "similarity",
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -166,10 +170,13 @@ async def search_trademarks(
         vienna_codes=norm_vienna if vienna_codes_mode == "all" else None,
         record_type=record_type,
         applicant_type=applicant_type,
+        applicant=applicant,
         year=year,
         month=month,
         gazette_id=gazette_id,
         ip_agency=ip_agency,
+        grant_date_from=grant_date_from,
+        grant_date_to=grant_date_to,
     )
     if nice_class and nice_class_mode == "any":
         where.append(Trademark.nice_classes.op("&&")(nice_class))
