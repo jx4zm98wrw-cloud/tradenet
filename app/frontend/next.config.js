@@ -7,7 +7,11 @@ const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Next.js needs unsafe-eval in dev; tighten with nonces in prod build
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src 'self' data: blob: https:",
+  // Same-origin images only (`/static/image/...` from the backend mount),
+  // plus `data:` (inline SVGs / canvas exports) and `blob:` (file uploads).
+  // No external image hosts are referenced today; if that changes, list
+  // them explicitly rather than re-opening `https:`.
+  "img-src 'self' data: blob:",
   "font-src 'self' https://fonts.gstatic.com",
   "connect-src 'self' " + (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"),
   "frame-ancestors 'none'",
