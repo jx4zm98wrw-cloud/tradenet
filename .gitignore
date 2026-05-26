@@ -48,3 +48,7 @@ Thumbs.db
 .idea/
 *.swp
 *~
+
+# Claude Code per-user runtime state (lock files, local-only settings)
+.claude/*.lock
+.claude/settings.local.json
