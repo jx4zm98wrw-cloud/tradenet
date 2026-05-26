@@ -126,6 +126,18 @@ jobs:
       - name: pip-audit
         # Fail the job on any reported vuln. Previously appended `|| true`
         # which silently swallowed warnings.
+        #
+        # --ignore-vuln is the documented escape hatch for known-unfixable
+        # advisories where no patched release is yet on PyPI. Each entry
+        # MUST carry an "until …" rationale and be reviewed periodically.
+        # Right now: python-multipart 0.0.20 is the latest published, but
+        # advisory drafts require >= 0.0.22 / 0.0.26 / 0.0.27 (future
+        # CVE-2026-* entries). Drop these once the patched releases ship.
+        # Each --ignore-vuln entry carries a "patched in" version that
+        # isn't yet on PyPI. Review and remove once published.
         run: |
           pip install pip-audit
-          pip-audit -r app/backend/requirements.txt --strict
+          pip-audit -r app/backend/requirements.txt --strict \
+            --ignore-vuln CVE-2026-24486 \
+            --ignore-vuln CVE-2026-40347 \
+            --ignore-vuln CVE-2026-42561
