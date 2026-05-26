@@ -300,10 +300,7 @@ def composite_score(
     """
     w = weights or DEFAULT_WEIGHTS
     composite = round(
-        w["phonetic"] * phonetic
-        + w["visual"] * visual
-        + w["class"] * class_o
-        + w["vienna"] * vienna_o,
+        w["phonetic"] * phonetic + w["visual"] * visual + w["class"] * class_o + w["vienna"] * vienna_o,
         3,
     )
     max_sig = max(phonetic, visual)

@@ -95,9 +95,7 @@ def _score(
         if not mark_codes:
             return 0.0
         satisfied = sum(
-            1
-            for req in vienna_query
-            if any(c == req or c.startswith(req + ".") for c in mark_codes)
+            1 for req in vienna_query if any(c == req or c.startswith(req + ".") for c in mark_codes)
         )
         return round(satisfied / len(vienna_query), 3)
 
@@ -203,10 +201,7 @@ async def search_trademarks(
     total = (await session.execute(cnt_stmt)).scalar_one()
 
     has_vienna = bool(norm_vienna)
-    scored = [
-        (m, _score(m, q, mode, has_vienna=has_vienna, vienna_query=norm_vienna))
-        for m in rows
-    ]
+    scored = [(m, _score(m, q, mode, has_vienna=has_vienna, vienna_query=norm_vienna)) for m in rows]
     scored = [(m, s) for (m, s) in scored if s >= threshold]
     if sort == "similarity":
         scored.sort(key=lambda x: (-x[1], str(x[0].id)))

@@ -73,9 +73,7 @@ class CompareResponse(BaseModel):
 
 
 @router.post("", response_model=CompareResponse)
-async def compare(
-    body: CompareRequest, session: AsyncSession = Depends(get_session)
-) -> CompareResponse:
+async def compare(body: CompareRequest, session: AsyncSession = Depends(get_session)) -> CompareResponse:
     if len(body.markIds) < 2:
         raise HTTPException(400, "Need at least 2 marks to compare")
     if len(body.markIds) > 3:
@@ -86,9 +84,7 @@ async def compare(
     total = sum(weights.values()) or 1.0
     weights = {k: v / total for k, v in weights.items()}
 
-    rows = (
-        await session.execute(select(Trademark).where(Trademark.id.in_(body.markIds)))
-    ).scalars().all()
+    rows = (await session.execute(select(Trademark).where(Trademark.id.in_(body.markIds)))).scalars().all()
     by_id = {str(m.id): m for m in rows}
     ordered = [by_id[mid] for mid in body.markIds if mid in by_id]
     if len(ordered) < 2:
@@ -115,9 +111,7 @@ async def compare(
     )
 
 
-def _score_pair(
-    anchor: Trademark, other: Trademark, w: dict[str, float], image_root
-) -> PairScore:
+def _score_pair(anchor: Trademark, other: Trademark, w: dict[str, float], image_root) -> PairScore:
     """Compute the four per-signal scores + composite + examiner verdict.
 
     Inputs are drawn from real columns:

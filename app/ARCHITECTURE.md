@@ -125,12 +125,39 @@ stripped, and the specimen frame renders in a visibly-subdued placeholder
 mode. Coverage on the 2026 gazette set: 99.985% combined, all 4 A-files at
 100% combined.
 
-### Similarity engine (the load-bearing TODO)
-All scoring (phonetic, visual, class overlap, composite) flows through small
-`_score_*()` functions in `routes/{search,today,marks,compare}.py`. Class
-overlap is real (Jaccard); the others are deterministic per-id jitter. Real
-implementation plugs in by replacing function bodies — UI contract stays the
-same.
+### Similarity engine
+`backend/api/similarity.py` is the single source of truth for conflict scoring.
+Four independent signals feed a weighted composite + verdict band:
+
+- **phonetic** — `0.7 · JW(raw) + 0.3 · JW(metaphone)` on diacritic-normalised
+  uppercase text. Jaro-Winkler weights matching prefixes (Cohen-Ravikumar-
+  Fienberg 2003); Metaphone catches sound-alikes like NEUREX/NEUROFAX that
+  share no surface chars. The weighted blend (not `max`) prevents Metaphone
+  from spiking short alphanumerics like MF11RCE → MFRS to coincidental highs.
+  Vietnamese: NFD decomposition + explicit `Đ`/`đ` map handles `Bạc`/`BAC`.
+
+- **visual** — pHash on extracted PNG specimens when both marks have a
+  `logo_path`; typographic Jaro-Winkler on the wordmark text as a fallback.
+  The return value carries a `confidence` flag (`phash` | `typographic` |
+  `none`) the UI surfaces so users can tell real visual analysis from the
+  text proxy.
+
+- **class_overlap** / **vienna_overlap** — Jaccard on Nice classes and Vienna
+  figurative codes respectively. Necessary-not-sufficient signals.
+
+The composite is a straight weighted sum (default 40/25/20/15, tunable per
+matter via the Compare request's `weights` field). The *verdict* applies
+**examiner-grade conjunction guards**: a row is only "Likely" or "Possible
+conflict" when the composite AND `max(phonetic, visual)` AND `class_o` all
+clear band thresholds — class overlap alone never makes confusion (Apple
+Records vs Apple Computer in 1976 wasn't a conflict; identical names in
+unrelated industries don't confuse consumers).
+
+Callsites: `routes/compare.py::_score_pair`, `routes/marks.py::similar_marks`
+(SQL-prescreens then re-ranks by real composite), `routes/search.py::_score`
+(phonetic and vienna modes use the real engine; text mode stays
+substring-strength because text mode is a literal search). Per-matter weight
+tuning lives at the composite level — the four signal functions stay pure.
 
 ## Data flow per route
 
