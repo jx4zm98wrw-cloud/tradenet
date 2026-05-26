@@ -23,6 +23,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -130,6 +131,17 @@ class Watchlist(Base):
 
 class Trademark(Base):
     __tablename__ = "trademarks"
+
+    # Composite/extension indexes that can't be expressed via mapped_column(index=True).
+    # The GIN index on nice_classes powers "contains any of [05, 12, 41]" array queries
+    # in /search; without it those queries fall back to seq scan on the trademarks table.
+    __table_args__ = (
+        Index(
+            "ix_trademarks_nice_classes_gin",
+            "nice_classes",
+            postgresql_using="gin",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     gazette_id: Mapped[uuid.UUID] = mapped_column(
