@@ -98,7 +98,13 @@ function qs(p: Record<string, unknown>): string {
 
 async function json<T>(url: string): Promise<T> {
   const r = await fetch(url);
-  if (!r.ok) throw new Error(`${url} -> ${r.status}`);
+  if (!r.ok) {
+    // FastAPI returns structured errors as `{detail: "..."}`. Surface that to
+    // the caller (toast / error UI) instead of swallowing it into a bare status
+    // code. .catch handles non-JSON error bodies (e.g. an HTML 502 page).
+    const body = (await r.json().catch(() => null)) as { detail?: string } | null;
+    throw new Error(body?.detail ?? `${url} -> ${r.status}`);
+  }
   return r.json();
 }
 
