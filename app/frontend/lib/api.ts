@@ -72,10 +72,17 @@ export type SearchParams = {
   vienna_codes?: string[];
   record_type?: string;
   applicant_type?: string;
+  /** Free-text or facet-picked applicant name (substring, case-insensitive). */
+  applicant?: string;
   year?: number;
   month?: number;
   gazette_id?: string;
   ip_agency?: string;
+  /** ISO date strings (YYYY-MM-DD). Filter by INID (151) certificate issue
+   * date. Only B-files (domestic + Madrid registrations) carry this, so
+   * A-files are naturally excluded by any grant-date filter. */
+  grant_date_from?: string;
+  grant_date_to?: string;
   limit?: number;
   offset?: number;
 };
@@ -292,6 +299,10 @@ export const api = {
     json<CountBucket[]>(`/api/v1/facets/countries?${qs({ ...filters, limit, offset: undefined })}`, init),
   facetsNiceClasses: (filters: SearchParams, limit = 45, init?: RequestInit) =>
     json<CountBucket[]>(`/api/v1/facets/nice-classes?${qs({ ...filters, limit, offset: undefined })}`, init),
+  facetsApplicants: (filters: SearchParams, limit = 20, init?: RequestInit) =>
+    json<CountBucket[]>(`/api/v1/facets/applicants?${qs({ ...filters, limit, offset: undefined })}`, init),
+  facetsIpAgencies: (filters: SearchParams, limit = 20, init?: RequestInit) =>
+    json<CountBucket[]>(`/api/v1/facets/ip-agencies?${qs({ ...filters, limit, offset: undefined })}`, init),
   statsTopApplicants: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-applicants?limit=${limit}`),
   statsTopAgents: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-agents?limit=${limit}`),
   getMark: (id: string) => json<MarkDetail>(`/api/v1/marks/${id}`),

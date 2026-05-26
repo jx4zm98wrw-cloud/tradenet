@@ -43,10 +43,13 @@ function SearchPage() {
       nice_class: ncs.length ? ncs : undefined,
       record_type: sp.get("record_type") ?? undefined,
       applicant_type: sp.get("applicant_type") ?? undefined,
+      applicant: sp.get("applicant") ?? undefined,
       year: sp.get("year") ? parseInt(sp.get("year")!, 10) : undefined,
       month: sp.get("month") ? parseInt(sp.get("month")!, 10) : undefined,
       gazette_id: sp.get("gazette_id") ?? undefined,
       ip_agency: sp.get("ip_agency") ?? undefined,
+      grant_date_from: sp.get("grant_date_from") ?? undefined,
+      grant_date_to: sp.get("grant_date_to") ?? undefined,
       limit: PAGE_SIZE,
       offset: sp.get("offset") ? parseInt(sp.get("offset")!, 10) : 0,
     };
@@ -66,6 +69,8 @@ function SearchPage() {
   const [results, setResults] = React.useState<SearchResults | null>(null);
   const [countries, setCountries] = React.useState<CountBucket[]>([]);
   const [classes, setClasses] = React.useState<CountBucket[]>([]);
+  const [applicants, setApplicants] = React.useState<CountBucket[]>([]);
+  const [ipAgencies, setIpAgencies] = React.useState<CountBucket[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
@@ -78,16 +83,15 @@ function SearchPage() {
   React.useEffect(() => {
     const controller = new AbortController();
     const init: RequestInit = { signal: controller.signal };
-    api.facetsCountries(filters, 20, init).then(setCountries).catch((e) => {
-      if (e?.name !== "AbortError") {
+    const silent = (e: unknown) => {
+      if ((e as { name?: string })?.name !== "AbortError") {
         // intentionally silent — facets are best-effort
       }
-    });
-    api.facetsNiceClasses(filters, 45, init).then(setClasses).catch((e) => {
-      if (e?.name !== "AbortError") {
-        // intentionally silent
-      }
-    });
+    };
+    api.facetsCountries(filters, 20, init).then(setCountries).catch(silent);
+    api.facetsNiceClasses(filters, 45, init).then(setClasses).catch(silent);
+    api.facetsApplicants(filters, 8, init).then(setApplicants).catch(silent);
+    api.facetsIpAgencies(filters, 8, init).then(setIpAgencies).catch(silent);
     return () => controller.abort();
   }, [filters]);
 
@@ -195,6 +199,8 @@ function SearchPage() {
           onNiceModeChange={setNiceMode}
           countries={countries}
           classes={classes}
+          applicants={applicants}
+          ipAgencies={ipAgencies}
         />
 
         <main className="min-w-0 space-y-4">
@@ -401,7 +407,10 @@ function buildChips(filters: Params, setFilter: (p: Partial<Params>) => void, ni
     chips.push({ key: "rt", label: <>Type: {m[filters.record_type] ?? filters.record_type}</>, onRemove: () => setFilter({ record_type: undefined }) });
   }
   if (filters.applicant_type) {
-    chips.push({ key: "at", label: <>Applicant: {filters.applicant_type}</>, onRemove: () => setFilter({ applicant_type: undefined }) });
+    chips.push({ key: "at", label: <>Applicant type: {filters.applicant_type}</>, onRemove: () => setFilter({ applicant_type: undefined }) });
+  }
+  if (filters.applicant) {
+    chips.push({ key: "applicant", label: <>Applicant: {filters.applicant}</>, onRemove: () => setFilter({ applicant: undefined }) });
   }
   if (filters.year) chips.push({ key: "year", label: `Year ${filters.year}`, onRemove: () => setFilter({ year: undefined }) });
   if (filters.month) chips.push({ key: "month", label: `Month ${filters.month}`, onRemove: () => setFilter({ month: undefined }) });
@@ -417,6 +426,15 @@ function buildChips(filters: Params, setFilter: (p: Partial<Params>) => void, ni
     });
   }
   if (filters.ip_agency) chips.push({ key: "agent", label: `Agent: ${filters.ip_agency}`, onRemove: () => setFilter({ ip_agency: undefined }) });
+  if (filters.grant_date_from || filters.grant_date_to) {
+    const from = filters.grant_date_from ?? "…";
+    const to = filters.grant_date_to ?? "…";
+    chips.push({
+      key: "grant-date",
+      label: `Granted ${from} → ${to}`,
+      onRemove: () => setFilter({ grant_date_from: undefined, grant_date_to: undefined }),
+    });
+  }
   return chips;
 }
 

@@ -16,11 +16,18 @@ type Props = {
   onNiceModeChange: (m: NiceMode) => void;
   countries: CountBucket[];
   classes: CountBucket[];
+  applicants: CountBucket[];
+  ipAgencies: CountBucket[];
 };
 
-export function FilterRail({ filters, setFilter, niceMode, onNiceModeChange, countries, classes }: Props) {
+export function FilterRail({
+  filters, setFilter, niceMode, onNiceModeChange,
+  countries, classes, applicants, ipAgencies,
+}: Props) {
   const [countryModal, setCountryModal] = React.useState(false);
   const [classesModal, setClassesModal] = React.useState(false);
+  const [applicantModal, setApplicantModal] = React.useState(false);
+  const [agencyModal, setAgencyModal] = React.useState(false);
 
   return (
     <aside className="space-y-5">
@@ -112,7 +119,7 @@ export function FilterRail({ filters, setFilter, niceMode, onNiceModeChange, cou
         </button>
       </RailGroup>
 
-      <RailGroup title="Applicant">
+      <RailGroup title="Applicant type">
         {[
           { v: "Company",  label: "Company" },
           { v: "Personal", label: "Personal" },
@@ -124,6 +131,75 @@ export function FilterRail({ filters, setFilter, niceMode, onNiceModeChange, cou
             label={a.label}
           />
         ))}
+      </RailGroup>
+
+      <RailGroup
+        title="Applicant"
+        trailing={
+          <button
+            type="button"
+            onClick={() => setApplicantModal(true)}
+            className="text-[11px] text-stamp hover:text-stamp-deep font-medium"
+          >
+            Show all
+          </button>
+        }
+      >
+        {pinSelected(applicants, filters.applicant ? [filters.applicant] : [], 8).map((a) => {
+          const active = filters.applicant === a.key;
+          return (
+            <Row
+              key={a.key}
+              checked={active}
+              onToggle={() => setFilter({ applicant: active ? undefined : a.key })}
+              label={a.key}
+              count={a.count}
+              empty={a.count === 0 && !active}
+            />
+          );
+        })}
+      </RailGroup>
+
+      <RailGroup
+        title="IP agency"
+        trailing={
+          <button
+            type="button"
+            onClick={() => setAgencyModal(true)}
+            className="text-[11px] text-stamp hover:text-stamp-deep font-medium"
+          >
+            Show all
+          </button>
+        }
+      >
+        {pinSelected(ipAgencies, filters.ip_agency ? [filters.ip_agency] : [], 8).map((a) => {
+          const active = filters.ip_agency === a.key;
+          return (
+            <Row
+              key={a.key}
+              checked={active}
+              onToggle={() => setFilter({ ip_agency: active ? undefined : a.key })}
+              label={a.key}
+              count={a.count}
+              empty={a.count === 0 && !active}
+            />
+          );
+        })}
+      </RailGroup>
+
+      <RailGroup title="Grant date" subtitle="Filters by certificate issue date (B-files only).">
+        <div className="grid grid-cols-2 gap-2 px-1">
+          <DateField
+            label="From"
+            value={filters.grant_date_from ?? null}
+            onChange={(v) => setFilter({ grant_date_from: v || undefined })}
+          />
+          <DateField
+            label="To"
+            value={filters.grant_date_to ?? null}
+            onChange={(v) => setFilter({ grant_date_to: v || undefined })}
+          />
+        </div>
       </RailGroup>
 
       {countryModal && (
@@ -164,6 +240,28 @@ export function FilterRail({ filters, setFilter, niceMode, onNiceModeChange, cou
             setFilter({ nice_class: next.length ? next : undefined });
           }}
           onClose={() => setClassesModal(false)}
+        />
+      )}
+      {applicantModal && (
+        <FullPickerModal
+          title="Filter by applicant"
+          fetchAll={() => api.facetsApplicants(filters, 300)}
+          selected={filters.applicant ? [filters.applicant] : []}
+          multi={false}
+          renderItem={(b) => <span className="flex-1 truncate">{b.key}</span>}
+          onToggle={(k) => setFilter({ applicant: filters.applicant === k ? undefined : k })}
+          onClose={() => setApplicantModal(false)}
+        />
+      )}
+      {agencyModal && (
+        <FullPickerModal
+          title="Filter by IP agency"
+          fetchAll={() => api.facetsIpAgencies(filters, 300)}
+          selected={filters.ip_agency ? [filters.ip_agency] : []}
+          multi={false}
+          renderItem={(b) => <span className="flex-1 truncate">{b.key}</span>}
+          onToggle={(k) => setFilter({ ip_agency: filters.ip_agency === k ? undefined : k })}
+          onClose={() => setAgencyModal(false)}
         />
       )}
 
@@ -238,13 +336,24 @@ function Row({
   );
 }
 
-function DateField({ label, value }: { label: string; value: string | null }) {
+function DateField({
+  label, value, onChange,
+}: {
+  label: string;
+  value: string | null;
+  onChange?: (v: string) => void;
+}) {
   return (
     <label className="block">
       <div className="text-[11px] text-mute mb-0.5">{label}</div>
       <input
         type="date"
-        defaultValue={value ?? ""}
+        // controlled when onChange is provided, uncontrolled otherwise (the
+        // Publication date input is still a stub — leave it uncontrolled so
+        // it doesn't break existing behaviour)
+        {...(onChange
+          ? { value: value ?? "", onChange: (e) => onChange(e.target.value) }
+          : { defaultValue: value ?? "" })}
         className="w-full text-[12px] px-2 py-1.5 border border-line rounded bg-surface"
       />
     </label>
