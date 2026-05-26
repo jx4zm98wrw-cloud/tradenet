@@ -13,6 +13,7 @@ from datetime import date
 from typing import Any
 
 from api.db.models import RecordType, Trademark
+from tm_extractor.constants import MISSING_COUNTRY_CODE
 
 _DATE_DMY_RE = re.compile(r"^\s*(\d{1,2})[./](\d{1,2})[./](\d{4})\s*$")
 _DATE_MDY_RE = re.compile(r"^\s*(\d{1,2})/(\d{1,2})/(\d{4})\s*$")
@@ -53,15 +54,17 @@ def _str(value: Any) -> str | None:
 def _country_code(value: Any) -> str | None:
     """Coerce the extractor's `Applicant Country Code` to an ISO-2 or NULL.
 
-    The library emits the literal string `"unknown"` when no ISO code was
-    matched in the applicant text; that's a missing-value sentinel, not a real
-    code — store NULL so DB constraints (varchar(2)) and queries stay clean.
+    The extractor writes MISSING_COUNTRY_CODE (currently "Unknown") when no
+    ISO code was matched in the applicant text; that's a missing-value
+    sentinel, not a real code — store NULL so DB constraints (varchar(2))
+    and queries stay clean. Lowercase comparison so the sentinel's case
+    convention can change without breaking this normalisation.
     """
     s = _str(value)
     if s is None:
         return None
     s = s.strip().lower()
-    if not s or s == "unknown":
+    if not s or s == MISSING_COUNTRY_CODE.lower():
         return None
     return s.upper()[:2]
 

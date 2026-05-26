@@ -1,5 +1,11 @@
 """ISO 3166-1 alpha-2 country codes used in the gazette."""
 
+# Sentinel written into `Applicant Country Code` when neither a valid ISO
+# code nor a country-name match could be derived. The worker's mapper
+# normalises this back to NULL before persisting (case-insensitive match)
+# so the column never carries the literal string.
+MISSING_COUNTRY_CODE = "Unknown"
+
 COUNTRY_CODES = {
     # A
     "AD": "Andorra",

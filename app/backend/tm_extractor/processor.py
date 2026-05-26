@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 from .applicant import parse_applicant_field
 from .config import ExtractorConfig
-from .constants import TrademarkConstants
+from .constants import MISSING_COUNTRY_CODE, TrademarkConstants
 from .data_loaders import build_city_patterns, load_cities_by_country, load_company_suffixes
 from .text_processor import ColoredFormatter, TextProcessor, reformat_date
 
@@ -374,7 +374,7 @@ class PDFProcessor:
                 if valid_code:
                     section["Applicant Country Code"] = valid_code
                 elif paren_codes:
-                    section["Applicant Country Code"] = "Unknown"
+                    section["Applicant Country Code"] = MISSING_COUNTRY_CODE
                 else:
                     country_name = re.sub(r"^\d+\.\s*", "", applicant_text).strip()
                     country_code = next(
@@ -385,7 +385,7 @@ class PDFProcessor:
                         ),
                         None,
                     )
-                    section["Applicant Country Code"] = country_code or "Unknown"
+                    section["Applicant Country Code"] = country_code or MISSING_COUNTRY_CODE
                 section["Applicant City"] = ""
                 cc = section["Applicant Country Code"]
                 # Match cities only inside the parsed address. Searching the

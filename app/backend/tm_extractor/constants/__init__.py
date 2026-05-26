@@ -12,7 +12,7 @@ from .classifier import (
     VN_SURNAMES,
     VN_SURNAMES_UPPER,
 )
-from .countries import COUNTRY_CODES
+from .countries import COUNTRY_CODES, MISSING_COUNTRY_CODE
 from .markers import CSV_COLUMNS, MARKER_CODES, MARKER_DESCRIPTIONS, MARKERS, PATTERNS, MarkerConfig
 
 
