@@ -25,14 +25,16 @@ from worker.ingest import _run_image_extraction
 
 
 def _install_fake_extractor(monkeypatch: pytest.MonkeyPatch, modify_pdf_impl=None) -> None:
-    """Inject a fake `Final_TRADEMARK_image_extractor_refine` into sys.modules.
+    """Inject a fake `image_extractor` module into sys.modules.
 
-    monkeypatch auto-reverts after the test so the real extractor (or any
-    other test's stub) is untouched.
+    The worker does a lazy `from image_extractor import ImageExtractor, ImagePaths`
+    inside _run_image_extraction, so by the time the import runs the fake is
+    already swapped in. monkeypatch auto-reverts after the test so the real
+    extractor (or any other test's stub) is untouched.
     """
-    fake = types.ModuleType("Final_TRADEMARK_image_extractor_refine")
+    fake = types.ModuleType("image_extractor")
 
-    class _PDFProcessor:
+    class _ImageExtractor:
         def __init__(self, *a, **k):
             pass
 
@@ -47,13 +49,13 @@ def _install_fake_extractor(monkeypatch: pytest.MonkeyPatch, modify_pdf_impl=Non
         def _create_image_link_csv(self, *a, **k):
             pass
 
-    class _ProcessingPaths:
+    class _ImagePaths:
         def __init__(self, **k):
             pass
 
-    fake.PDFProcessor = _PDFProcessor  # type: ignore[attr-defined]
-    fake.ProcessingPaths = _ProcessingPaths  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "Final_TRADEMARK_image_extractor_refine", fake)
+    fake.ImageExtractor = _ImageExtractor  # type: ignore[attr-defined]
+    fake.ImagePaths = _ImagePaths  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "image_extractor", fake)
 
 
 def test_missing_year_returns_none_with_warning(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:

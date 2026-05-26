@@ -6,7 +6,6 @@ import hashlib
 import logging
 import re
 import string
-import sys
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -77,31 +76,24 @@ def _run_image_extraction(
         logger.warning("Gazette has no issue_year; skipping image extraction for %s", pdf_path.name)
         return None
 
-    # Sole sys.path mutation in the backend — `Final_TRADEMARK_image_extractor_refine.py`
-    # lives at the project root, outside the installable `tm-backend` package, so it can't
-    # be reached by ordinary imports. Moving the extractor into the package would unify
-    # this; left as a deliberate exception per the integration commit.
-    project_root = str(data_dir)
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-
+    # Lazy import: pymupdf/PIL/pdfplumber are heavy and only needed during extraction,
+    # not on worker boot. Keeping the import inside the function also lets
+    # test_run_image_extraction.py inject a fake `image_extractor` module via
+    # `monkeypatch.setitem(sys.modules, ...)` before this line runs.
     try:
-        import yaml  # noqa: I001 — yaml import is conditional on extractor being available
+        import yaml
 
-        from Final_TRADEMARK_image_extractor_refine import (
-            PDFProcessor as ImageExtractor,
-            ProcessingPaths as ImagePaths,
-        )
+        from image_extractor import ImageExtractor, ImagePaths
     except (ImportError, ModuleNotFoundError) as e:
-        # Genuine "extractor not installed / file moved" — degrade to no-logo.
-        logger.warning("Image extractor not importable from %s: %s", project_root, e)
+        # Extractor package or yaml not installed — degrade to no-logo.
+        logger.warning("Image extractor not importable: %s", e)
         return None
     except Exception:
         # Anything else (SyntaxError on a hand-edit, AttributeError on a
         # renamed symbol, third-party RuntimeError at module init) is a real
         # programming error masquerading as "extractor missing." Surface it
         # so the operator can see what broke.
-        logger.exception("Unexpected error importing image extractor from %s", project_root)
+        logger.exception("Unexpected error importing image extractor")
         return None
 
     cfg_path = data_dir / "config_image_extractor.yaml"

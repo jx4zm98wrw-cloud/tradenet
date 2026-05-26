@@ -48,10 +48,10 @@ country codes, classifier rules), `data_loaders.py` (cities/suffixes JSON).
 The legacy CLI is preserved as `TM_csv_builder_legacy.py` at the repo root
 for byte-identical reference output.
 
-The image extractor lives separately at the repo root as
-`Final_TRADEMARK_image_extractor_refine.py` (lazy-imported by
-`worker/ingest.py` via a single `sys.path.insert`). It uses PyMuPDF for
-blank-page removal + image-rect extraction and produces per-sector PNGs.
+The image extractor is vendored into the backend package as
+`image_extractor/` (lazy-imported by `worker/ingest.py` so the worker boot
+doesn't pay the pymupdf/PIL load cost). It uses PyMuPDF for blank-page
+removal + image-rect extraction and produces per-sector PNGs.
 
 ### `api/`
 HTTP layer. Routes are thin — input validation via Pydantic, business logic
@@ -109,7 +109,7 @@ Linux is unaffected.
 
 ### Mark specimens (placeholder vs. real)
 Two sources fill the specimen frame, picked in order:
-1. **Extracted logo PNG** — `Final_TRADEMARK_image_extractor_refine.py` carves
+1. **Extracted logo PNG** — `image_extractor/extractor.py` carves
    per-sector PNGs into `image/<year>/<stem>/`, the worker's `_resolve_logo_path`
    probes `(210) → (111) → (116)` (plus Madrid letter-suffix variants) and
    writes the relative path to `trademarks.logo_path`. `_save_page_images`

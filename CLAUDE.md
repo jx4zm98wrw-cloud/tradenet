@@ -17,17 +17,17 @@ claude_csvbuilder/
 │   │   ├── api/                    FastAPI app + SQLAlchemy models
 │   │   ├── worker/                 RQ jobs (ingest pipeline lives here)
 │   │   ├── tm_extractor/           Vendored CSV parser (was TM_csv_builder.py)
+│   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
 │   │   ├── alembic/                Migrations
 │   │   ├── scripts/                One-off scripts (smoke_ingest.py)
 │   │   ├── tests/                  pytest suite (httpx + ASGI)
 │   │   ├── pyproject.toml          Lint, type-check, package config
-│   │   ├── requirements.txt        Pinned runtime deps (includes pymupdf etc. for the image extractor)
+│   │   ├── requirements.txt        Pinned runtime deps (includes pymupdf etc. for image_extractor)
 │   │   └── Dockerfile              Multi-stage prod build (PYTHONPATH-based)
 │   ├── frontend/                   Next.js 15 (App Router) + Tailwind
 │   ├── docker-compose.yml          Local dev stack (postgres :5435, redis :6380)
 │   └── README.md                   Setup + dev workflow
-├── Final_TRADEMARK_image_extractor_refine.py   Standalone logo extractor (project root, lazy-imported by worker)
-├── config_image_extractor.yaml     Standalone extractor config
+├── config_image_extractor.yaml     Runtime config for image_extractor (read by worker.ingest)
 ├── input/                          Source PDFs
 ├── csv/                            Legacy CSV outputs (still produced by tm_extractor for parity)
 ├── image/<year>/<pdf_stem>/        Extracted logo PNGs (served at /static/image/)
@@ -56,7 +56,7 @@ uvicorn api.main:app --reload --port 8000                 # backend
 cd app/frontend && pnpm install && pnpm dev               # frontend on :3000
 ```
 
-`pip install -e app/backend` puts `api`, `worker`, `tm_extractor`, and `scripts` on `sys.path` — replaces what used to be ad-hoc `sys.path.insert` calls in `tests/conftest.py` and `alembic/env.py`. The Docker image still uses `PYTHONPATH=/srv/backend` (frozen-build artifact, not a dev environment).
+`pip install -e app/backend` puts `api`, `worker`, `tm_extractor`, `image_extractor`, and `scripts` on `sys.path`. The Docker image still uses `PYTHONPATH=/srv/backend` (frozen-build artifact, not a dev environment).
 
 Smoke-test one PDF through the worker synchronously:
 ```bash
@@ -123,11 +123,11 @@ Inputs and outputs live at the project root (alongside the legacy script, since 
 ### Worker + image extractor (web stack only)
 
 `app/backend/worker/ingest.py:ingest_pdf` orchestrates one PDF through:
-1. `_run_image_extraction` lazy-imports `Final_TRADEMARK_image_extractor_refine.py` from the project root, runs `_modify_pdf` (blank-page removal via PyMuPDF) → `_extract_images` (per-sector PNGs into `image/<year>/<stem>/`) → `_create_image_link_csv`. Failures degrade to `logo_path = NULL`; the CSV ingest still proceeds. `_save_page_images` detects when the clustering step has merged image rects across sector boundaries (rect contains additional marker label y-positions past the +20 best-tolerance band) and splits the merged image at each interior boundary, saving per-label crops — without this, adjacent-sector logos within `cluster_threshold=80px` of each other would collapse into a single PNG assigned to only the topmost sector.
+1. `_run_image_extraction` lazy-imports `image_extractor` (the vendored package re-exports `PDFProcessor as ImageExtractor` and `ProcessingPaths as ImagePaths` to avoid colliding with `tm_extractor.PDFProcessor`) and runs `_modify_pdf` (blank-page removal via PyMuPDF) → `_extract_images` (per-sector PNGs into `image/<year>/<stem>/`) → `_create_image_link_csv`. Failures degrade to `logo_path = NULL`; the CSV ingest still proceeds. `_save_page_images` detects when the clustering step has merged image rects across sector boundaries (rect contains additional marker label y-positions past the +20 best-tolerance band) and splits the merged image at each interior boundary, saving per-label crops — without this, adjacent-sector logos within `cluster_threshold=80px` of each other would collapse into a single PNG assigned to only the topmost sector. The import is kept lazy so worker boot doesn't pay the pymupdf/PIL/pdfplumber load cost, and so tests can monkey-patch `sys.modules["image_extractor"]` with a fake before the import runs.
 2. The tm_extractor parser produces sections (same logic as the legacy script).
 3. `mapper.section_to_trademark` materializes a `Trademark` row; `_resolve_logo_path(section, image_subdir, image_root)` probes `image/<year>/<stem>/<(210)>.png` → `<(111)>.png` → `<(116)>.png` in that order and stores the first hit's path **relative** in `trademarks.logo_path`. Madrid `(116)` lookups also try letter-suffix variants `<id>A.png` through `<id>Z.png` for WIPO modifications/renewals; `(210)` and `(111)` use exact match only.
 
-The standalone extractor is the sole `sys.path.insert` in the backend (it lives outside the package, at the project root). FastAPI mounts `data_dir/image` at `/static/image/`; Next.js proxies `/static/*` to the backend. `markDisplay()` on the frontend prepends `/static/image/` to `logo_path` and feeds it to every `MarkSpecimen` call site.
+All backend imports resolve through the editable install — there are no `sys.path.insert` calls in production code. FastAPI mounts `data_dir/image` at `/static/image/`; Next.js proxies `/static/*` to the backend. `markDisplay()` on the frontend prepends `/static/image/` to `logo_path` and feeds it to every `MarkSpecimen` call site.
 
 ## Data files
 

@@ -139,7 +139,7 @@ isolated to a single function so swap-in is trivial.
 | OCR confidence + flagged-row count | **Mock** — derived from SHA-256 of file content | `routes/gazettes.py:_gazette_out` |
 | Authentication | **Stub** — returns a fixed admin user | `api/auth.py:_resolve_user` |
 | Recent-search history | localStorage (no server-side persistence) | `components/cmdk.tsx`, `app/page.tsx` |
-| Mark specimen images | **Real** — `Final_TRADEMARK_image_extractor_refine.py` extracts per-sector PNGs to `image/<year>/<stem>/`; worker resolver writes `trademarks.logo_path`; ~99.985% combined coverage across the 2026 gazette set. `markDisplay()` falls back to a synthesized SVG wordmark only for the ~3% of B-file rows where the gazette has no figurative image AND no `(540)` text. | `lib/mark-display.ts`, `worker/ingest.py:_resolve_logo_path` |
+| Mark specimen images | **Real** — `image_extractor/extractor.py` extracts per-sector PNGs to `image/<year>/<stem>/`; worker resolver writes `trademarks.logo_path`; ~99.985% combined coverage across the 2026 gazette set. `markDisplay()` falls back to a synthesized SVG wordmark only for the ~0.015% of rows where the gazette has no figurative image AND no `(540)` text. | `lib/mark-display.ts`, `worker/ingest.py:_resolve_logo_path` |
 | Compare PDF report export | Returns HTTP 501 | `routes/compare.py:export_pdf` |
 
 Real data flowing today: trademark records, opposition window math, co-marks,

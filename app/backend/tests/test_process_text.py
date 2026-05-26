@@ -1,4 +1,4 @@
-"""Unit tests for Final_TRADEMARK_image_extractor_refine.PDFProcessor._process_text.
+"""Unit tests for image_extractor.extractor.PDFProcessor._process_text.
 
 The hybrid line-offset table is the subtlest code in PR #2. The two bugs it
 fixes are:
@@ -9,23 +9,19 @@ fixes are:
 
 These tests construct fake fitz.Page-like objects (no real PDFs) and assert
 that insert_text is called at the correct line y.
+
+We import from the `image_extractor.extractor` module (not the `image_extractor`
+package) because the package re-exports `PDFProcessor` as `ImageExtractor` to
+avoid colliding with tm_extractor's class of the same name. Tests probing
+internals keep the original names.
 """
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
-# Make the standalone extractor (lives at project root) importable.
-ROOT = Path(__file__).resolve().parents[3]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-from Final_TRADEMARK_image_extractor_refine import (  # noqa: E402
-    PDFProcessor,
-    ProcessingPaths,
-)
+from image_extractor.extractor import PDFProcessor, ProcessingPaths
 
 
 def _processor() -> PDFProcessor:
