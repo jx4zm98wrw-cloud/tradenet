@@ -3,6 +3,7 @@ import { Be_Vietnam_Pro, JetBrains_Mono, Source_Serif_4 } from "next/font/google
 import type { Metadata } from "next";
 import { TopNav } from "@/components/top-nav";
 import { CmdKProvider } from "@/components/cmdk";
+import { TweaksPanel } from "@/components/tweaks-panel";
 
 const sans = Be_Vietnam_Pro({
   subsets: ["latin", "vietnamese"],
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <CmdKProvider>
           <TopNav />
           <main>{children}</main>
+          <TweaksPanel />
         </CmdKProvider>
       </body>
     </html>

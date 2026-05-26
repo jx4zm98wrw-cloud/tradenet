@@ -23,6 +23,7 @@ export const Icon = {
   Help:      (p: IP) => <Stroke {...p}><circle cx="12" cy="12" r="10" /><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .9-1 1.7M12 17h.01" /></Stroke>,
   Image:     (p: IP) => <Stroke {...p}><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-5-5L5 21" /></Stroke>,
   Filter:    (p: IP) => <Stroke {...p}><path d="M3 6h18M6 12h12M10 18h4" /></Stroke>,
+  Sliders:   (p: IP) => <Stroke {...p}><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></Stroke>,
   Grid:      (p: IP) => <Stroke {...p}><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></Stroke>,
   Rows:      (p: IP) => <Stroke {...p}><path d="M3 6h18M3 12h18M3 18h18" /></Stroke>,
   Clock:     (p: IP) => <Stroke {...p}><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></Stroke>,
