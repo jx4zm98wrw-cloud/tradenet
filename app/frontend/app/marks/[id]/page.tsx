@@ -382,7 +382,7 @@ export default function MarkDetailPage() {
 /* Small subcomponents                                                          */
 /* =========================================================================== */
 
-function Breadcrumb({ mark, onBack }: { mark: any; onBack: () => void }) {
+function Breadcrumb({ mark, onBack }: { mark: Trademark; onBack: () => void }) {
   return (
     <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
       <div className="flex items-center gap-3 min-w-0">
