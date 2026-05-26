@@ -103,6 +103,7 @@ async def seed_vienna_test_data() -> AsyncIterator[None]:
             await s.commit()
         await engine.dispose()
 
+
 # ----- normalizer unit tests --------------------------------------------------
 
 

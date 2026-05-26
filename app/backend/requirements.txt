@@ -16,7 +16,10 @@ psutil==7.2.2
 pyyaml==6.0.3
 
 # === API + DB ===
-fastapi==0.118.3              # was 0.115.5, pulls starlette 0.49 (PYSEC-2026-161 + CVE-2025-54121 + 62727)
+fastapi==0.128.8              # was 0.115.5
+starlette==0.49.3             # explicit pin (fastapi only constrains <1.0,>=0.40 — without
+                              # this, pip-audit caught starlette 0.41 still in the lockfile
+                              # with PYSEC-2026-161 + CVE-2025-54121 + 62727 unpatched)
 uvicorn[standard]==0.32.1
 sqlalchemy[asyncio]==2.0.36
 alembic==1.14.0
