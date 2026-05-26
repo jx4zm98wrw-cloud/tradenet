@@ -24,11 +24,15 @@ class Settings(BaseSettings):
     """Used by Sentry tagging + log structure. CI sets `staging`/`production`."""
 
     # ---- Database ----
-    database_url: str = "postgresql+asyncpg://tm:tm@localhost:5432/tm"
-    database_url_sync: str = "postgresql+psycopg2://tm:tm@localhost:5432/tm"
+    # Defaults target the docker-compose dev stack (postgres published on host :5435,
+    # not the standard :5432). Production deployments must override via TM_DATABASE_URL[_SYNC]
+    # — in-cluster postgres is reached on its own DNS name, not these defaults.
+    database_url: str = "postgresql+asyncpg://tm:tm@localhost:5435/tm"
+    database_url_sync: str = "postgresql+psycopg2://tm:tm@localhost:5435/tm"
 
     # ---- Redis (RQ + rate limit storage) ----
-    redis_url: str = "redis://localhost:6379/0"
+    # Same convention: defaults target compose-published :6380, not the standard :6379.
+    redis_url: str = "redis://localhost:6380/0"
 
     # ---- Filesystem ----
     upload_dir: Path = Path("/tmp/tm_uploads")
