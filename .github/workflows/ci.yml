@@ -138,6 +138,7 @@ jobs:
         run: |
           pip install pip-audit
           pip-audit -r app/backend/requirements.txt --strict \
-            --ignore-vuln CVE-2026-24486 \
-            --ignore-vuln CVE-2026-40347 \
-            --ignore-vuln CVE-2026-42561
+            --ignore-vuln CVE-2026-24486   `# python-multipart, needs unreleased 0.0.22` \
+            --ignore-vuln CVE-2026-40347   `# python-multipart, needs unreleased 0.0.26` \
+            --ignore-vuln CVE-2026-42561   `# python-multipart, needs unreleased 0.0.27` \
+            --ignore-vuln PYSEC-2026-161   `# starlette, needs 1.0.1; fastapi caps at <1.0`
