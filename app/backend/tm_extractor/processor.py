@@ -36,7 +36,6 @@ class PDFProcessor:
         self.output_csv_dir = config.output_dir
         self.setup_logging()
         self.text_processor = TextProcessor()
-        self.first_date: str | None = None
         # Reference data — loaded once per processor instance.
         self.cities_by_country: dict[str, set[str]] = load_cities_by_country(config.cities_file)
         self.city_patterns: dict[str, Pattern] = build_city_patterns(self.cities_by_country)
@@ -187,6 +186,11 @@ class PDFProcessor:
         accumulating_540 = False
         max_iterations = len(page_lines)
         iteration_count = 0
+        # Per-call state: the first (441)/(450) marker seen in this PDF.
+        # Used by add_date_fields below to populate Month/Year/DateCombined_441_450.
+        # Local (not self.) so concurrent or back-to-back calls to process_sections
+        # on the same PDFProcessor don't leak dates across files.
+        first_date: str | None = None
 
         i = 0
         start_time = time.time()
@@ -195,6 +199,7 @@ class PDFProcessor:
         )
 
         def extract_markers_from_line(line: str) -> dict[str, str | int]:
+            nonlocal first_date  # may be reassigned below on first (441)/(450)
             markers_found: dict[str, str | int] = {}
             remaining_line = line.strip()
             line_start_time = time.time()
@@ -205,8 +210,8 @@ class PDFProcessor:
                         cleaned_value = self.text_processor.clean_text(match.group(1))
                         if key in ["(141)", "(151)", "(156)", "(181)", "(220)", "(441)", "(450)"]:
                             cleaned_value = reformat_date(cleaned_value)
-                            if key in ["(441)", "(450)"] and self.first_date is None:
-                                self.first_date = cleaned_value
+                            if key in ["(441)", "(450)"] and first_date is None:
+                                first_date = cleaned_value
                         elif key == "(300)":
                             parts = cleaned_value.split()
                             if len(parts) >= 3 and re.match(r"\d{2}/\d{2}/\d{4}", parts[-2]):
@@ -439,11 +444,11 @@ class PDFProcessor:
                 section["Applicant Type"] = ""
 
         def add_date_fields(section: dict[str, str | int]) -> None:
-            if self.first_date and isinstance(self.first_date, str):
-                month, day, year = self.first_date.split("/")
+            if first_date and isinstance(first_date, str):
+                month, day, year = first_date.split("/")
                 section["Month"] = month
                 section["Year"] = year
-                section["DateCombined_441_450"] = self.first_date
+                section["DateCombined_441_450"] = first_date
             else:
                 section["Month"] = ""
                 section["Year"] = ""
@@ -651,14 +656,12 @@ class PDFProcessor:
         path) must pass `gazette_type` explicitly; otherwise the filename's first
         letter is used.
         """
-        self.first_date = None
         page_texts = self.extract_text_from_pdf(pdf_path)
         yield from self.process_sections(page_texts, pdf_path, gazette_type=gazette_type)
 
     def process_file(self, pdf_path: Path) -> None:
         try:
             self.logger.info(f"{Fore.YELLOW}Processing: {pdf_path.name}{Style.RESET_ALL}")
-            self.first_date = None
             page_texts = self.extract_text_from_pdf(pdf_path)
             sections = list(self.process_sections(page_texts, pdf_path))
             # B-file Madrid (116) entries have a different schema than domestic
