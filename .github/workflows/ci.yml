@@ -118,10 +118,14 @@ jobs:
           cache-dependency-path: app/frontend/pnpm-lock.yaml
       - name: pnpm audit
         working-directory: app/frontend
-        run: pnpm audit --prod --audit-level=high || true
+        # Fail the job on high-severity vulns so the team sees them.
+        # Previously appended `|| true` which silently swallowed warnings.
+        run: pnpm audit --prod --audit-level=high
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
       - name: pip-audit
+        # Fail the job on any reported vuln. Previously appended `|| true`
+        # which silently swallowed warnings.
         run: |
           pip install pip-audit
-          pip-audit -r app/backend/requirements.txt --strict || true
+          pip-audit -r app/backend/requirements.txt --strict
