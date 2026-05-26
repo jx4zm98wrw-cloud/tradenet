@@ -20,15 +20,17 @@ contracts under test are:
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from api.db import Gazette, GazetteStatus, GazetteType, RecordType, Trademark
 from api.routes._filters import normalize_vienna_code
-
+from api.settings import get_settings
 
 # ----- fixture: seed a small set of Trademark rows with known vienna_codes ---
 #
@@ -42,18 +44,12 @@ _FIXTURE_GAZETTE_ID = uuid.UUID("e0000000-0000-4000-8000-000000000001")
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def seed_vienna_test_data() -> "AsyncIterator[None]":  # type: ignore[name-defined]
+async def seed_vienna_test_data() -> AsyncIterator[None]:
     """Insert one Gazette + 7 Trademark rows with known vienna_codes,
     teardown after each test. Function-scoped because pytest-asyncio's
     event_loop is function-scoped by default and a higher-scoped fixture
     triggers ScopeMismatch. The data set is tiny (8 rows) so per-test
     setup/teardown is cheap."""
-    from collections.abc import AsyncIterator  # noqa: F401  (used in annotation above)
-
-    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-
-    from api.settings import get_settings
-
     engine = create_async_engine(get_settings().database_url)
     Session = async_sessionmaker(engine, expire_on_commit=False)
 
