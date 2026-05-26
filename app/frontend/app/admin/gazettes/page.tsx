@@ -15,7 +15,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import { api, type Gazette } from "@/lib/api";
-import { formatBytes, formatNumber, relativeTime } from "@/lib/format";
+import { errorMessage, formatBytes, formatNumber, relativeTime } from "@/lib/format";
 
 export default function AdminGazettesPage() {
   const router = useRouter();
@@ -42,8 +42,8 @@ export default function AdminGazettesPage() {
       const r = await api.listGazettes();
       setItems(r.items);
       setError(null);
-    } catch (e: any) {
-      setError(e.message ?? String(e));
+    } catch (e) {
+      setError(errorMessage(e));
     } finally {
       if (!silent) setRefreshing(false);
     }
@@ -65,8 +65,8 @@ export default function AdminGazettesPage() {
       try {
         await api.uploadGazette(file);
         setUploading((prev) => prev.map((u) => (u.name === file.name ? { ...u, progress: 100 } : u)));
-      } catch (e: any) {
-        setError(`${file.name}: ${e.message}`);
+      } catch (e) {
+        setError(`${file.name}: ${errorMessage(e)}`);
       }
     }
     await refresh();

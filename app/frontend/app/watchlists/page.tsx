@@ -12,7 +12,7 @@ import { MarkSpecimen } from "@/components/specimen";
 import { markDisplay } from "@/lib/mark-display";
 import { Icon } from "@/components/icons";
 import { api, type Trademark, type Watchlist, type WatchQuery } from "@/lib/api";
-import { formatNumber, relativeTime } from "@/lib/format";
+import { errorMessage, formatNumber, relativeTime } from "@/lib/format";
 
 export default function WatchlistsPage() {
   const router = useRouter();
@@ -33,8 +33,8 @@ export default function WatchlistsPage() {
         } catch { map[w.id] = []; }
       }));
       setFindings(map);
-    } catch (e: any) {
-      setError(e.message ?? String(e));
+    } catch (e) {
+      setError(errorMessage(e));
     }
   }, []);
 
@@ -212,8 +212,8 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         query,
       });
       onCreated(created);
-    } catch (e: any) {
-      setErr(e.message ?? String(e));
+    } catch (e) {
+      setErr(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -282,7 +282,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-[10.5px] font-mono uppercase tracking-[0.06em] text-mute">
+      <span className="label-meta">
         {label}{required && " *"}
       </span>
       <div className="mt-1">{children}</div>
