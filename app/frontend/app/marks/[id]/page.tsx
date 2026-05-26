@@ -112,7 +112,7 @@ export default function MarkDetailPage() {
                     size="lg"
                     placeholder={md.isPlaceholder}
                   />
-                  <div className="mt-2 text-[10.5px] font-mono tracking-[0.06em] uppercase text-mute">
+                  <div className="mt-2 label-meta">
                     {md.isPlaceholder
                       ? "Placeholder · WIPO field 540 not extracted"
                       : "WIPO INID code 540 · Reproduction of the mark"}
@@ -431,7 +431,7 @@ function Claims({ mark: m }: { mark: Trademark }) {
 function ClaimRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="grid gap-3 py-1.5 border-b border-dashed border-line" style={{ gridTemplateColumns: "160px 1fr" }}>
-      <span className="text-[10.5px] font-mono uppercase tracking-[0.06em] text-mute">{label}</span>
+      <span className="label-meta">{label}</span>
       <span className="text-[13px] text-ink-2">{children}</span>
     </div>
   );
@@ -440,7 +440,7 @@ function ClaimRow({ label, children }: { label: string; children: React.ReactNod
 function KV({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-[10.5px] font-mono uppercase tracking-[0.06em] text-mute">{label}</dt>
+      <dt className="label-meta">{label}</dt>
       <dd className="text-[13px] text-ink mt-0.5">{children}</dd>
     </div>
   );

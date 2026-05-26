@@ -78,6 +78,16 @@
   input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 }
 
+@layer components {
+  /* Small uppercase metadata label sitting under a value — repeated under
+   * specimen frames, dl/dt rows, panel sub-captions. Three identical
+   * call sites today; left other minor variants (font-semibold,
+   * tracking-wider, etc.) inline pending a fuller design-system pass. */
+  .label-meta {
+    @apply text-[10.5px] font-mono uppercase tracking-[0.06em] text-mute;
+  }
+}
+
 @layer utilities {
   /* tabular numerics — used heavily in dates, app numbers, KPI counts */
   .tabular { font-variant-numeric: tabular-nums; }
