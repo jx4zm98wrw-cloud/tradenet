@@ -92,15 +92,29 @@ export function MarkSpecimen({
   const dims = DIMENSIONS[size];
 
   // If a real raster specimen URL is present, render it.
+  //
+  // CSS recipe: the <img> is given a hard 100% × 100% box and
+  // object-fit:contain. That fits the raster INSIDE the plate without
+  // ever exceeding it, regardless of the file's intrinsic aspect ratio
+  // (tall icons like the MTV VÀNG triangle would otherwise overflow
+  // because maxHeight: 72% percentage doesn't always resolve against
+  // an aspect-ratio-sized parent, and without an explicit box objectFit
+  // is a no-op). The inner padding (the visual breathing room around the
+  // logo) is supplied by the wrapper's padding, NOT by sizing the image
+  // smaller — keeps the math reliable across layout contexts.
   if (s.imageUrl) {
     const img = (
       <img
         src={s.imageUrl}
         alt={s.text}
-        style={{ maxWidth: "86%", maxHeight: "72%", objectFit: "contain" }}
+        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
       />
     );
-    return plain ? img : <SpecimenPlate aspect={`${dims.w}/${dims.h}`} frame={frame} className={className}>{img}</SpecimenPlate>;
+    return plain ? img : (
+      <SpecimenPlate aspect={`${dims.w}/${dims.h}`} frame={frame} className={className} padImage>
+        {img}
+      </SpecimenPlate>
+    );
   }
 
   const inner =
@@ -183,14 +197,25 @@ function renderMonogramCircle(s: SpecimenInfo) {
 /* ---- plate frame ---- */
 
 export function SpecimenPlate({
-  children, aspect = "8/5", frame = true, className = "", placeholder = false,
+  children, aspect = "8/5", frame = true, className = "", placeholder = false, padImage = false,
 }: {
   children: React.ReactNode;
   aspect?: string;
   frame?: boolean;
   className?: string;
   placeholder?: boolean;
+  /** When true, reserve ~7%/14% padding around the centred content. Used for
+   * raster <img> children that fill 100% × 100% via object-fit:contain — the
+   * padding gives visual breathing room around the logo without making the
+   * image's own box smaller (which was unreliable across layout contexts).
+   * SVG wordmarks set their own internal padding so they don't need this. */
+  padImage?: boolean;
 }) {
+  // 7% horizontal + 14% vertical breathing room. Matches the visual feel of
+  // the previous 86% × 72% max-sizing on the <img> itself (100% - 14% = 86%,
+  // 100% - 28% = 72%), but enforced by the *container* so the image's box
+  // sizing stays predictable.
+  const innerPad = padImage ? "px-[7%] py-[14%]" : "";
   return (
     <div
       className={`grid place-items-center relative overflow-hidden ${frame ? "bg-paper border border-line rounded" : "bg-transparent"} ${className}`}
@@ -205,7 +230,9 @@ export function SpecimenPlate({
         </>
       )}
       {/* Subdue the specimen content + watermark when it's a derived placeholder. */}
-      <div className={placeholder ? "opacity-50 grid place-items-center w-full h-full" : "grid place-items-center w-full h-full"}>
+      <div
+        className={`${placeholder ? "opacity-50 " : ""}grid place-items-center w-full h-full ${innerPad}`}
+      >
         {children}
       </div>
       {placeholder && (
