@@ -19,10 +19,93 @@ contracts under test are:
 
 from __future__ import annotations
 
-import pytest
-from httpx import AsyncClient
+import uuid
 
+import pytest
+import pytest_asyncio
+from httpx import AsyncClient
+from sqlalchemy import delete
+
+from api.db import Gazette, GazetteStatus, GazetteType, RecordType, Trademark
 from api.routes._filters import normalize_vienna_code
+
+
+# ----- fixture: seed a small set of Trademark rows with known vienna_codes ---
+#
+# The live-route tests below assert relative counts (parent >= child,
+# ANY >= max, ALL <= min) and presence of specific codes. Both hold up
+# whether the DB is empty (CI) or pre-populated with ~46k real marks
+# (dev). This fixture inserts just enough rows for the empty-DB case;
+# the assertions are robust to either.
+
+_FIXTURE_GAZETTE_ID = uuid.UUID("e0000000-0000-4000-8000-000000000001")
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def seed_vienna_test_data() -> "AsyncIterator[None]":  # type: ignore[name-defined]
+    """Insert one Gazette + 7 Trademark rows with known vienna_codes,
+    teardown after each test. Function-scoped because pytest-asyncio's
+    event_loop is function-scoped by default and a higher-scoped fixture
+    triggers ScopeMismatch. The data set is tiny (8 rows) so per-test
+    setup/teardown is cheap."""
+    from collections.abc import AsyncIterator  # noqa: F401  (used in annotation above)
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from api.settings import get_settings
+
+    engine = create_async_engine(get_settings().database_url)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+
+    inserted_tm_ids: list[uuid.UUID] = []
+    async with Session() as s:
+        # Idempotency: drop any leftover seed rows from a previous aborted run.
+        await s.execute(delete(Trademark).where(Trademark.gazette_id == _FIXTURE_GAZETTE_ID))
+        await s.execute(delete(Gazette).where(Gazette.id == _FIXTURE_GAZETTE_ID))
+        await s.commit()
+
+        gz = Gazette(
+            id=_FIXTURE_GAZETTE_ID,
+            filename="TEST_vienna_fixture.pdf",
+            sha256="vienna_test_" + uuid.uuid4().hex,
+            gazette_type=GazetteType.A,
+            issue_year=2099,
+            storage_path="/dev/null",
+            size_bytes=0,
+            status=GazetteStatus.completed,
+        )
+        s.add(gz)
+
+        # (vienna_codes, appno) tuples covering each assertion the suite makes.
+        rows: list[tuple[list[str] | None, str]] = [
+            (["26.1.1"], "TM-V-001"),
+            (["26.1.1", "5.3.13"], "TM-V-002"),
+            (["5.3.13"], "TM-V-003"),
+            (["5.7.1"], "TM-V-004"),  # child of parent code 5.7
+            (["5.7.20"], "TM-V-005"),  # another child
+            (["15.7.1"], "TM-V-006"),  # boundary: 5.7 prefix must NOT match
+            (None, "TM-V-007"),  # control row with no codes
+        ]
+        for codes, appno in rows:
+            tm = Trademark(
+                id=uuid.uuid4(),
+                gazette_id=_FIXTURE_GAZETTE_ID,
+                record_type=RecordType.A,
+                application_number=appno,
+                vienna_codes=codes,
+            )
+            s.add(tm)
+            inserted_tm_ids.append(tm.id)
+        await s.commit()
+
+    try:
+        yield
+    finally:
+        async with Session() as s:
+            await s.execute(delete(Trademark).where(Trademark.gazette_id == _FIXTURE_GAZETTE_ID))
+            await s.execute(delete(Gazette).where(Gazette.id == _FIXTURE_GAZETTE_ID))
+            await s.commit()
+        await engine.dispose()
 
 # ----- normalizer unit tests --------------------------------------------------
 
