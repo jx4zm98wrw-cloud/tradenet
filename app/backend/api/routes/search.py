@@ -1,9 +1,15 @@
 """Scored search — extends /api/trademarks with a similarity score per result.
 
-Until the real similarity engine (phonetic Metaphone+Levenshtein / visual pHash /
-semantic NLP) ships, scores are derived from how strongly the text mode matches:
-exact substring → 0.95, prefix3 → 0.82, anywhere else within the result set → 0.6
-plus a deterministic per-id jitter so the column stays stable across reloads.
+Per-mode scoring:
+  - text:     substring strength against wordmark / applicant (mock — text
+              mode is a literal-match search, not a similarity search).
+  - phonetic: REAL Jaro-Winkler + Metaphone via api.similarity. NEUROFAX
+              correctly surfaces NEUREX (both encode NRKS-family).
+  - vienna:   REAL Jaccard overlap of the user's selected figurative codes
+              against the mark's stored vienna_codes — a row sharing 3/3
+              codes outranks one sharing 1/3.
+  - image:    placeholder 0.78 until uploaded-image pHash lands (need the
+              upload pipeline + a hash of the source bytes first).
 """
 
 from __future__ import annotations
@@ -17,6 +23,7 @@ from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import similarity as sim
 from ..db import RecordType, Trademark, get_session
 from ..schemas import TrademarkOut
 from ._filters import build_trademark_where, normalize_vienna_code, vienna_code_match
@@ -43,8 +50,14 @@ def _jitter(seed: str, lo: float = -0.04, hi: float = 0.04) -> float:
     return lo + (hi - lo) * (h % 1000) / 1000.0
 
 
-def _score(mark: Trademark, q: str | None, mode: SearchMode, has_vienna: bool = False) -> float:
-    """Mocked similarity score in [0, 1]. Swap this function for a real engine.
+def _score(
+    mark: Trademark,
+    q: str | None,
+    mode: SearchMode,
+    has_vienna: bool = False,
+    vienna_query: list[str] | None = None,
+) -> float:
+    """Per-mark similarity score in [0, 1] for the active search mode.
 
     When the user hasn't supplied a similarity *target* — no text query in
     text/phonetic mode, no codes in Vienna mode — the threshold slider is
@@ -58,27 +71,58 @@ def _score(mark: Trademark, q: str | None, mode: SearchMode, has_vienna: bool = 
         return 1.0
     if mode == "vienna" and not has_vienna:
         return 1.0
-    base = 0.6
-    if mode == "image":
-        base = 0.78  # all results "match" the uploaded image at varying strength
-    elif mode == "vienna":
-        base = 0.74
-    elif q:
-        ql = q.lower()
-        bag = (
-            " ".join(
-                (mark.mark_sample or ""),
-            ).lower()
-            + " "
-            + (mark.applicant_name or "").lower()
+
+    if mode == "phonetic" and q:
+        # Real engine: Jaro-Winkler on diacritic-normalised raw text blended
+        # with JW on Metaphone codes. Compare against the wordmark first,
+        # fall back to applicant_name only when there's literally no
+        # wordmark (most A-files lack mark_sample but have applicants).
+        # No jitter — the real signal carries its own ordering.
+        target = mark.mark_sample or mark.applicant_name
+        return round(sim.phonetic_similarity(q, target), 3)
+
+    if mode == "vienna" and vienna_query:
+        # Coverage score: fraction of the user's requested codes that the
+        # mark satisfies, respecting parent → child prefix expansion
+        # ("5.7" matches "5.7.1"). Plain Jaccard wouldn't work — the DB
+        # stores leaf codes, so set equality between "5.7" (parent) and
+        # "5.7.1" (leaf) is 0 even though the SQL pre-filter matched.
+        #
+        # The SQL pre-filter already ensured at least one code overlaps;
+        # this just ranks how completely the request is satisfied so
+        # 3-of-3 beats 1-of-3.
+        mark_codes = mark.vienna_codes or []
+        if not mark_codes:
+            return 0.0
+        satisfied = sum(
+            1
+            for req in vienna_query
+            if any(c == req or c.startswith(req + ".") for c in mark_codes)
         )
-        if (mark.mark_sample or "").lower() == ql:
+        return round(satisfied / len(vienna_query), 3)
+
+    if mode == "image":
+        # Placeholder. The uploaded-image pipeline isn't wired yet — when it
+        # lands, this branch will pHash the uploaded bytes once and call
+        # sim.visual_similarity() per row against logo_path.
+        return round(min(0.999, 0.78 + _jitter(str(mark.id))), 2)
+
+    # mode == "text" — substring-strength heuristic. Text mode is a literal
+    # search, not a similarity search; the score expresses how cleanly the
+    # query matched the wordmark or applicant string, not how phonetically
+    # close they are.
+    base = 0.6
+    if q:
+        ql = q.lower()
+        wordmark = (mark.mark_sample or "").lower()
+        bag = wordmark + " " + (mark.applicant_name or "").lower()
+        if wordmark == ql:
             base = 0.98
-        elif ql in (mark.mark_sample or "").lower():
+        elif ql in wordmark:
             base = 0.92
         elif ql in bag:
             base = 0.78
-        elif (mark.mark_sample or "")[:3].lower() == ql[:3]:
+        elif wordmark[:3] == ql[:3]:
             base = 0.76
     s = base + _jitter(str(mark.id))
     return round(max(0.0, min(0.999, s)), 2)
@@ -159,7 +203,10 @@ async def search_trademarks(
     total = (await session.execute(cnt_stmt)).scalar_one()
 
     has_vienna = bool(norm_vienna)
-    scored = [(m, _score(m, q, mode, has_vienna=has_vienna)) for m in rows]
+    scored = [
+        (m, _score(m, q, mode, has_vienna=has_vienna, vienna_query=norm_vienna))
+        for m in rows
+    ]
     scored = [(m, s) for (m, s) in scored if s >= threshold]
     if sort == "similarity":
         scored.sort(key=lambda x: (-x[1], str(x[0].id)))

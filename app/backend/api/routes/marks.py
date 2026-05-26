@@ -12,7 +12,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import uuid
 from datetime import date, timedelta
 
@@ -21,8 +20,10 @@ from pydantic import BaseModel
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import similarity as sim
 from ..db import RecordType, Trademark, get_session
 from ..schemas import TrademarkOut
+from ..settings import get_settings
 from .today import DEMO_TODAY, _opp_close_date
 
 router = APIRouter(prefix="/api/v1/marks", tags=["marks"])
@@ -262,23 +263,55 @@ async def co_marks(
     ]
 
 
-# ===== Similar marks (mocked similarity) =====
+# ===== Similar marks (real similarity engine) =====
 
 
 class SimilarMark(BaseModel):
     mark: TrademarkOut
     score: float
+    # Same provenance flag as compare.PairScore.visualConfidence so the
+    # UI can warn when the visual signal is a typographic proxy.
+    visualConfidence: str = "none"
+
+
+# Minimum composite score for a mark to be considered "similar" enough to
+# surface as a recommendation. Below this the engine considers the two
+# marks unrelated and a trademark professional wouldn't bother flagging
+# them — return nothing rather than noise.
+_SIMILAR_MIN_COMPOSITE = 0.30
+
+# Candidate pool size before re-ranking with the real engine. The DB
+# typically has hundreds of rows in a single class + ±60d window; we
+# fetch up to this many, compute composite for each, then return the
+# top `limit` above the threshold. Keeping this bounded means Compare
+# pages stay fast even for popular classes.
+_SIMILAR_CANDIDATE_POOL = 40
 
 
 @router.get("/{id}/similar", response_model=list[SimilarMark])
 async def similar_marks(
     id: uuid.UUID, limit: int = 4, session: AsyncSession = Depends(get_session)
 ) -> list[SimilarMark]:
+    """Return marks similar to the given one, ranked by composite score.
+
+    Pipeline:
+      1. Pre-screen via SQL — share at least one Nice class, published
+         within ±60 days. This is a 100x reduction of the candidate set
+         before any Python similarity work runs.
+      2. For each candidate, compute the full composite score (phonetic
+         + visual + class + vienna) via api.similarity.
+      3. Drop candidates whose composite < 0.30 (irrelevant noise).
+      4. Sort by composite descending, return top `limit`.
+
+    The prior implementation sorted by md5 jitter — the recommendations
+    were random within the SQL pre-screen pool, which surfaced
+    'Montinis → MF11RCE / SPRINGFERM' as 'similar' even though no
+    examiner would group those together.
+    """
     m = await session.get(Trademark, id)
     if m is None:
         return []
-    # "Similar" = shares at least one Nice class + published within ±60 days. Mock score
-    # is a per-id jitter; the real similarity engine swaps in here later.
+
     pub_range = []
     if m.publication_date_441:
         lo = m.publication_date_441 - timedelta(days=60)
@@ -290,16 +323,39 @@ async def similar_marks(
         q = q.where(Trademark.nice_classes.op("&&")(m.nice_classes))
     if pub_range:
         q = q.where(and_(*pub_range))
-    q = q.order_by(desc(Trademark.publication_date_441), Trademark.id).limit(limit)
+    q = q.order_by(desc(Trademark.publication_date_441), Trademark.id).limit(_SIMILAR_CANDIDATE_POOL)
 
-    rows = list((await session.execute(q)).scalars().all())
-    out = []
-    for r in rows:
-        h = int(hashlib.md5(f"{m.id}{r.id}".encode()).hexdigest()[:8], 16)
-        score = round(0.55 + (h % 350) / 1000.0, 2)
-        out.append(SimilarMark(mark=TrademarkOut.model_validate(r), score=score))
-    out.sort(key=lambda x: -x.score)
-    return out
+    candidates = list((await session.execute(q)).scalars().all())
+    image_root = get_settings().data_dir / "image"
+    m_text = m.mark_sample or m.applicant_name
+
+    scored: list[tuple[Trademark, float, str]] = []
+    for r in candidates:
+        r_text = r.mark_sample or r.applicant_name
+        phon = sim.phonetic_similarity(m_text, r_text)
+        vis = sim.visual_similarity(
+            a_logo=m.logo_path,
+            b_logo=r.logo_path,
+            a_text=m_text,
+            b_text=r_text,
+            image_root=image_root,
+        )
+        class_o = sim.class_overlap(m.nice_classes, r.nice_classes)
+        vienna_o = sim.vienna_overlap(m.vienna_codes, r.vienna_codes)
+        cs = sim.composite_score(phon, vis.score, class_o, vienna_o)
+        if cs.composite >= _SIMILAR_MIN_COMPOSITE:
+            scored.append((r, cs.composite, vis.confidence))
+
+    scored.sort(key=lambda x: -x[1])
+
+    return [
+        SimilarMark(
+            mark=TrademarkOut.model_validate(r),
+            score=round(score, 3),
+            visualConfidence=conf,
+        )
+        for r, score, conf in scored[:limit]
+    ]
 
 
 # ===== Applicant portfolio stats (mostly real) =====
