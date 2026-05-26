@@ -210,7 +210,7 @@ export function SpecimenPlate({
       </div>
       {placeholder && (
         <div
-          className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[8px] font-mono tracking-[0.15em] uppercase text-mute pointer-events-none"
+          className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] font-mono tracking-[0.12em] uppercase text-mute pointer-events-none"
           aria-label="Specimen image not yet extracted"
         >
           no specimen on file

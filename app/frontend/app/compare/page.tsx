@@ -11,6 +11,7 @@ import {
   Card, Button, Pill, Flag, ClassChip, SimilarityRing, PulseDot, LinkButton,
 } from "@/components/ui";
 import { MarkSpecimen } from "@/components/specimen";
+import { formatDateShort } from "@/lib/format";
 import { markDisplay } from "@/lib/mark-display";
 import { Icon } from "@/components/icons";
 import {
@@ -19,8 +20,8 @@ import {
 } from "@/lib/api";
 import type { PillTone } from "@/components/ui";
 
-const fmtShort = (iso?: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "—";
+// Compact date for the compare grid (no year — implied by surrounding context).
+// Imported from lib/format to keep a single source of truth across the app.
 
 export default function ComparePageShell() {
   return (
@@ -195,13 +196,13 @@ function ComparePage() {
           <CmpHeader>Procedural state</CmpHeader>
           <CmpRow label="Filed" n={N}>
             {data.marks.map((m) => (
-              <span key={m.id} className="font-mono text-[12.5px] tabular">{fmtShort(m.submission_date)}</span>
+              <span key={m.id} className="font-mono text-[12.5px] tabular">{formatDateShort(m.submission_date)}</span>
             ))}
           </CmpRow>
           <CmpRow label="Published" n={N}>
             {data.marks.map((m) => (
               <span key={m.id} className="font-mono text-[12.5px] tabular">
-                {fmtShort(m.publication_date_441 ?? m.publication_date_450)}
+                {formatDateShort(m.publication_date_441 ?? m.publication_date_450)}
               </span>
             ))}
           </CmpRow>

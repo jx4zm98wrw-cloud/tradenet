@@ -30,6 +30,21 @@ export function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
+/** Compact day+short-month date, no year. Used in tight grid cells where the
+ * year is implied by surrounding context (e.g. the compare page's date row).
+ * Example: `2025-01-15` -> `"15 Jan"`. */
+export function formatDateShort(iso?: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+}
+
+/** Narrow an unknown thrown value (catch clause inferred type) to a string.
+ * Use in every `catch (e) { setError(errorMessage(e)) }` site so the
+ * components don't have to type the parameter as `any`. */
+export function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 export function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds.toFixed(1)}s`;
   const m = Math.floor(seconds / 60);
