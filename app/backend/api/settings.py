@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""  # blank disables
     enable_prometheus: bool = True
 
+    # ---- Worker tuning ----
+    # Number of trademark rows the worker bulk-inserts per session.add_all()
+    # call. Larger = fewer round trips; smaller = lower memory footprint per
+    # batch. 200 is the historical default tuned for the 2026 gazette set.
+    worker_batch_size: int = 200
+
     # ---- Computed ----
     @property
     def cors_origin_list(self) -> list[str]:
@@ -65,9 +71,21 @@ class Settings(BaseSettings):
     @field_validator("secret_key", mode="after")
     @classmethod
     def _warn_default_secret(cls, v: str, info) -> str:
-        # Don't crash dev, but make prod misconfiguration loud.
-        if info.data.get("env", "").lower() == "production" and "dev-only" in v:
-            raise ValueError("TM_SECRET_KEY must be set to a long random string in production")
+        # Crash hard in prod; emit a one-line stderr warning in dev so the
+        # default doesn't silently bleed into a non-local environment that
+        # forgot to set TM_SECRET_KEY (e.g. a staging instance running with
+        # env=development by accident).
+        env = info.data.get("env", "").lower()
+        if "dev-only" in v:
+            if env == "production":
+                raise ValueError("TM_SECRET_KEY must be set to a long random string in production")
+            import sys
+
+            print(
+                "WARNING: TM_SECRET_KEY is the dev default. "
+                "Set it to a long random value before any non-local deployment.",
+                file=sys.stderr,
+            )
         return v
 
 
