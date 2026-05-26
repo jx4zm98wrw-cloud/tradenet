@@ -72,10 +72,23 @@ function SearchPage() {
 
   React.useEffect(() => setSearchText(filters.q ?? ""), [filters.q]);
 
-  // Re-fetch facets when filters change (cross-react).
+  // Re-fetch facets when filters change. Aborts inflight requests on
+  // superseding filter changes so a slow "Vietnam" facet response can't
+  // overwrite the newer "China" one (same race the CmdK abort solved).
   React.useEffect(() => {
-    api.facetsCountries(filters, 20).then(setCountries).catch(() => {});
-    api.facetsNiceClasses(filters, 45).then(setClasses).catch(() => {});
+    const controller = new AbortController();
+    const init: RequestInit = { signal: controller.signal };
+    api.facetsCountries(filters, 20, init).then(setCountries).catch((e) => {
+      if (e?.name !== "AbortError") {
+        // intentionally silent — facets are best-effort
+      }
+    });
+    api.facetsNiceClasses(filters, 45, init).then(setClasses).catch((e) => {
+      if (e?.name !== "AbortError") {
+        // intentionally silent
+      }
+    });
+    return () => controller.abort();
   }, [filters]);
 
   // Fetch results.

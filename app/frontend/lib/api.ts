@@ -267,10 +267,10 @@ export const api = {
   statsOverview: () => json<StatsOverview>(`/api/v1/stats/overview`),
   statsCountries: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/countries?limit=${limit}`),
   statsNiceClasses: (limit = 12) => json<CountBucket[]>(`/api/v1/stats/nice-classes?limit=${limit}`),
-  facetsCountries: (filters: SearchParams, limit = 20) =>
-    json<CountBucket[]>(`/api/v1/facets/countries?${qs({ ...filters, limit, offset: undefined })}`),
-  facetsNiceClasses: (filters: SearchParams, limit = 45) =>
-    json<CountBucket[]>(`/api/v1/facets/nice-classes?${qs({ ...filters, limit, offset: undefined })}`),
+  facetsCountries: (filters: SearchParams, limit = 20, init?: RequestInit) =>
+    json<CountBucket[]>(`/api/v1/facets/countries?${qs({ ...filters, limit, offset: undefined })}`, init),
+  facetsNiceClasses: (filters: SearchParams, limit = 45, init?: RequestInit) =>
+    json<CountBucket[]>(`/api/v1/facets/nice-classes?${qs({ ...filters, limit, offset: undefined })}`, init),
   statsTopApplicants: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-applicants?limit=${limit}`),
   statsTopAgents: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-agents?limit=${limit}`),
   getMark: (id: string) => json<MarkDetail>(`/api/v1/marks/${id}`),
