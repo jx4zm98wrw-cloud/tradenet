@@ -60,18 +60,29 @@ export default function MarkDetailPage() {
 
   React.useEffect(() => {
     if (!id) return;
-    Promise.all([
+    // Promise.allSettled, not Promise.all: one failed sidebar (e.g. similar
+    // marks 500ing) must not block the whole page from rendering. Core mark
+    // detail is the only required call — its failure is the actual page-level
+    // error. Sidebar cards fall back to empty/null on individual failure.
+    Promise.allSettled([
       api.getMark(id),
       api.markTimeline(id),
       api.markCoMarks(id, 5),
       api.markSimilar(id, 4),
-      api.markApplicantStats(id).catch(() => null),
+      api.markApplicantStats(id),
       api.markInidFields(id),
-    ])
-      .then(([d, t, c, s, st, fi]) => {
-        setDetail(d); setTimeline(t); setCoMarks(c); setSimilar(s); setStats(st); setInid(fi);
-      })
-      .catch((e) => setError(e.message ?? String(e)));
+    ]).then(([d, t, c, s, st, fi]) => {
+      if (d.status === "rejected") {
+        setError(d.reason?.message ?? String(d.reason));
+        return;
+      }
+      setDetail(d.value);
+      setTimeline(t.status === "fulfilled" ? t.value : []);
+      setCoMarks(c.status === "fulfilled" ? c.value : []);
+      setSimilar(s.status === "fulfilled" ? s.value : []);
+      setStats(st.status === "fulfilled" ? st.value : null);
+      setInid(fi.status === "fulfilled" ? fi.value : []);
+    });
   }, [id]);
 
   if (error) return <Err error={error} />;
