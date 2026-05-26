@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "./icons";
 import { Kbd } from "./ui/kbd";
 import { api, type Trademark } from "@/lib/api";
+import { markDisplay } from "@/lib/mark-display";
 
 /* ----- Context: any component can call useCmdK().open() to summon the palette ----- */
 
@@ -149,14 +150,22 @@ function CmdKPalette({ open, onClose }: { open: boolean; onClose: () => void }) 
       },
     ].filter((a) => matches(a.label));
 
-    const tmItems: Item[] = marks.map((t) => ({
-      id: `tm-${t.id}`,
-      icon: <span className="font-sans font-bold text-[11px] text-stamp tracking-wider">{(t.mark_sample ?? t.applicant_name ?? "").slice(0, 2).toUpperCase()}</span>,
-      label: t.mark_sample ?? t.applicant_name ?? "—",
-      sub: t.applicant_name ?? undefined,
-      hint: t.application_number ?? t.certificate_number ?? t.madrid_number ?? undefined,
-      onSelect: () => { router.push(`/marks/${t.id}`); onClose(); },
-    }));
+    const tmItems: Item[] = marks.map((t) => {
+      // Route the label + icon initials through markDisplay() so CmdK shows the
+      // same compacted label as everywhere else (e.g. "ACME LTD" not "Công ty
+      // TNHH Acme Ltd"). The previous direct field access bypassed the helper
+      // and produced different labels in the palette vs. the mark detail page.
+      const md = markDisplay(t);
+      const initials = (md.text || "").slice(0, 2).toUpperCase();
+      return {
+        id: `tm-${t.id}`,
+        icon: <span className="font-sans font-bold text-[11px] text-stamp tracking-wider">{initials}</span>,
+        label: md.text || "—",
+        sub: t.applicant_name ?? undefined,
+        hint: t.application_number ?? t.certificate_number ?? t.madrid_number ?? undefined,
+        onSelect: () => { router.push(`/marks/${t.id}`); onClose(); },
+      };
+    });
 
     const recentItems: Item[] = recent.filter((r) => matches(r.q)).map((r, i) => ({
       id: `rec-${i}`,
