@@ -221,7 +221,16 @@ export type CoMark = {
   classes: string[];
 };
 
-export type SimilarMark = { mark: Trademark; score: number };
+export type SimilarMark = {
+  mark: Trademark;
+  score: number;
+  // Whether the visual signal that fed into `score` was a real pHash
+  // comparison ('phash'), a typographic fallback on the wordmark text
+  // ('typographic'), or no visual signal at all ('none'). The UI surfaces
+  // a small annotation when visual is typographic so the user knows the
+  // visual score isn't authoritative.
+  visualConfidence?: "phash" | "typographic" | "none";
+};
 
 export type ApplicantStats = {
   name: string;
@@ -238,9 +247,16 @@ export type PairScore = {
   phonetic: number;
   visual: number;
   classOverlap: number;
+  viennaOverlap: number;
   composite: number;
   verdict: string;       // "Likely conflict" | "Possible conflict" | "Low risk"
   verdictTone: "stamp" | "warn" | "ok";
+  // 'phash' = visual is a real perceptual-hash comparison on extracted PNGs
+  // (gold standard). 'typographic' = both marks were missing logos, so the
+  // visual score is a typographic JW on the wordmark text — meaningful but
+  // a trademark expert should inspect the actual specimens. 'none' = no
+  // visual signal at all.
+  visualConfidence: "phash" | "typographic" | "none";
 };
 
 export type CompareResponse = {

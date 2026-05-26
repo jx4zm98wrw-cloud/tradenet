@@ -279,7 +279,17 @@ export default function MarkDetailPage() {
                           ))}
                         </div>
                       </div>
-                      <SimilarityRing score={s.score} size={28} />
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <SimilarityRing score={s.score} size={28} />
+                        {s.visualConfidence === "typographic" && (
+                          <span
+                            className="text-[9px] font-mono font-semibold tracking-wider text-mute border border-line rounded px-1"
+                            title="Visual signal is typographic fallback (no extracted logo PNG on one or both marks). Inspect specimens before relying on the score."
+                          >
+                            T
+                          </span>
+                        )}
+                      </div>
                     </Link>
                   );
                 })}
