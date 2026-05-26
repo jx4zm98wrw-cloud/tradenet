@@ -246,7 +246,7 @@ def ingest_pdf(gazette_id: str) -> dict:
 
         batch: list[Trademark] = []
         row_count = 0
-        BATCH_SIZE = 200
+        batch_size = settings.worker_batch_size
         # Pass gazette_type explicitly — the stored path is `<digest>_<orig>.pdf`,
         # so the filename's first letter is the digest, not A/B.
         for section in processor.extract_records(pdf_path, gazette_type=letter):
@@ -255,7 +255,7 @@ def ingest_pdf(gazette_id: str) -> dict:
                 _resolve_logo_path(section, image_subdir_rel, image_root) if image_subdir_rel else None
             )
             batch.append(section_to_trademark(gazette.id, rt, section, logo_path=logo_path))
-            if len(batch) >= BATCH_SIZE:
+            if len(batch) >= batch_size:
                 session.add_all(batch)
                 session.commit()
                 row_count += len(batch)
