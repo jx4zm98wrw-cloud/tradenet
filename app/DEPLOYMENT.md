@@ -14,6 +14,14 @@ Three configurations distinguished by `TM_ENV`:
 
 See `.env.example` for the full list. The bare minimum for production:
 
+> **Port conventions.** Production examples below use the *standard* ports
+> `:5432` (postgres) and `:6379` (redis), assuming an in-cluster service
+> reachable on its own DNS name. **Dev** (`docker compose`) publishes
+> postgres on `:5435` and redis on `:6380` to avoid colliding with anything
+> already running on the host — those are dev-only host-published ports.
+> `.env.example` and `Settings` defaults target the dev ports; production
+> envs override.
+
 ```bash
 TM_ENV=production
 TM_DATABASE_URL=postgresql+asyncpg://USER:PASS@db-host:5432/tm
