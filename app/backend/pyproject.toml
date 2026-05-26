@@ -56,6 +56,13 @@ warn_redundant_casts = true
 strict_optional = true
 exclude = "(alembic/|scripts/|tm_extractor/|image_extractor/)"
 
+# Vendored packages: mypy still resolves their imports when api/ or worker/
+# pull them in. follow_imports="skip" stops mypy from analyzing them entirely,
+# matching the "treated as vendored" intent of the lint/format exclusions.
+[[tool.mypy.overrides]]
+module = ["image_extractor.*", "tm_extractor.*"]
+follow_imports = "skip"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"

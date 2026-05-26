@@ -13,9 +13,7 @@ from tm_extractor.applicant import parse_applicant_field
 
 def test_skips_non_iso_city_abbrev_before_real_country_code():
     """Regression: (GZ) is Guangzhou, not an ISO code. The real code is (CN)."""
-    names, addresses = parse_applicant_field(
-        "MEISHANG (GZ) COSMETICS CO., LTD. (CN) 123 Some St, Guangzhou"
-    )
+    names, addresses = parse_applicant_field("MEISHANG (GZ) COSMETICS CO., LTD. (CN) 123 Some St, Guangzhou")
     assert names == ["MEISHANG (GZ) COSMETICS CO., LTD."]
     assert addresses == ["123 Some St, Guangzhou"]
 
@@ -28,9 +26,7 @@ def test_simple_name_country_address():
 
 def test_multi_applicant_numbered_keeps_first_only():
     """1. ... 2. ... pattern: drop the second applicant entirely."""
-    names, addresses = parse_applicant_field(
-        "1. ACME LTD (US) 123 Main St 2. BETA INC (CN) 456 Oak Rd"
-    )
+    names, addresses = parse_applicant_field("1. ACME LTD (US) 123 Main St 2. BETA INC (CN) 456 Oak Rd")
     assert names == ["ACME LTD"]
     assert addresses == ["123 Main St"]
 

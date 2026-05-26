@@ -197,8 +197,8 @@ async def get_timeline(id: uuid.UUID, session: AsyncSession = Depends(get_sessio
                     body=f"Cert № {m.certificate_number or '—'}. 10-year validity.",
                 )
             )
-        if m.expiry_date_141 or m.expiry_date_181:
-            ex = m.expiry_date_141 or m.expiry_date_181  # type: ignore[assignment]
+        ex = m.expiry_date_141 or m.expiry_date_181
+        if ex is not None:
             events.append(
                 TimelineEvent(
                     kind="renewal",

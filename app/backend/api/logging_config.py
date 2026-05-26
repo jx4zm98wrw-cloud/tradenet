@@ -20,7 +20,10 @@ import structlog
 def configure_logging(env: str = "development") -> None:
     is_prod = env.lower() in ("production", "staging")
 
-    shared_processors = [
+    # Explicit Processor annotations: without them, mypy infers list[object]
+    # from the heterogeneous-looking processor list, and the renderer type
+    # gets pinned to whichever branch runs first.
+    shared_processors: list[structlog.types.Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
@@ -28,6 +31,7 @@ def configure_logging(env: str = "development") -> None:
         structlog.processors.format_exc_info,
     ]
 
+    renderer: structlog.types.Processor
     if is_prod or not sys.stderr.isatty():
         renderer = structlog.processors.JSONRenderer()
     else:

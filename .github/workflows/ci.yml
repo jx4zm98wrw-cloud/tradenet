@@ -54,6 +54,13 @@ jobs:
           ruff check .
           ruff format --check .
 
+      - name: Type-check
+        working-directory: app/backend
+        # Scoped to api + worker (the actively-typed packages).
+        # tm_extractor/ and image_extractor/ are vendored — type checks
+        # would drown out signal from real bugs.
+        run: mypy api worker
+
       - name: Migrate
         working-directory: app/backend
         run: alembic upgrade head
