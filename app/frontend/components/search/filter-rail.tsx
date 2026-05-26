@@ -6,6 +6,7 @@ import {
   countryDisplay, NICE_LABELS,
 } from "@/lib/api";
 import { Flag } from "@/components/ui";
+import { Icon } from "@/components/icons";
 import { formatNumber } from "@/lib/format";
 
 type Props = {
@@ -18,6 +19,9 @@ type Props = {
 };
 
 export function FilterRail({ filters, setFilter, niceMode, onNiceModeChange, countries, classes }: Props) {
+  const [countryModal, setCountryModal] = React.useState(false);
+  const [classesModal, setClassesModal] = React.useState(false);
+
   return (
     <aside className="space-y-5">
       <RailGroup title="Record type">
@@ -37,7 +41,15 @@ export function FilterRail({ filters, setFilter, niceMode, onNiceModeChange, cou
 
       <RailGroup
         title="Country"
-        trailing={<button className="text-[11px] text-stamp hover:text-stamp-deep font-medium">Show all 67</button>}
+        trailing={
+          <button
+            type="button"
+            onClick={() => setCountryModal(true)}
+            className="text-[11px] text-stamp hover:text-stamp-deep font-medium"
+          >
+            Show all
+          </button>
+        }
       >
         {pinSelected(countries, filters.country ? [filters.country] : [], 8).map((c) => {
           const d = countryDisplay(c.key);
@@ -91,7 +103,11 @@ export function FilterRail({ filters, setFilter, niceMode, onNiceModeChange, cou
             />
           );
         })}
-        <button className="text-[11px] text-stamp hover:text-stamp-deep font-medium ml-1 mt-1 text-left">
+        <button
+          type="button"
+          onClick={() => setClassesModal(true)}
+          className="text-[11px] text-stamp hover:text-stamp-deep font-medium ml-1 mt-1 text-left"
+        >
           Show all 45 classes →
         </button>
       </RailGroup>
@@ -109,6 +125,47 @@ export function FilterRail({ filters, setFilter, niceMode, onNiceModeChange, cou
           />
         ))}
       </RailGroup>
+
+      {countryModal && (
+        <FullPickerModal
+          title="Filter by country"
+          fetchAll={() => api.facetsCountries(filters, 300)}
+          selected={filters.country ? [filters.country] : []}
+          multi={false}
+          renderItem={(b) => {
+            const d = countryDisplay(b.key);
+            return (
+              <>
+                <Flag code={b.key} size={14} />
+                <span className="flex-1 truncate">{d.name}</span>
+                <span className="text-[10px] font-mono text-mute uppercase">{b.key}</span>
+              </>
+            );
+          }}
+          onToggle={(k) => setFilter({ country: filters.country === k ? undefined : k })}
+          onClose={() => setCountryModal(false)}
+        />
+      )}
+      {classesModal && (
+        <FullPickerModal
+          title="Filter by Nice class"
+          fetchAll={() => api.facetsNiceClasses(filters, 300)}
+          selected={filters.nice_class ?? []}
+          multi={true}
+          renderItem={(b) => (
+            <>
+              <span className="font-mono text-[12px] font-bold w-7 text-stamp tabular shrink-0">{b.key}</span>
+              <span className="flex-1 truncate">{b.label || NICE_LABELS[b.key] || "—"}</span>
+            </>
+          )}
+          onToggle={(k) => {
+            const cur = filters.nice_class ?? [];
+            const next = cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k];
+            setFilter({ nice_class: next.length ? next : undefined });
+          }}
+          onClose={() => setClassesModal(false)}
+        />
+      )}
 
       <RailGroup title="Publication date">
         <div className="grid grid-cols-2 gap-2 px-1">
@@ -205,4 +262,149 @@ function pinSelected(items: CountBucket[], selectedKeys: string[], limit: number
     }
   }
   return [...top, ...missing];
+}
+
+/* =========================================================================== */
+/* Full picker modal — "Show all 67 countries" / "Show all 45 classes"        */
+/* =========================================================================== */
+
+/** Generic full-list picker. Fetches the un-truncated facet list, supports
+ * incremental search, and toggles selection through the parent's setFilter.
+ * `multi` distinguishes country-style (radio, single) from class-style
+ * (checkbox, array). */
+function FullPickerModal({
+  title,
+  fetchAll,
+  selected,
+  multi,
+  renderItem,
+  onToggle,
+  onClose,
+}: {
+  title: string;
+  fetchAll: () => Promise<CountBucket[]>;
+  selected: string[];
+  multi: boolean;
+  renderItem: (b: CountBucket) => React.ReactNode;
+  onToggle: (key: string) => void;
+  onClose: () => void;
+}) {
+  const [items, setItems] = React.useState<CountBucket[] | null>(null);
+  const [search, setSearch] = React.useState("");
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetchAll().then((data) => {
+      if (!cancelled) setItems(data);
+    }).catch(() => {
+      if (!cancelled) setItems([]);
+    });
+    return () => { cancelled = true; };
+  }, [fetchAll]);
+
+  // Close on Escape.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const q = search.trim().toLowerCase();
+  const filtered = items?.filter((b) => {
+    if (!q) return true;
+    const haystack = `${b.key} ${b.label ?? ""} ${countryDisplay(b.key).name ?? ""} ${NICE_LABELS[b.key] ?? ""}`.toLowerCase();
+    return haystack.includes(q);
+  }) ?? [];
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm grid"
+      style={{ alignItems: "flex-start", justifyItems: "center", paddingTop: "8vh" }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-surface border border-line rounded-lg shadow-md w-[480px] max-w-[94vw] overflow-hidden flex flex-col"
+        style={{ maxHeight: "78vh" }}
+        role="dialog"
+        aria-label={title}
+      >
+        <header className="px-4 py-3 border-b border-line flex items-center justify-between shrink-0">
+          <h2 className="head-serif text-[15px] font-semibold tracking-tight">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-7 h-7 grid place-items-center rounded hover:bg-paper-2"
+            aria-label="Close"
+          >
+            <Icon.X className="w-4 h-4 text-mute" />
+          </button>
+        </header>
+
+        <div className="px-4 py-2.5 border-b border-line shrink-0">
+          <div className="relative">
+            <Icon.Search className="w-4 h-4 text-mute absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              autoFocus
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search…"
+              className="w-full text-sm pl-8 pr-3 h-9 border border-line rounded bg-paper-2 focus:bg-surface focus:border-stamp-line outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto py-1">
+          {items === null ? (
+            <p className="px-4 py-6 text-sm text-mute text-center">Loading…</p>
+          ) : filtered.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-mute text-center">No matches.</p>
+          ) : (
+            <ul className="px-2">
+              {filtered.map((b) => {
+                const active = selected.includes(b.key);
+                return (
+                  <li key={b.key}>
+                    <button
+                      type="button"
+                      onClick={() => onToggle(b.key)}
+                      className={`w-full flex items-center gap-2 py-1.5 px-2 rounded text-[13px] text-left transition ${
+                        active ? "bg-stamp-2 text-stamp" : "hover:bg-paper-2 text-ink-2"
+                      }`}
+                    >
+                      <input
+                        type={multi ? "checkbox" : "radio"}
+                        checked={active}
+                        readOnly
+                        tabIndex={-1}
+                        className="accent-stamp w-3.5 h-3.5 shrink-0"
+                      />
+                      {renderItem(b)}
+                      <span className="text-[11px] tabular text-mute shrink-0">
+                        {formatNumber(b.count)}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <footer className="px-4 py-2.5 border-t border-line flex items-center justify-between bg-paper-2 shrink-0">
+          <span className="text-[12px] text-mute">
+            {selected.length === 0 ? "No selection" : `${selected.length} selected`}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[12.5px] font-medium px-3 h-7 rounded bg-stamp hover:bg-stamp-deep text-white"
+          >
+            Done
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
 }
