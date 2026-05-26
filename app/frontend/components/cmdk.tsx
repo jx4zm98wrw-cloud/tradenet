@@ -89,14 +89,29 @@ function CmdKPalette({ open, onClose }: { open: boolean; onClose: () => void }) 
     }
   }, [open]);
 
-  // Live trademark search (debounced).
+  // Live trademark search (debounced, with abort on superseding keystroke so
+  // a slow "apple" response can't land after a faster "orange" and overwrite
+  // results with stale data).
   React.useEffect(() => {
     if (!open) return;
+    const controller = new AbortController();
     const t = setTimeout(() => {
       if (!q.trim()) return setMarks([]);
-      api.searchTrademarks({ q: q.trim(), limit: 6 }).then((r) => setMarks(r.items)).catch(() => {});
+      api.searchTrademarks({ q: q.trim(), limit: 6 }, { signal: controller.signal })
+        .then((r) => setMarks(r.items))
+        .catch((e) => {
+          // AbortError is the success path for an interrupted request; swallow.
+          // Real network/parse errors are also swallowed here — CmdK is a
+          // best-effort autocomplete, not a primary surface for showing errors.
+          if (e?.name !== "AbortError") {
+            // intentionally silent
+          }
+        });
     }, 150);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      controller.abort();
+    };
   }, [q, open]);
 
   const recent = React.useMemo(() => readRecent(), [open]);

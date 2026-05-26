@@ -96,8 +96,8 @@ function qs(p: Record<string, unknown>): string {
   return u.toString();
 }
 
-async function json<T>(url: string): Promise<T> {
-  const r = await fetch(url);
+async function json<T>(url: string, init?: RequestInit): Promise<T> {
+  const r = await fetch(url, init);
   if (!r.ok) {
     // FastAPI returns structured errors as `{detail: "..."}`. Surface that to
     // the caller (toast / error UI) instead of swallowing it into a bare status
@@ -258,7 +258,8 @@ export type PipelineStats = {
 };
 
 export const api = {
-  searchTrademarks: (p: SearchParams) => json<TrademarkListResponse>(`/api/v1/trademarks?${qs(p)}`),
+  searchTrademarks: (p: SearchParams, init?: RequestInit) =>
+    json<TrademarkListResponse>(`/api/v1/trademarks?${qs(p)}`, init),
   scoredSearch: (p: ScoredSearchParams) => json<SearchResults>(`/api/v1/search/trademarks?${qs(p)}`),
   getTrademark: (id: string) => json<Trademark>(`/api/v1/trademarks/${id}`),
   listGazettes: () => json<GazetteListResponse>(`/api/v1/gazettes`),
