@@ -90,9 +90,21 @@ export function markDisplay(m: Pick<Trademark, "mark_sample" | "applicant_name" 
 
   // 0. Real raster logo extracted from the PDF — highest priority. Once present,
   // it's a real specimen so isPlaceholder=false regardless of mark_sample.
+  //
+  // Label precedence when no mark_sample exists:
+  //   1. mark_sample (the WIPO 540 wordmark)
+  //   2. compactApplicantName(applicant_name) — human-readable, e.g. "ACME"
+  //   3. id (application/cert/madrid number) — last resort, machine-readable
+  //
+  // Previously fell straight from mark_sample to id, which made CmdK
+  // results read like "4-2026-09350" instead of the applicant name when
+  // an A-file had a logo but no 540 field. The compacted applicant name is
+  // what every other surface (search grid, mark detail hero) already shows.
   if (m.logo_path) {
     const url = `/static/image/${m.logo_path}`;
-    const label = m.mark_sample?.trim() || id || "";
+    const sample = m.mark_sample?.trim();
+    const compacted = m.applicant_name ? compactApplicantName(m.applicant_name) : "";
+    const label = sample || compacted || id || "";
     return { text: label, isPlaceholder: false, identifier: id, imageUrl: url };
   }
 
