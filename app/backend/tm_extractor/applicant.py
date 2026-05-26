@@ -56,7 +56,7 @@ def parse_applicant_field(applicant_text: str) -> tuple[list[str], list[str]]:
                 else:
                     applicant_names.append(applicant.strip())
                     applicant_addresses.append("")
-    except (re.error, AttributeError, IndexError, ValueError) as e:
+    except (re.error, AttributeError, IndexError, KeyError, ValueError) as e:
         # Narrow catch: these are the failure modes consistent with malformed
         # text (regex blowup, missing capture group, split returned unexpected
         # arity). Anything else — TypeError from a non-str input, RuntimeError
