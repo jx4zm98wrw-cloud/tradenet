@@ -15,6 +15,9 @@ claude_csvbuilder/
 ├── app/
 │   ├── backend/                    Installable Python package `tm-backend`
 │   │   ├── api/                    FastAPI app + SQLAlchemy models
+│   │   │                           (incl. `_filename.py`: single source of truth
+│   │   │                           for NOIP filename parsing, imported by both
+│   │   │                           routes/gazettes.py and worker/ingest.py)
 │   │   ├── worker/                 RQ jobs (ingest pipeline lives here)
 │   │   ├── tm_extractor/           Vendored CSV parser (was TM_csv_builder.py)
 │   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
