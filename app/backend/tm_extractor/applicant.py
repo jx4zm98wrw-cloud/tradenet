@@ -56,9 +56,16 @@ def parse_applicant_field(applicant_text: str) -> tuple[list[str], list[str]]:
                 else:
                     applicant_names.append(applicant.strip())
                     applicant_addresses.append("")
-    except Exception as e:
+    except (re.error, AttributeError, IndexError, ValueError) as e:
+        # Narrow catch: these are the failure modes consistent with malformed
+        # text (regex blowup, missing capture group, split returned unexpected
+        # arity). Anything else — TypeError from a non-str input, RuntimeError
+        # from a downstream lookup, KeyError on COUNTRY_CODES — is a real
+        # programming error and should propagate so the operator can see it
+        # instead of getting a silently mis-parsed row.
         logging.warning(
-            f"{Fore.YELLOW}Failed to parse applicant text '{applicant_text}': {e!s}{Style.RESET_ALL}"
+            f"{Fore.YELLOW}Failed to parse applicant text '{applicant_text}' "
+            f"({type(e).__name__}: {e!s}){Style.RESET_ALL}"
         )
         applicant_names.append(applicant_text.strip())
         applicant_addresses.append("")
