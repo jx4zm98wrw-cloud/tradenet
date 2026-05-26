@@ -65,6 +65,13 @@ jobs:
         working-directory: app/backend
         run: alembic upgrade head
 
+      - name: Schema-vs-models drift check
+        working-directory: app/backend
+        # Fails if SQLAlchemy models have diverged from the latest migration.
+        # Forces "model changed without migration" PRs to add the migration
+        # before merge.
+        run: alembic check
+
       - name: Test
         working-directory: app/backend
         run: pytest tests/ -q
