@@ -16,11 +16,63 @@ from sqlalchemy.sql.elements import ColumnElement
 from ..db import RecordType, Trademark
 
 
+def vienna_code_match(code: str) -> ColumnElement:
+    """Build a WHERE clause matching any trademark whose vienna_codes array
+    contains `code` (exact) OR a more-specific child under it (prefix).
+
+    Vienna classification is hierarchical: `5.7` is the "Flowers" parent;
+    every actual mark carries 3-level child codes like `5.7.1` (single
+    flower) or `5.7.20` (stylized flower). The DB stores only the
+    3-level codes. A user who clicks the "05.07 Flowers" quick-pick
+    expects ANY flower mark to match, not "marks with literally `5.7`
+    in their codes" (none exist).
+
+    Implementation: exact match goes through the GIN index via `&&`;
+    prefix match scans a comma-delimited form of the array. The exact
+    branch is index-fast and cheap; the prefix branch only fires for
+    2-level codes (most user queries) and is bounded by the same row
+    set the exact filter would touch.
+    """
+    exact = Trademark.vienna_codes.op("&&")([code])
+    if code.count(".") < 2:
+        # Bookend with commas so `,5.7.,` and `,5.7,` boundaries don't
+        # accidentally match `15.7.x` or `5.70.x`.
+        joined = func.concat(",", func.array_to_string(Trademark.vienna_codes, ","), ",")
+        prefix = joined.like(f"%,{code}.%")
+        return or_(exact, prefix)
+    return exact
+
+
+def normalize_vienna_code(code: str) -> str | None:
+    """Normalize a Vienna code to the stored representation.
+
+    The extractor strips leading zeros, so `01.01.01` becomes `1.1.1` in
+    the DB. Frontend / WIPO references frequently zero-pad. Strip leading
+    zeros from each dotted segment so `01.01` and `1.1` both find the
+    same rows. Returns None if the input doesn't look like a Vienna
+    code (lets callers cheaply filter out garbage).
+    """
+    s = code.strip()
+    if not s:
+        return None
+    parts = s.split(".")
+    if not (2 <= len(parts) <= 3):
+        return None
+    out: list[str] = []
+    for p in parts:
+        p = p.strip()
+        if not p.isdigit():
+            return None
+        out.append(str(int(p)))  # strips leading zeros
+    return ".".join(out)
+
+
 def build_trademark_where(
     *,
     q: str | None = None,
     country: str | None = None,
     nice_class: list[str] | None = None,
+    vienna_codes: list[str] | None = None,
     record_type: RecordType | None = None,
     applicant_type: str | None = None,
     year: int | None = None,
@@ -33,6 +85,11 @@ def build_trademark_where(
 
     Pass `exclude="<field>"` to skip one filter — used by facet endpoints so a
     selected value doesn't suppress its own facet's other options.
+
+    `nice_class` and `vienna_codes` use ALL-semantics here (each requested
+    value must be present). Callers that want ANY-semantics should pass
+    None and apply `Trademark.<column>.op("&&")(values)` themselves —
+    array overlap is one expression instead of N.
     """
     where: list[ColumnElement] = []
     if q and exclude != "q":
@@ -51,6 +108,10 @@ def build_trademark_where(
     if nice_class and exclude != "nice_class":
         for nc in nice_class:
             where.append(Trademark.nice_classes.contains([nc]))
+    if vienna_codes and exclude != "vienna_codes":
+        # Each requested code matches exact OR prefix (parent → child).
+        for vc in vienna_codes:
+            where.append(vienna_code_match(vc))
     if record_type is not None and exclude != "record_type":
         where.append(Trademark.record_type == record_type)
     if applicant_type and exclude != "applicant_type":

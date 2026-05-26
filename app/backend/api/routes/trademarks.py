@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import RecordType, Trademark, get_session
 from ..schemas import TrademarkListOut, TrademarkOut
-from ._filters import build_trademark_where
+from ._filters import build_trademark_where, normalize_vienna_code
 
 router = APIRouter(prefix="/api/v1/trademarks", tags=["trademarks"])
 
@@ -24,6 +24,11 @@ async def search(
     nice_class: list[str] | None = Query(
         None, description="One or more Nice classes; repeat param to combine"
     ),
+    vienna_codes: list[str] | None = Query(
+        None,
+        description="One or more Vienna figurative codes (NN.NN or NN.NN.NN); "
+        "leading zeros are stripped to match storage format",
+    ),
     record_type: RecordType | None = None,
     applicant_type: str | None = Query(None, description="Personal | Company"),
     year: int | None = None,
@@ -34,10 +39,14 @@ async def search(
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> TrademarkListOut:
+    norm_vienna: list[str] | None = None
+    if vienna_codes:
+        norm_vienna = [c for c in (normalize_vienna_code(v) for v in vienna_codes) if c]
     where = build_trademark_where(
         q=q,
         country=country,
         nice_class=nice_class,
+        vienna_codes=norm_vienna,
         record_type=record_type,
         applicant_type=applicant_type,
         year=year,

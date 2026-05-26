@@ -14,12 +14,12 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import RecordType, Trademark, get_session
 from ..schemas import TrademarkOut
-from ._filters import build_trademark_where
+from ._filters import build_trademark_where, normalize_vienna_code, vienna_code_match
 
 router = APIRouter(prefix="/api/v1/search", tags=["search"])
 
@@ -79,6 +79,8 @@ async def search_trademarks(
     country: str | None = Query(None, min_length=2, max_length=2),
     nice_class: list[str] | None = Query(None),
     nice_class_mode: Literal["any", "all"] = Query("any"),
+    vienna_codes: list[str] | None = Query(None),
+    vienna_codes_mode: Literal["any", "all"] = Query("any"),
     record_type: RecordType | None = None,
     applicant_type: str | None = Query(None),
     year: int | None = None,
@@ -90,12 +92,23 @@ async def search_trademarks(
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> SearchResultsOut:
-    # The shared WHERE builder uses ALL-class semantics (Trademark.nice_classes.contains([nc])).
+    # Normalize Vienna codes to the stored representation (DB stores `4.3.3`
+    # not `04.03.03`). Codes that don't pass shape validation are dropped
+    # silently — better than 0 results from a typo'd code segment.
+    norm_vienna: list[str] | None = None
+    if vienna_codes:
+        norm_vienna = [c for c in (normalize_vienna_code(v) for v in vienna_codes) if c]
+        # Vienna mode skips the text `q` field — codes ARE the query.
+        if mode == "vienna":
+            q = None
+
+    # The shared WHERE builder uses ALL semantics for array contains.
     # For ANY semantics we run a separate where with array overlap.
     where = build_trademark_where(
         q=q,
         country=country,
         nice_class=nice_class if nice_class_mode == "all" else None,
+        vienna_codes=norm_vienna if vienna_codes_mode == "all" else None,
         record_type=record_type,
         applicant_type=applicant_type,
         year=year,
@@ -105,6 +118,11 @@ async def search_trademarks(
     )
     if nice_class and nice_class_mode == "any":
         where.append(Trademark.nice_classes.op("&&")(nice_class))
+    if norm_vienna and vienna_codes_mode == "any":
+        # ANY semantics with parent-code expansion: a request for `5.7`
+        # should match any `5.7.x`. OR together each code's match clause
+        # (each is exact-or-prefix per vienna_code_match).
+        where.append(or_(*[vienna_code_match(c) for c in norm_vienna]))
 
     stmt = select(Trademark)
     cnt_stmt = select(func.count()).select_from(Trademark)

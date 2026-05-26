@@ -49,6 +49,7 @@ class TrademarkOut(BaseModel):
     registration_date_151: date | None
     nice_classes: list[str] | None
     nice_total: int | None
+    vienna_codes: list[str] | None = None
     mark_sample: str | None
     # Relative path to the extracted logo PNG (under /static/). NULL when no
     # logo was extracted for this row — frontend should fall back to mark_sample.

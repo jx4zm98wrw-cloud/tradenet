@@ -133,12 +133,17 @@ class Trademark(Base):
     __tablename__ = "trademarks"
 
     # Composite/extension indexes that can't be expressed via mapped_column(index=True).
-    # The GIN index on nice_classes powers "contains any of [05, 12, 41]" array queries
-    # in /search; without it those queries fall back to seq scan on the trademarks table.
+    # Both GIN indexes power "contains any of …" array queries in /search;
+    # without them, the queries fall back to seq scan on the trademarks table.
     __table_args__ = (
         Index(
             "ix_trademarks_nice_classes_gin",
             "nice_classes",
+            postgresql_using="gin",
+        ),
+        Index(
+            "ix_trademarks_vienna_codes_gin",
+            "vienna_codes",
             postgresql_using="gin",
         ),
     )
