@@ -97,6 +97,68 @@ def test_phonetic_empty_inputs_safe() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Multi-word marks — the trap whole-string JW falls into
+
+
+def test_phonetic_multiword_unrelated_brands_should_score_low() -> None:
+    """OMBRES TENDRES (Chanel) vs MAYBELLINE SPOT RESCUE (L'Oreal) — two
+    multi-word cosmetics marks with no shared distinctive word. Whole-string
+    Jaro-Winkler scores 0.70 (false positive) from shared common letters in
+    similar-length strings; an examiner would not call these confusable.
+
+    Token-level best-pair JW must reflect: "no token in OMBRES TENDRES has
+    a strong match in MAYBELLINE SPOT RESCUE" → well below the 0.50
+    conjunction-guard floor.
+    """
+    s = phonetic_similarity("OMBRES TENDRES", "MAYBELLINE SPOT RESCUE")
+    assert s < 0.50, f"expected <0.50 (no shared dominant word), got {s}"
+
+
+def test_phonetic_multiword_no_shared_word_should_score_low() -> None:
+    """OMBRES TENDRES vs PRETTY PEONY — same trap, both 2-token cosmetics
+    marks. Whole-string JW finds 0.59 from shared letters; word pairing
+    sees no good match between any pair of tokens."""
+    s = phonetic_similarity("OMBRES TENDRES", "PRETTY PEONY")
+    assert s < 0.50, f"expected <0.50 (no shared dominant word), got {s}"
+
+
+def test_phonetic_shared_dominant_word_should_still_match() -> None:
+    """LIPITOR EXTRA vs LIPITAR PLUS — same dominant 'LIPITOR/LIPITAR'
+    family, descriptive variant ('EXTRA'/'PLUS') after. A trademark
+    examiner would flag the dominant-word collision. With token-level
+    pairing the LIPITOR/LIPITAR pair scores ~0.95 and EXTRA/PLUS scores
+    near 0, averaging to a moderate-but-meaningful conflict signal."""
+    s = phonetic_similarity("LIPITOR EXTRA", "LIPITAR PLUS")
+    assert s >= 0.50, f"expected >=0.50 (shared dominant LIPITOR-family), got {s}"
+
+
+def test_phonetic_one_shared_distinctive_word() -> None:
+    """COCA COLA vs COCA ZERO — one of two tokens shared (the brand
+    house), the other is a product descriptor. Examiner takeaway: still
+    related (both Coca-branded). Token pairing gives ~0.5."""
+    s = phonetic_similarity("COCA COLA", "COCA ZERO")
+    assert s >= 0.40, f"expected ~0.5 (one shared brand token), got {s}"
+
+
+def test_phonetic_token_count_mismatch_penalty() -> None:
+    """A single-token mark should not score 1.0 against a multi-token mark
+    just because one token matched. BMW vs BMW AUTO REPAIR SERVICE has the
+    BMW token in common, but the multi-word longer mark adds distinguishing
+    descriptive tokens that should pull the average down."""
+    s = phonetic_similarity("BMW", "BMW AUTO REPAIR SERVICE")
+    assert s < 0.50, f"expected <0.50 (1-of-4 token match), got {s}"
+
+
+def test_phonetic_separator_tolerant_tokenisation() -> None:
+    """Tokens split on hyphens / slashes / ampersands the same way they
+    split on whitespace, so brand variants COCA-COLA vs COCA COLA score
+    identically (an examiner reads both as the same two-word mark)."""
+    assert phonetic_similarity("COCA-COLA", "COCA COLA") == pytest.approx(
+        phonetic_similarity("COCA COLA", "COCA COLA")
+    )
+
+
+# ---------------------------------------------------------------------------
 # Class overlap (already real, keep covered)
 
 
@@ -153,6 +215,24 @@ def test_visual_falls_back_to_typographic_when_no_logos(tmp_path: Path) -> None:
     )
     assert vs.confidence == "typographic"
     assert vs.score >= 0.85  # similar text
+
+
+def test_visual_typographic_uses_token_level_jw(tmp_path: Path) -> None:
+    """The same false-positive trap as phonetic: 'OMBRES TENDRES' vs
+    'MAYBELLINE SPOT RESCUE' both lack logos, fall to typographic JW.
+    Whole-string JW would return 0.70 (looks visually 'similar' purely
+    because of letter frequency). Token-level pairing must agree with
+    the examiner's read: two visually distinct multi-word wordmarks
+    score well below 0.50."""
+    vs = visual_similarity(
+        a_logo=None,
+        b_logo=None,
+        a_text="OMBRES TENDRES",
+        b_text="MAYBELLINE SPOT RESCUE",
+        image_root=tmp_path,
+    )
+    assert vs.confidence == "typographic"
+    assert vs.score < 0.50, f"expected <0.50, got {vs.score}"
 
 
 def test_visual_returns_none_signal_for_blank_marks(tmp_path: Path) -> None:
@@ -264,3 +344,49 @@ def test_per_matter_weights_cannot_override_conjunction_guards() -> None:
     c = composite_score(phonetic=0.3, visual=0.0, class_o=0.0, vienna_o=0.0, weights=sketchy)
     # composite = 0.30 — below all bands; conjunction guards moot
     assert c.verdict == "Low risk"
+
+
+def test_typographic_visual_cannot_satisfy_conjunction_guard_alone() -> None:
+    """OMBRES TENDRES vs PRETTY PEONY case: token-level pairing puts
+    phonetic at ~0.48 (below the 0.50 sight-or-sound floor) but
+    typographic visual JW spikes to ~0.56 because both marks are
+    multi-word same-length English-ish strings.
+
+    Typographic visual is JW on the same wordmark text the phonetic
+    raw component already saw — it's the same family of signal, not
+    independent. Letting it independently satisfy the conjunction
+    guard is double-counting. Only real pHash visual (real perceptual
+    comparison of extracted logo PNGs) is independent enough to
+    satisfy the guard on its own.
+    """
+    c = composite_score(
+        phonetic=0.476,
+        visual=0.559,
+        class_o=1.0,
+        vienna_o=0.0,
+        visual_confidence="typographic",
+    )
+    # composite = 0.4*0.476 + 0.25*0.559 + 0.2*1.0 + 0 = 0.530 — would
+    # otherwise hit Possible. But max_sig collapses to phonetic only
+    # (0.476 < 0.50) → conjunction guard fails → Low risk.
+    assert c.verdict == "Low risk", (
+        f"typographic visual {0.559} should NOT independently satisfy "
+        f"the conjunction guard; expected Low risk, got {c.verdict}"
+    )
+
+
+def test_phash_visual_does_satisfy_conjunction_guard() -> None:
+    """Real pHash visual IS independent evidence. If the engine ran a
+    perceptual-hash comparison on extracted logo PNGs and found 0.85
+    similarity, that's an examiner-grade visual signal — it can carry
+    the conjunction guard even when phonetic is weak."""
+    c = composite_score(
+        phonetic=0.30,
+        visual=0.85,
+        class_o=1.0,
+        vienna_o=0.0,
+        visual_confidence="phash",
+    )
+    # composite = 0.4*0.30 + 0.25*0.85 + 0.2*1.0 + 0 = 0.533
+    # max_sig = max(0.30, 0.85) = 0.85 ≥ 0.50 → Possible conflict.
+    assert c.verdict == "Possible conflict"

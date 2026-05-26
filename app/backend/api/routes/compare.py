@@ -150,7 +150,9 @@ def _score_pair(anchor: Trademark, other: Trademark, w: dict[str, float], image_
         "class": w["classOverlap"],
         "vienna": w["viennaOverlap"],
     }
-    cs = sim.composite_score(phon, vis.score, class_o, vienna_o, composite_w)
+    cs = sim.composite_score(
+        phon, vis.score, class_o, vienna_o, composite_w, visual_confidence=vis.confidence
+    )
 
     return PairScore(
         markId=str(other.id),

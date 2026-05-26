@@ -45,6 +45,7 @@ composite level via `weights`. The four signal functions stay pure.
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
@@ -86,29 +87,107 @@ def normalize_vn(s: str | None) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Token-level similarity (the multi-word backbone)
+
+
+_TOKEN_SPLIT = re.compile(r"[\s\-_/&,.]+")
+
+
+def _tokens(s: str) -> list[str]:
+    """Split a normalised mark string into tokens.
+
+    Splits on whitespace and common brand separators (`-`, `_`, `/`, `&`, `,`,
+    `.`). Empty tokens are dropped. Single-word marks return a one-element list,
+    which keeps the downstream best-pair logic numerically identical to
+    whole-string Jaro-Winkler (so MONTINIS/MONTANIS still score 0.94).
+    """
+    return [t for t in _TOKEN_SPLIT.split(s.strip()) if t]
+
+
+def _best_pair_jw(short: list[str], long: list[str]) -> float:
+    """Greedy best-pairing Jaro-Winkler between two token lists.
+
+    For each token in the *shorter* list, pick the most-similar unmatched
+    token in the *longer* list. Average over `len(long)` so unpaired tokens
+    in the longer list drag the score down — "BMW" vs "BMW AUTO REPAIR
+    SERVICE" must not score 1.0 just because the one BMW token matched.
+
+    The greedy choice (not Hungarian-optimal) is fine for the token counts
+    we see in real marks (2-5 tokens); any pathology requires constructing
+    a degenerate test case where two tokens both prefer the same third
+    token. Hungarian would cost O(n³); greedy is O(n²) with negligible
+    quality difference at this scale.
+
+    Why this matters vs. whole-string JW:
+    Raw JW on "OMBRES TENDRES" vs "MAYBELLINE SPOT RESCUE" scores 0.70
+    purely from shared common letters (E, R, S, T, N) in similar-length
+    strings — the algorithm has no notion of word boundaries. Token-level
+    pairing reflects how a trademark examiner actually reads multi-word
+    marks: "is there a dominant word in common?" USPTO TMEP §1207.01(b)
+    and EU IPO comparison guidance both call out the dominant-element
+    rule that single-string JW cannot express.
+    """
+    if not short or not long:
+        return 0.0
+    used = [False] * len(long)
+    pair_scores: list[float] = []
+    for t in short:
+        best, best_idx = 0.0, -1
+        for i, u in enumerate(long):
+            if used[i]:
+                continue
+            s = jellyfish.jaro_winkler_similarity(t, u)
+            if s > best:
+                best, best_idx = s, i
+        if best_idx >= 0:
+            used[best_idx] = True
+        pair_scores.append(best)
+    return sum(pair_scores) / len(long)
+
+
+def _token_jw(a: str, b: str) -> float:
+    """Best-pair Jaro-Winkler between two whitespace-separated strings."""
+    ta, tb = _tokens(a), _tokens(b)
+    if not ta or not tb:
+        return 0.0
+    short, long = (ta, tb) if len(ta) <= len(tb) else (tb, ta)
+    return _best_pair_jw(short, long)
+
+
+# ---------------------------------------------------------------------------
 # Phonetic similarity
 
 
 def phonetic_similarity(a: str | None, b: str | None) -> float:
-    """Return Jaro-Winkler-based phonetic similarity in [0, 1].
+    """Return token-level Jaro-Winkler phonetic similarity in [0, 1].
 
-    Weighted blend of two signals:
-      - Raw JW on diacritic-normalised uppercase strings (70% weight) —
-        the authoritative signal; trademark examiners compare what's
-        actually written before they consider sound-alikes.
-      - JW on Metaphone codes (30% weight) — catches genuine sound-alike
-        variants ("NEUREX" / "NEUROFAX" both encode to NRKS/NRFKS) but
-        only as a *boost* on top of the raw signal.
+    Weighted blend of two signals, both computed at the *token* level:
+      - Raw JW (70% weight) — best-pair JW between tokens of the two marks,
+        on diacritic-normalised uppercase strings.
+      - Metaphone-encoded JW (30% weight) — same best-pair scheme on the
+        Metaphone code of each token; catches sound-alike variants like
+        NEUREX/NEUROFAX where the surface spellings diverge but the
+        phoneme sequences align.
+
+    Why token-level matters:
+    Whole-string Jaro-Winkler over multi-word marks ("OMBRES TENDRES"
+    vs "MAYBELLINE SPOT RESCUE") spikes to ~0.70 purely from shared
+    common letters in similar-length strings — no examiner would call
+    those confusable, but the algorithm has no word boundaries.
+    Best-pair token JW correctly drops that to ~0.38 because no token
+    in OMBRES TENDRES has a strong match in MAYBELLINE SPOT RESCUE.
+
+    Single-word marks are unchanged: best-pair JW on one-element token
+    lists reduces to whole-string JW. MONTINIS/MONTANIS still scores
+    0.94; NEUREX/NEUROFAX still scores 0.90.
 
     Why a weighted blend rather than max:
     Metaphone reduces aggressively for short/alphanumeric marks
     ("MF11RCE" → "MFRS"), and JW between two short reduced codes can
     spike to 0.6+ purely because they share a first letter and a last
-    letter. Taking the max would let that coincidence dominate. The
-    blend keeps Metaphone as supporting evidence — a real sound-alike
-    will score high on both raw and Metaphone, so the blend still
-    rewards it; a coincidental Metaphone match alone won't carry the
-    score over the conflict threshold.
+    letter. The blend keeps Metaphone as supporting evidence — a real
+    sound-alike scores high on both raw and Metaphone; a coincidental
+    Metaphone match alone won't carry the score over the threshold.
 
     Empty/blank inputs return 0.0 (no signal).
     """
@@ -116,12 +195,18 @@ def phonetic_similarity(a: str | None, b: str | None) -> float:
     if not na or not nb:
         return 0.0
 
-    raw = jellyfish.jaro_winkler_similarity(na, nb)
+    raw = _token_jw(na, nb)
 
-    ma, mb = jellyfish.metaphone(na), jellyfish.metaphone(nb)
-    if not ma or not mb:
-        return raw
-    phon = jellyfish.jaro_winkler_similarity(ma, mb)
+    # Metaphone per token, then best-pair JW on the resulting codes.
+    # Encoding the whole multi-word string in one call produces a single
+    # blob ("OMBRSTNTRS") that loses the same word-boundary information
+    # whole-string JW does — defeats the point of going token-level.
+    ma_codes = [c for c in (jellyfish.metaphone(t) for t in _tokens(na)) if c]
+    mb_codes = [c for c in (jellyfish.metaphone(t) for t in _tokens(nb)) if c]
+    if not ma_codes or not mb_codes:
+        return round(raw, 3)
+    short, long = (ma_codes, mb_codes) if len(ma_codes) <= len(mb_codes) else (mb_codes, ma_codes)
+    phon = _best_pair_jw(short, long)
 
     return round(0.7 * raw + 0.3 * phon, 3)
 
@@ -213,11 +298,13 @@ def visual_similarity(
         sim = max(0.0, 1.0 - hd / 64.0)
         return VisualScore(round(sim, 3), "phash")
 
-    # Typographic fallback. Uses the same JW as phonetic but on raw text
-    # (no Metaphone) since "visual" means glyph similarity, not sound.
+    # Typographic fallback. Token-level best-pair JW on the wordmark text —
+    # same reasoning as phonetic_similarity: whole-string JW on multi-word
+    # marks finds spurious overlap from shared common letters. No Metaphone
+    # here since "visual" means glyph similarity, not sound.
     na, nb = normalize_vn(a_text), normalize_vn(b_text)
     if na and nb:
-        sim = jellyfish.jaro_winkler_similarity(na, nb)
+        sim = _token_jw(na, nb)
         return VisualScore(round(sim, 3), "typographic")
 
     return VisualScore(0.0, "none")
@@ -274,11 +361,12 @@ def composite_score(
     class_o: float,
     vienna_o: float,
     weights: dict[str, float] | None = None,
+    visual_confidence: VisualConfidence = "phash",
 ) -> CompositeScore:
     """Weighted sum + verdict, with examiner-grade conjunction guards.
 
     The numeric composite is a straight weighted sum across the four
-    signals. The *verdict* requires both:
+    signals. The *verdict* requires:
       1. The composite to clear the band's threshold, AND
       2. At least one of {phonetic, visual} to clear a minimum strength
          (i.e. there's *some* sight-or-sound similarity, not just class
@@ -286,16 +374,29 @@ def composite_score(
       3. Some class proximity (marks in unrelated classes don't confuse
          consumers regardless of similarity).
 
+    `visual_confidence` matters for guard (2):
+      - When the visual signal came from a real pHash comparison on
+        extracted PNG specimens (`'phash'`), it's an *independent*
+        signal from phonetic — `max(phonetic, visual)` is the right
+        check.
+      - When the visual signal is a typographic JW fallback
+        (`'typographic'`), it's measuring the same wordmark text the
+        phonetic raw component already used. Letting it independently
+        satisfy the conjunction guard is double-counting. For OMBRES
+        TENDRES vs PRETTY PEONY the visual typographic JW spikes to
+        0.56 while phonetic stays at 0.48 — without this fix the
+        verdict would be 'Possible conflict' even though no examiner
+        would call those two multi-word cosmetic marks confusable.
+        So in typographic mode, only phonetic can satisfy the guard.
+      - When there's no visual signal at all (`'none'`), the same logic:
+        phonetic is the only sight-or-sound axis we can judge by.
+
     This matches how examiners think: confusion = similar marks IN
-    related goods, not "any signal high enough." The screenshot bug
-    case — MONTINIS (confectionery) vs MF11RCE (a model number)
-    sharing 100% Nice classes but no phonetic or visual similarity
-    — should land in 'Low risk', because neither phonetic nor visual
-    signal clears the 0.5 minimum.
+    related goods, not "any signal high enough."
 
     Bands:
-      Likely:   composite >= 0.70, max(phon,vis) >= 0.70, class >= 0.30
-      Possible: composite >= 0.50, max(phon,vis) >= 0.50, class >= 0.20
+      Likely:   composite >= 0.70, sight_or_sound >= 0.70, class >= 0.30
+      Possible: composite >= 0.50, sight_or_sound >= 0.50, class >= 0.20
       else:     Low risk
     """
     w = weights or DEFAULT_WEIGHTS
@@ -303,7 +404,10 @@ def composite_score(
         w["phonetic"] * phonetic + w["visual"] * visual + w["class"] * class_o + w["vienna"] * vienna_o,
         3,
     )
-    max_sig = max(phonetic, visual)
+    # Conjunction guard: pHash visual counts as independent evidence
+    # of similarity; typographic / none does not (it's derived from the
+    # same wordmark text the phonetic raw component already saw).
+    max_sig = max(phonetic, visual) if visual_confidence == "phash" else phonetic
 
     if composite >= 0.70 and max_sig >= 0.70 and class_o >= 0.30:
         return CompositeScore(composite, "Likely conflict", "stamp")

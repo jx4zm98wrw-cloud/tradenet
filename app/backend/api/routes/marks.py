@@ -342,7 +342,7 @@ async def similar_marks(
         )
         class_o = sim.class_overlap(m.nice_classes, r.nice_classes)
         vienna_o = sim.vienna_overlap(m.vienna_codes, r.vienna_codes)
-        cs = sim.composite_score(phon, vis.score, class_o, vienna_o)
+        cs = sim.composite_score(phon, vis.score, class_o, vienna_o, visual_confidence=vis.confidence)
         if cs.composite >= _SIMILAR_MIN_COMPOSITE:
             scored.append((r, cs.composite, vis.confidence))
 
