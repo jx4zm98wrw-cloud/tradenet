@@ -19,6 +19,7 @@ export default function WatchlistsPage() {
   const [items, setItems] = React.useState<Watchlist[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [creating, setCreating] = React.useState(false);
+  const [importing, setImporting] = React.useState(false);
   const [findings, setFindings] = React.useState<Record<string, Trademark[]>>({});
 
   const refresh = React.useCallback(async () => {
@@ -60,7 +61,7 @@ export default function WatchlistsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost">Import from CSV</Button>
+          <Button variant="ghost" onClick={() => setImporting(true)}>Import from CSV</Button>
           <Button variant="primary" onClick={() => setCreating(true)}>+ New watchlist</Button>
         </div>
       </div>
@@ -83,6 +84,21 @@ export default function WatchlistsPage() {
             setCreating(false);
             setItems((prev) => prev ? [w, ...prev] : [w]);
             api.watchlistFindings(w.id, 3).then((f) => setFindings((m) => ({ ...m, [w.id]: f }))).catch(() => {});
+          }}
+        />
+      )}
+
+      {importing && (
+        <CSVImportModal
+          onClose={() => setImporting(false)}
+          onImported={(created) => {
+            setImporting(false);
+            setItems((prev) => (prev ? [...created, ...prev] : created));
+            created.forEach((w) => {
+              api.watchlistFindings(w.id, 3)
+                .then((f) => setFindings((m) => ({ ...m, [w.id]: f })))
+                .catch(() => {});
+            });
           }}
         />
       )}
@@ -306,6 +322,261 @@ function SkeletonGrid() {
       {[...Array(4)].map((_, i) => (
         <div key={i} className="h-64 bg-paper-2 rounded-lg animate-pulse" />
       ))}
+    </div>
+  );
+}
+
+/* =========================================================================== */
+/* CSV import modal                                                            */
+/* =========================================================================== */
+
+/** A single parsed CSV row before submission. Required columns: name.
+ * Optional columns: client, matter, q, country, classes (comma-sep within cell). */
+type CsvRow = {
+  name: string;
+  client?: string;
+  matter?: string;
+  q?: string;
+  country?: string;
+  classes?: string[];
+};
+
+/** Minimal RFC-4180-ish parser: handles double-quoted fields with embedded
+ * commas and escaped quotes (""). Doesn't handle CR/LF inside quoted fields.
+ * Returns array of rows where each row is array of cell strings. */
+function parseCSV(text: string): string[][] {
+  const lines = text.replace(/\r\n?/g, "\n").split("\n").filter((l) => l.length > 0);
+  return lines.map((line) => {
+    const cells: string[] = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (ch === '"') { inQuotes = false; }
+        else { cur += ch; }
+      } else {
+        if (ch === ",") { cells.push(cur); cur = ""; }
+        else if (ch === '"' && cur === "") { inQuotes = true; }
+        else { cur += ch; }
+      }
+    }
+    cells.push(cur);
+    return cells.map((c) => c.trim());
+  });
+}
+
+/** Map header columns by name (case-insensitive) and return validated rows. */
+function rowsFromCSV(text: string): { rows: CsvRow[]; warnings: string[] } {
+  const grid = parseCSV(text);
+  if (grid.length < 2) return { rows: [], warnings: ["CSV needs a header row and at least one data row."] };
+  const header = grid[0].map((h) => h.toLowerCase());
+  const idx = (k: string) => header.indexOf(k);
+  const iName = idx("name");
+  if (iName < 0) return { rows: [], warnings: ["CSV must have a 'name' column (case-insensitive)."] };
+  const iClient = idx("client");
+  const iMatter = idx("matter");
+  const iQ = idx("q");
+  const iCountry = idx("country");
+  const iClasses = idx("classes");
+  const rows: CsvRow[] = [];
+  const warnings: string[] = [];
+  grid.slice(1).forEach((cells, n) => {
+    const name = cells[iName]?.trim();
+    if (!name) { warnings.push(`Row ${n + 2}: skipped (no name)`); return; }
+    const classesRaw = iClasses >= 0 ? cells[iClasses] : "";
+    const classes = classesRaw
+      ? classesRaw.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean)
+      : undefined;
+    const country = iCountry >= 0 ? cells[iCountry]?.trim().toUpperCase() : undefined;
+    rows.push({
+      name,
+      client: iClient >= 0 ? cells[iClient]?.trim() || undefined : undefined,
+      matter: iMatter >= 0 ? cells[iMatter]?.trim() || undefined : undefined,
+      q: iQ >= 0 ? cells[iQ]?.trim() || undefined : undefined,
+      country: country && country.length === 2 ? country : undefined,
+      classes,
+    });
+  });
+  return { rows, warnings };
+}
+
+const CSV_TEMPLATE = `name,client,matter,q,country,classes
+"NeuroFax watchlist","ACME Corp","CR-2024-118","neur","VN","05,10"
+"Bio-tech monitor","BetaCorp","","bio","",""
+`;
+
+function CSVImportModal({
+  onClose,
+  onImported,
+}: {
+  onClose: () => void;
+  onImported: (created: Watchlist[]) => void;
+}) {
+  const [text, setText] = React.useState<string>("");
+  const [rows, setRows] = React.useState<CsvRow[]>([]);
+  const [warnings, setWarnings] = React.useState<string[]>([]);
+  const [busy, setBusy] = React.useState(false);
+  const [progress, setProgress] = React.useState<{ done: number; total: number } | null>(null);
+  const [err, setErr] = React.useState<string | null>(null);
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const t = String(reader.result ?? "");
+      setText(t);
+      const { rows, warnings } = rowsFromCSV(t);
+      setRows(rows);
+      setWarnings(warnings);
+      setErr(null);
+    };
+    reader.onerror = () => setErr("Could not read file");
+    reader.readAsText(f);
+  }
+
+  function onTextChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setText(e.target.value);
+    const { rows, warnings } = rowsFromCSV(e.target.value);
+    setRows(rows);
+    setWarnings(warnings);
+    setErr(null);
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (rows.length === 0) { setErr("No valid rows to import"); return; }
+    setBusy(true);
+    setErr(null);
+    setProgress({ done: 0, total: rows.length });
+    const created: Watchlist[] = [];
+    try {
+      // Sequential creates so the operator sees row-by-row progress and
+      // server-side rate limits don't fire on a 20-row paste.
+      for (const r of rows) {
+        const w = await api.createWatchlist({
+          name: r.name,
+          client: r.client,
+          matter: r.matter,
+          query: {
+            q: r.q,
+            country: r.country,
+            nice_class: r.classes && r.classes.length > 0 ? r.classes : undefined,
+            nice_class_mode: r.classes && r.classes.length > 0 ? "any" : undefined,
+          },
+        });
+        created.push(w);
+        setProgress({ done: created.length, total: rows.length });
+      }
+      onImported(created);
+    } catch (e) {
+      setErr(`${errorMessage(e)} (${created.length} of ${rows.length} created before failure)`);
+      if (created.length > 0) onImported(created);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 bg-ink/40 backdrop-blur-sm grid"
+      style={{ alignItems: "flex-start", justifyItems: "center", paddingTop: "8vh" }}
+    >
+      <form
+        onSubmit={submit}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-surface border border-line rounded-lg shadow-md w-[720px] max-w-[94vw] overflow-hidden"
+      >
+        <header className="px-5 py-4 border-b border-line flex items-center justify-between">
+          <h2 className="head-serif text-[16px] font-semibold tracking-tight">Import watchlists from CSV</h2>
+          <button type="button" onClick={onClose} className="w-7 h-7 grid place-items-center rounded hover:bg-paper-2">
+            <Icon.X className="w-4 h-4 text-mute" />
+          </button>
+        </header>
+
+        <div className="px-5 py-4 space-y-3">
+          <p className="text-[12.5px] text-mute">
+            Required column: <span className="font-mono">name</span>. Optional:{" "}
+            <span className="font-mono">client</span>, <span className="font-mono">matter</span>,{" "}
+            <span className="font-mono">q</span>, <span className="font-mono">country</span> (ISO-2),{" "}
+            <span className="font-mono">classes</span> (comma- or space-separated within the cell).
+          </p>
+
+          <div className="flex items-center gap-3">
+            <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+              <span className="inline-flex items-center gap-1.5 h-8 px-3 border border-line rounded bg-paper-2 hover:bg-paper-3 text-[12.5px] font-medium">
+                <Icon.Upload className="w-3.5 h-3.5" />
+                Choose CSV file
+              </span>
+              <input type="file" accept=".csv,text/csv" onChange={onFileChange} className="hidden" />
+            </label>
+            <button
+              type="button"
+              onClick={() => { setText(CSV_TEMPLATE); const r = rowsFromCSV(CSV_TEMPLATE); setRows(r.rows); setWarnings(r.warnings); }}
+              className="text-[12.5px] text-stamp hover:underline"
+            >
+              Paste template
+            </button>
+          </div>
+
+          <Field label="Or paste CSV directly">
+            <textarea
+              value={text}
+              onChange={onTextChange}
+              spellCheck={false}
+              rows={8}
+              placeholder="name,client,matter,q,country,classes&#10;&quot;Sample row&quot;,&quot;ACME&quot;,&quot;CR-001&quot;,&quot;neur&quot;,&quot;VN&quot;,&quot;05,10&quot;"
+              className="w-full text-[12.5px] font-mono px-2.5 py-2 border border-line rounded bg-surface resize-y"
+            />
+          </Field>
+
+          {rows.length > 0 && (
+            <div className="border border-line rounded overflow-hidden">
+              <div className="px-3 py-2 bg-paper-2 border-b border-line flex items-center justify-between text-[11.5px]">
+                <span className="font-semibold text-ink">Preview · {rows.length} row{rows.length === 1 ? "" : "s"}</span>
+                <span className="text-mute">First applicant name + query summary</span>
+              </div>
+              <ul className="max-h-44 overflow-y-auto divide-y divide-line">
+                {rows.slice(0, 8).map((r, i) => (
+                  <li key={i} className="px-3 py-1.5 text-[12.5px] flex items-center gap-3">
+                    <span className="font-semibold text-ink truncate min-w-0">{r.name}</span>
+                    <span className="text-mute font-mono text-[11px] shrink-0">
+                      {[r.country, r.classes?.join(","), r.q && `"${r.q}"`].filter(Boolean).join(" · ") || "all marks"}
+                    </span>
+                  </li>
+                ))}
+                {rows.length > 8 && (
+                  <li className="px-3 py-1.5 text-[11.5px] text-mute italic">…and {rows.length - 8} more</li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          {warnings.length > 0 && (
+            <div className="text-[11.5px] text-warn space-y-0.5">
+              {warnings.map((w, i) => <p key={i}>• {w}</p>)}
+            </div>
+          )}
+
+          {progress && (
+            <p className="text-[12px] text-mute">
+              Importing {progress.done} / {progress.total}…
+            </p>
+          )}
+
+          {err && <p className="text-rose-600 text-xs">{err}</p>}
+        </div>
+
+        <footer className="px-5 py-3 border-t border-line flex items-center justify-end gap-2 bg-paper-2">
+          <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" type="submit" disabled={busy || rows.length === 0}>
+            {busy ? `Importing… (${progress?.done ?? 0}/${rows.length})` : `Import ${rows.length || ""} watchlist${rows.length === 1 ? "" : "s"}`}
+          </Button>
+        </footer>
+      </form>
     </div>
   );
 }
