@@ -254,7 +254,12 @@ def _purge_trademarks(session: Session, gazette_id: uuid.UUID) -> int:
     Returns the row count purged (informational; safe-to-ignore).
     """
     result = session.execute(delete(Trademark).where(Trademark.gazette_id == gazette_id))
-    purged = result.rowcount or 0
+    # `session.execute(delete(...))` returns a CursorResult at runtime, which
+    # has `.rowcount` — but newer SQLAlchemy stubs annotate the return as
+    # Result[Any] which lacks the attribute. Using getattr() with a default
+    # works cleanly under both stub generations without tripping
+    # warn_unused_ignores or warn_redundant_casts.
+    purged: int = getattr(result, "rowcount", 0) or 0
     session.commit()
     return purged
 
