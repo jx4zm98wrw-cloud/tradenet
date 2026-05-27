@@ -96,6 +96,14 @@ updates:
     labels:
       - "dependencies"
       - "ci"
+    # Ignore pnpm/action-setup major bumps — v6 was broken mid-day (mutable
+    # tag flapped, "Something went wrong, self-installer exits with code 1")
+    # while v4 stayed solid. Until we either pin to a SHA or upstream
+    # stabilises v6+, stay on v4.x. Revisit when a v7 with a clean
+    # release-notes history lands.
+    ignore:
+      - dependency-name: "pnpm/action-setup"
+        update-types: ["version-update:semver-major"]
     groups:
       actions:
         applies-to: version-updates
