@@ -281,6 +281,11 @@ jobs:
       PLAYWRIGHT_ADMIN_EMAIL: playwright@ci.local
       # 32+ chars to satisfy the schema's min-length validator.
       PLAYWRIGHT_ADMIN_PASSWORD: ci-playwright-password-1234567890
+      # Opt-in for tests/e2e/visual.spec.ts — baselines under
+      # visual.spec.ts-snapshots/ were baked on the same runner image
+      # (mcr.microsoft.com/playwright:v1.60.0-noble) that ubuntu-latest
+      # uses, so font hinting + sub-pixel rendering match.
+      PLAYWRIGHT_VISUAL: "1"
 
     steps:
       - uses: actions/checkout@v6
