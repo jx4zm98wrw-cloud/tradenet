@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { TopNav } from "@/components/top-nav";
 import { CmdKProvider } from "@/components/cmdk";
 import { TweaksPanel } from "@/components/tweaks-panel";
+import { AuthProvider } from "@/components/auth-context";
 
 const sans = Be_Vietnam_Pro({
   subsets: ["latin", "vietnamese"],
@@ -41,11 +42,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         data-serifheads="1"
         className="min-h-screen font-sans"
       >
-        <CmdKProvider>
-          <TopNav />
-          <main>{children}</main>
-          <TweaksPanel />
-        </CmdKProvider>
+        <AuthProvider>
+          <CmdKProvider>
+            <TopNav />
+            <main>{children}</main>
+            <TweaksPanel />
+          </CmdKProvider>
+        </AuthProvider>
       </body>
     </html>
   );

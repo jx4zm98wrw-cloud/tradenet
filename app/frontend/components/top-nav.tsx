@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import * as React from "react";
+import { useAuth } from "./auth-context";
 import { Icon } from "./icons";
 import { IconButton } from "./ui";
 import { Kbd } from "./ui/kbd";
@@ -69,12 +71,71 @@ export function TopNav() {
           <IconButton title="Help">
             <Icon.Help className="w-4 h-4" />
           </IconButton>
-          <div className="w-[30px] h-[30px] rounded-full bg-paper-3 border border-line grid place-items-center text-[11px] font-semibold text-ink">
-            FL
-          </div>
+          <UserMenu />
         </div>
       </div>
     </header>
+  );
+}
+
+function UserMenu() {
+  const { user, logout, loading } = useAuth();
+  const [open, setOpen] = React.useState(false);
+  const wrapRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("click", onClick);
+    return () => window.removeEventListener("click", onClick);
+  }, [open]);
+
+  if (loading || !user) {
+    return (
+      <div className="w-[30px] h-[30px] rounded-full bg-paper-2 border border-line animate-pulse" />
+    );
+  }
+
+  // Initials from the user's name (e.g. "Francis Luong" → "FL")
+  const initials = user.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((p) => p[0]!.toUpperCase())
+    .slice(0, 2)
+    .join("") || user.email[0]!.toUpperCase();
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-[30px] h-[30px] rounded-full bg-paper-3 border border-line grid place-items-center text-[11px] font-semibold text-ink hover:border-line-strong"
+        title={`${user.name} (${user.email})`}
+      >
+        {initials}
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-56 bg-surface border border-line rounded shadow-md z-50 overflow-hidden">
+          <div className="px-3 py-2 border-b border-line">
+            <div className="text-[12.5px] font-semibold truncate">{user.name}</div>
+            <div className="text-[11px] text-mute truncate">{user.email}</div>
+            <div className="text-[10px] uppercase tracking-wider text-mute font-mono mt-1">
+              {user.role}
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setOpen(false);
+              logout();
+            }}
+            className="w-full text-left text-[12.5px] px-3 py-2 hover:bg-paper-2 text-ink-2"
+          >
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
