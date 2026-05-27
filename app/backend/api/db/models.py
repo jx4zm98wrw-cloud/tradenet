@@ -246,3 +246,48 @@ class Trademark(Base):
     )
 
     gazette: Mapped[Gazette] = relationship("Gazette", back_populates="trademarks")
+
+
+class UserRole(str, enum.Enum):
+    """RBAC roles. Sorted from most privileged to least.
+
+    - admin   — full access; can create users, reprocess gazettes, see audit
+    - editor  — can create/modify watchlists, upload gazettes
+    - viewer  — read-only access to search/marks/today; cannot mutate
+    """
+
+    admin = "admin"
+    editor = "editor"
+    viewer = "viewer"
+
+
+class User(Base):
+    """Application user. Email + bcrypt-hashed password + RBAC role.
+
+    No external IdP for v1 — local password auth signs HS256 JWTs with the
+    same TM_SECRET_KEY used elsewhere in the app. Future: SSO via OAuth/OIDC
+    can land as an alternative login path without changing the User schema.
+    """
+
+    __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("email", name="uq_users_email"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(254), nullable=False)
+    # bcrypt hash — passlib produces "$2b$..." prefix; ~60 chars.
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        SAEnum(UserRole, name="user_role"), nullable=False, default=UserRole.viewer, index=True
+    )
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    # Token revocation: incrementing counter so refresh tokens issued before
+    # a logout/password-change are rejected. Stored as Postgres BIGINT so we
+    # never wrap (default 0 = no revocations yet).
+    token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

@@ -33,6 +33,9 @@ from .routes import (
     trademarks,
     watchlists,
 )
+from .routes import (
+    auth as auth_routes,
+)
 from .settings import get_settings
 
 
@@ -123,6 +126,7 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
 
     # ---- Routes ----
+    app.include_router(auth_routes.router)
     app.include_router(gazettes.router)
     app.include_router(trademarks.router)
     app.include_router(stats.router)

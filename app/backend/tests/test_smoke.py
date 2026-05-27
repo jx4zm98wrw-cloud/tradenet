@@ -32,10 +32,17 @@ async def test_list_gazettes_returns_list(client: AsyncClient) -> None:
     assert isinstance(body["items"], list)
 
 
-async def test_upload_rejects_non_pdf(client: AsyncClient) -> None:
+async def test_upload_rejects_non_pdf(authed_client: AsyncClient) -> None:
+    files = {"file": ("plain.txt", b"not a pdf", "text/plain")}
+    r = await authed_client.post("/api/v1/gazettes", files=files)
+    assert r.status_code == 400
+
+
+async def test_upload_unauthenticated_returns_401(client: AsyncClient) -> None:
+    """Confirms the C1 hardening: gazette upload requires auth."""
     files = {"file": ("plain.txt", b"not a pdf", "text/plain")}
     r = await client.post("/api/v1/gazettes", files=files)
-    assert r.status_code == 400
+    assert r.status_code == 401
 
 
 # ---------- search + facets ----------
@@ -100,27 +107,27 @@ async def test_compare_requires_two_marks(client: AsyncClient) -> None:
 # ---------- watchlists ----------
 
 
-async def test_watchlists_crud(client: AsyncClient) -> None:
+async def test_watchlists_crud(authed_client: AsyncClient) -> None:
     body = {
         "name": "TEST watchlist (smoke)",
         "client": "Test client",
         "matter": "T-1",
         "query": {"q": "zzz_nomatch", "mode": "text"},
     }
-    created = await client.post("/api/v1/watchlists", json=body)
+    created = await authed_client.post("/api/v1/watchlists", json=body)
     assert created.status_code == 201
     wl = created.json()
     assert wl["name"] == body["name"]
     wid = wl["id"]
     try:
-        listed = await client.get("/api/v1/watchlists")
+        listed = await authed_client.get("/api/v1/watchlists")
         assert listed.status_code == 200
         assert any(w["id"] == wid for w in listed.json())
-        f = await client.get(f"/api/v1/watchlists/{wid}/findings")
+        f = await authed_client.get(f"/api/v1/watchlists/{wid}/findings")
         assert f.status_code == 200
         assert isinstance(f.json(), list)
     finally:
-        d = await client.delete(f"/api/v1/watchlists/{wid}")
+        d = await authed_client.delete(f"/api/v1/watchlists/{wid}")
         assert d.status_code == 204
 
 
