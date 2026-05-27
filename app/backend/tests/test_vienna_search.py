@@ -225,9 +225,9 @@ async def test_vienna_parent_code_matches_child_codes(client: AsyncClient) -> No
     parent_count = await _vienna_count(client, vienna_codes=["5.7"])
     child_count = await _vienna_count(client, vienna_codes=["5.7.1"])
     assert parent_count > 0, "parent code must match some marks"
-    assert (
-        child_count <= parent_count
-    ), f"parent ({parent_count}) should be a superset of any single child ({child_count})"
+    assert child_count <= parent_count, (
+        f"parent ({parent_count}) should be a superset of any single child ({child_count})"
+    )
 
 
 async def test_vienna_parent_zero_padded_matches_child(client: AsyncClient) -> None:
@@ -251,6 +251,5 @@ async def test_vienna_parent_does_not_match_unrelated_prefixes(client: AsyncClie
     for it in items:
         codes = it["mark"]["vienna_codes"] or []
         assert any(c == "5.7" or c.startswith("5.7.") for c in codes), (
-            f"row {it['mark']['application_number']} matched 5.7 but its "
-            f"codes are {codes} — boundary leak"
+            f"row {it['mark']['application_number']} matched 5.7 but its codes are {codes} — boundary leak"
         )
