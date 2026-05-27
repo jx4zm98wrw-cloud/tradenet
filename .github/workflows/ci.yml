@@ -204,7 +204,16 @@ jobs:
           trivyignores: .trivyignore
 
       - name: Upload SARIF to GitHub Security
+        # Best-effort — surfaces findings in the Security tab when Code
+        # Scanning is enabled on the repo. If it isn't (free private
+        # repos without GHAS, or first-time enablement pending), the
+        # step 403s with "Code scanning is not enabled for this
+        # repository" and we don't want that to fail the job. The
+        # gating Trivy scan above is the real security policy gate.
+        # To enable: Settings → Code security and analysis → Code
+        # scanning → Set up.
         if: always() && hashFiles('trivy-results.sarif') != ''
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
