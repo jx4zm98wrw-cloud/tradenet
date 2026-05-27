@@ -71,8 +71,7 @@ def test_first_date_does_not_leak_across_process_sections_calls(
 
     # File A should carry its own date.
     assert sections_a[0]["DateCombined_441_450"], (
-        f"file A should have a non-empty DateCombined_441_450, got "
-        f"{sections_a[0]['DateCombined_441_450']!r}"
+        f"file A should have a non-empty DateCombined_441_450, got {sections_a[0]['DateCombined_441_450']!r}"
     )
 
     # File B has no (441)/(450) — the date field MUST be empty.

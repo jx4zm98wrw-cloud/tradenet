@@ -160,6 +160,5 @@ def test_multi_slice_thin_sliver_still_dropped(tmp_path: Path) -> None:
     # The sliver is tiny — at raster (200 px tall * 2/100 = 4 px), well below
     # MIN_SLICE_PX (20). Should NOT be emitted.
     assert not bbbb.is_file(), (
-        f"Thin sliver from multi-slice split should still be filtered by "
-        f"MIN_SLICE_PX, but {bbbb} was written"
+        f"Thin sliver from multi-slice split should still be filtered by MIN_SLICE_PX, but {bbbb} was written"
     )

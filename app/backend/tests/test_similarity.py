@@ -299,7 +299,7 @@ def test_composite_low_risk_when_only_class_overlaps() -> None:
     # composite = 0.4*0.486 + 0.25*0.423 + 0.2*1.0 + 0 = 0.500
     # max_sig = 0.486 < 0.5 → conjunction guard kicks in → Low risk
     assert c.verdict == "Low risk", (
-        f"max signal {max(0.486, 0.423)} < 0.5 should force Low risk, " f"even with composite={c.composite}"
+        f"max signal {max(0.486, 0.423)} < 0.5 should force Low risk, even with composite={c.composite}"
     )
 
 
