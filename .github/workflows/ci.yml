@@ -38,9 +38,9 @@ jobs:
       TM_REDIS_URL: redis://localhost:6379/0
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -81,12 +81,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with: { version: 10 }
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: pnpm
@@ -108,8 +108,8 @@ jobs:
     name: Security audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
         with: { version: 10 }
       # No `cache: pnpm` here — this job runs `pnpm audit` (which queries
       # the registry directly from the lockfile) without `pnpm install`,
@@ -117,7 +117,7 @@ jobs:
       # setup-node's post-job save step errors out with "Path Validation
       # Error: Path(s) specified in the action for caching do(es) not
       # exist" on any cache-miss (i.e. any lockfile-changing PR).
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
       - name: pnpm audit
@@ -125,7 +125,7 @@ jobs:
         # Fail the job on high-severity vulns so the team sees them.
         # Previously appended `|| true` which silently swallowed warnings.
         run: pnpm audit --prod --audit-level=high
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with: { python-version: "3.11" }
       - name: pip-audit
         # Fail the job on any reported vuln. Previously appended `|| true`
