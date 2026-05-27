@@ -1,0 +1,105 @@
+# Dependabot configuration — automated dependency updates
+#
+# Audit finding H12 — without this, pinned versions go stale and CVEs land
+# silently between human audits. With it, Dependabot opens monthly grouped
+# PRs for minor/patch bumps; security advisories trigger PRs immediately
+# regardless of schedule (Dependabot's default behavior, not opt-in).
+#
+# Three ecosystems:
+#   - pip          → app/backend/requirements.txt + requirements-dev.txt
+#   - npm          → app/frontend/package.json (uses pnpm-lock.yaml)
+#   - github-actions → .github/workflows/*.yml
+#
+# Grouping policy: bundle non-major bumps to reduce PR noise. A major-bump
+# (e.g. SQLAlchemy 2.x → 3.x) gets its own PR for individual review since
+# it's likely to need code changes.
+
+version: 2
+updates:
+  # ---- Python backend ----
+  - package-ecosystem: "pip"
+    directory: "/app/backend"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Ho_Chi_Minh"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(py)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      # Bundle non-breaking bumps into one PR per month per group.
+      backend-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+      # Security updates always get their own grouped PR (or individual
+      # if Dependabot decides) — never delayed.
+      backend-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # ---- TypeScript / Next.js frontend ----
+  - package-ecosystem: "npm"
+    directory: "/app/frontend"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Ho_Chi_Minh"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(js)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "javascript"
+    # Ignore Next.js major bumps — they almost always need an app-router
+    # migration. Dependabot will still post a security PR for any Next.js
+    # CVE regardless of this rule.
+    ignore:
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+    groups:
+      frontend-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+      frontend-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # ---- GitHub Actions ----
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Ho_Chi_Minh"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps(ci)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "ci"
+    groups:
+      actions:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+          - "major"
