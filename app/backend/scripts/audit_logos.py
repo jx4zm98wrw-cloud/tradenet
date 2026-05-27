@@ -35,8 +35,8 @@ import os
 import re
 import sys
 from collections import defaultdict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 # Lazy fitz import (consistent with extractor) — silences MuPDF stderr noise.
 _orig_stderr_fd = os.dup(2)
@@ -74,9 +74,7 @@ def _page_labels(page) -> list[tuple[float, str, str]]:
         for line in block.get("lines", []):
             if not isinstance(line, dict):
                 continue
-            line_text = " ".join(
-                str(s.get("text", "")) for s in line.get("spans", []) if isinstance(s, dict)
-            )
+            line_text = " ".join(str(s.get("text", "")) for s in line.get("spans", []) if isinstance(s, dict))
             for m in _LABEL_RE.finditer(line_text):
                 code = m.group(1)
                 ident = m.group(2).strip()
@@ -120,7 +118,7 @@ def _scan_pdf(pdf_path: Path) -> dict:
                 sections_seen.add(ident)
             if not labels:
                 continue
-            for x0, y0, x1, y1, _ in _page_image_placements(page):
+            for _x0, y0, _x1, _y1, _xref in _page_image_placements(page):
                 # Nearest label whose y is <= image y0.
                 attributed: str | None = None
                 for ly, _code, ident in labels:

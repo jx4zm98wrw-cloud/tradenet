@@ -91,7 +91,7 @@ def check_madrid_number_in_applicant() -> list[dict]:
 _ADDRESS_FRAGMENT_STRONG = re.compile(
     # Strong signals only — avoid false-positives on legit names that
     # happen to start with a digit ("123 Industries Co.").
-    r"^\d+[-\s]?[a-z]{2,4}[,]"          # "503-ho, ..." (Korean address)
+    r"^\d+[-\s]?[a-z]{2,4}[,]"  # "503-ho, ..." (Korean address)
     r"|^(SỐ|Số|No\.\s*\d|Apt\s|Suite\s|Floor\s|Lô\s|Lot\s)",
     re.IGNORECASE,
 )
@@ -231,7 +231,7 @@ def check_invalid_nice_classes() -> list[dict]:
         ).all()
     bad = []
     for r in rows:
-        for c in (r.nice_classes or []):
+        for c in r.nice_classes or []:
             try:
                 n = int(c)
                 if not (1 <= n <= 45):
