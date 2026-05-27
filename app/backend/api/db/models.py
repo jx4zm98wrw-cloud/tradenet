@@ -42,19 +42,19 @@ class Base(DeclarativeBase):
     pass
 
 
-class GazetteType(str, enum.Enum):
+class GazetteType(enum.StrEnum):
     A = "A"  # Applications
     B = "B"  # Registrations
 
 
-class GazetteStatus(str, enum.Enum):
+class GazetteStatus(enum.StrEnum):
     uploaded = "uploaded"
     processing = "processing"
     completed = "completed"
     failed = "failed"
 
 
-class RecordType(str, enum.Enum):
+class RecordType(enum.StrEnum):
     A = "A"  # A-file application row
     B_domestic = "B_domestic"  # B-file (111) domestic registration
     B_madrid = "B_madrid"  # B-file (116) Madrid international registration
@@ -248,7 +248,7 @@ class Trademark(Base):
     gazette: Mapped[Gazette] = relationship("Gazette", back_populates="trademarks")
 
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     """RBAC roles. Sorted from most privileged to least.
 
     - admin   — full access; can create users, reprocess gazettes, see audit
