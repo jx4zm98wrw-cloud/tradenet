@@ -129,15 +129,29 @@ async def upload_gazette(
 
     # Enqueue ingest. If Redis isn't reachable we still return 201 — the row is
     # there in status='uploaded' and can be re-queued.
+    #
+    # Retry policy: 3 attempts (1 initial + 2 retries) with 10-minute backoff.
+    # Catches transient failures (transient Postgres unavailability, Redis
+    # hiccup mid-job, image extractor OOM on a single page). After 3 failed
+    # attempts the job moves to RQ's "failed" registry where it's retained
+    # for forensics; an operator can re-queue manually from /admin/gazettes
+    # or run `rq requeue --queue ingest <job_id>`.
+    #
+    # The 3600s job_timeout caps a single attempt's wall time — long enough
+    # for the largest gazette in the corpus (B_T4 at ~10 min wall time on
+    # commodity hardware), short enough to free the worker if a job hangs.
     try:
         from redis import Redis
-        from rq import Queue
+        from rq import Queue, Retry
 
         redis = Redis.from_url(settings.redis_url)
         Queue("ingest", connection=redis).enqueue(
             "worker.ingest.ingest_pdf",
             str(g.id),
             job_timeout=3600,
+            retry=Retry(max=2, interval=[600, 1800]),  # 10 min, then 30 min
+            failure_ttl=86400 * 7,  # keep failed jobs for 7 days for forensics
+            result_ttl=86400,  # keep results 1 day (mainly for debugging)
         )
     except Exception:
         # Surface in error_message but don't fail the upload.

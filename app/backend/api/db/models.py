@@ -29,6 +29,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy import (
     Enum as SAEnum,
@@ -133,8 +134,10 @@ class Trademark(Base):
     __tablename__ = "trademarks"
 
     # Composite/extension indexes that can't be expressed via mapped_column(index=True).
-    # Both GIN indexes power "contains any of …" array queries in /search;
-    # without them, the queries fall back to seq scan on the trademarks table.
+    # The two array-GIN indexes power "contains any of …" queries in /search.
+    # The two trigram-GIN indexes power ILIKE '%q%' substring search on
+    # applicant_name + mark_sample (requires the pg_trgm extension; see
+    # migration 20260527_0009).
     __table_args__ = (
         Index(
             "ix_trademarks_nice_classes_gin",
@@ -145,6 +148,20 @@ class Trademark(Base):
             "ix_trademarks_vienna_codes_gin",
             "vienna_codes",
             postgresql_using="gin",
+        ),
+        Index(
+            "ix_trademarks_applicant_name_trgm",
+            "applicant_name",
+            postgresql_using="gin",
+            postgresql_ops={"applicant_name": "gin_trgm_ops"},
+            postgresql_where=text("applicant_name IS NOT NULL"),
+        ),
+        Index(
+            "ix_trademarks_mark_sample_trgm",
+            "mark_sample",
+            postgresql_using="gin",
+            postgresql_ops={"mark_sample": "gin_trgm_ops"},
+            postgresql_where=text("mark_sample IS NOT NULL"),
         ),
     )
 
