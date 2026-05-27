@@ -6,12 +6,13 @@ import hashlib
 import logging
 import re
 import string
+import struct
 import uuid
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 
-from sqlalchemy import create_engine, delete
+from sqlalchemy import create_engine, delete, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from api.db.models import Gazette, GazetteStatus, GazetteType, Trademark
@@ -21,6 +22,53 @@ from tm_extractor import ExtractorConfig, PDFProcessor
 from .mapper import infer_record_type, section_to_trademark
 
 logger = logging.getLogger("worker.ingest")
+
+
+def _gazette_lock_id(gazette_id: uuid.UUID) -> int:
+    """Map a gazette UUID to a stable signed int64 for pg_advisory_lock.
+
+    We can't use Python's `hash()` — it's randomized per process via
+    PYTHONHASHSEED, so the lock id would differ between workers and
+    the lock would be useless. Taking the first 8 bytes of the UUID
+    and interpreting them as a big-endian signed int64 gives a stable
+    bijection from gazette_id to lock_id within the int64 range that
+    pg_try_advisory_lock(bigint) accepts.
+    """
+    return struct.unpack(">q", gazette_id.bytes[:8])[0]
+
+
+def _try_advisory_lock(session: Session, gazette_id: uuid.UUID) -> bool:
+    """Try to acquire a Postgres advisory lock for this gazette.
+
+    Returns True if we got the lock, False if another worker holds it.
+    The lock is session-scoped (survives commits) — released when the
+    connection closes or `_release_advisory_lock` is called explicitly.
+
+    Why advisory, not SELECT FOR UPDATE: ingest commits multiple times
+    (after each batch). A row-level lock would release on each commit
+    and another worker could slip in between batches. Advisory locks
+    persist across commits and are exactly what "hold a logical lock
+    for the whole job" needs.
+    """
+    lock_id = _gazette_lock_id(gazette_id)
+    result = session.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": lock_id}).scalar()
+    return bool(result)
+
+
+def _release_advisory_lock(session: Session, gazette_id: uuid.UUID) -> None:
+    """Release the advisory lock. Safe to call even if we never acquired
+    it (Postgres returns False instead of raising), so callers don't need
+    to track lock state across error paths."""
+    lock_id = _gazette_lock_id(gazette_id)
+    try:
+        session.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": lock_id})
+        session.commit()
+    except Exception:
+        # Best-effort unlock; we don't want a cleanup failure to mask
+        # the real exception being raised from ingest. The lock will
+        # also be auto-released when the session's connection closes.
+        logger.exception("Failed to release advisory lock for gazette %s", gazette_id)
+        session.rollback()
 
 
 def sha256_file(path: Path, chunk_size: int = 1 << 20) -> str:
@@ -241,17 +289,32 @@ def ingest_pdf(gazette_id: str) -> dict:
     `app/backend/api/routes/gazettes.py` (3 attempts, then to RQ's
     failed registry for forensic retention).
 
-    Known limitation — concurrent worker safety: this code does not
-    take a row lock, so two workers processing the same gazette_id
-    concurrently could double-write. RQ's at-least-once delivery makes
-    that rare (a job is reserved before being processed), but a strict
-    fix would use SELECT FOR UPDATE NOWAIT on the gazette row and
-    skip on lock conflict. Deferred.
+    Concurrent worker safety: a Postgres advisory lock keyed on
+    gazette_id ensures at-most-one worker can be in the ingest path
+    for a given gazette at a time. The advisory lock survives commits
+    (so it holds across the batched-commit loop) and is released
+    automatically when the session's connection closes. A duplicate
+    enqueue (RQ's at-least-once delivery, or an operator re-running a
+    job) sees `pg_try_advisory_lock` return false and returns a
+    `locked-by-another` skip result — no double-writing.
     """
     settings = get_settings()
     session = _sync_session()
+    gid = uuid.UUID(gazette_id)
+    # Acquire the advisory lock BEFORE doing any DB work. Released in
+    # finally so abnormal exits also clean up.
+    if not _try_advisory_lock(session, gid):
+        logger.warning(
+            "Gazette %s is being processed by another worker; skipping duplicate enqueue",
+            gazette_id,
+        )
+        session.close()
+        return {
+            "gazette_id": gazette_id,
+            "status": "locked-by-another",
+            "skipped": True,
+        }
     try:
-        gid = uuid.UUID(gazette_id)
         gazette = session.get(Gazette, gid)
         if gazette is None:
             raise ValueError(f"Gazette {gazette_id} not found")
@@ -386,4 +449,8 @@ def ingest_pdf(gazette_id: str) -> dict:
             )
         raise
     finally:
+        # Release advisory lock explicitly before closing the connection.
+        # Closing alone would release it (lock is session-scoped), but
+        # the explicit unlock keeps the lifecycle traceable in logs.
+        _release_advisory_lock(session, gid)
         session.close()
