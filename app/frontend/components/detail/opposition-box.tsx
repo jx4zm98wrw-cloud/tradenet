@@ -12,8 +12,12 @@ export function OppositionBox({ detail }: { detail: MarkDetail }) {
 
   return (
     <div className={`mt-4 rounded-lg border p-4 ${urgent ? "bg-stamp-2 border-stamp-line" : "bg-paper-2 border-line"}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      {/* flex-wrap + min-w-0 so the "File opposition" button drops to a new
+       * row instead of overflowing when the column is narrow (long applicant
+       * names force the mark-detail middle column narrower than the button
+       * + countdown side-by-side). */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
           <p className="text-[10.5px] font-semibold tracking-[0.08em] uppercase text-mute font-mono">
             Opposition window — open
           </p>
@@ -24,7 +28,7 @@ export function OppositionBox({ detail }: { detail: MarkDetail }) {
             <span className="text-sm text-mute">days remaining</span>
           </p>
         </div>
-        <Button variant="primary" size="sm">File opposition</Button>
+        <Button variant="primary" size="sm" className="shrink-0">File opposition</Button>
       </div>
       <div className="relative mt-4 h-1.5 bg-line rounded overflow-hidden">
         <div

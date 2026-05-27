@@ -103,7 +103,10 @@ export default function MarkDetailPage() {
         <div className="space-y-5 min-w-0">
           {/* Hero specimen card */}
           <Card>
-            <div className="grid gap-6 p-5" style={{ gridTemplateColumns: "1.05fr 1fr" }}>
+            <div
+              className="grid gap-6 p-5"
+              style={{ gridTemplateColumns: "minmax(0, 1.05fr) minmax(0, 1fr)" }}
+            >
               <div>
                 <div>
                   <MarkSpecimen
@@ -121,9 +124,9 @@ export default function MarkDetailPage() {
                 <Claims mark={m} />
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-start justify-between gap-3">
-                  <h1 className="head-serif text-[26px] font-semibold tracking-tight leading-tight">
+                  <h1 className="head-serif text-[26px] font-semibold tracking-tight leading-tight min-w-0 break-words">
                     {md.text}
                   </h1>
                 </div>
