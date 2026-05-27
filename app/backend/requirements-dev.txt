@@ -6,4 +6,4 @@ mypy==1.13.0
 types-PyYAML==6.0.12.20260518   # type stubs for the lazy `import yaml` in worker.ingest
 pytest==8.4.0
 pytest-asyncio==1.4.0
-httpx==0.28.0
+httpx==0.28.1
