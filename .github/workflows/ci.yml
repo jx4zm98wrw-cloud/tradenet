@@ -167,7 +167,7 @@ jobs:
       - name: Trivy vulnerability scan (fail on HIGH/CRITICAL)
         # Pinned to a release tag (not @master) so a compromised upstream
         # can't silently change scan behavior on us. Bump deliberately.
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: tradenet-backend:ci
           format: table
@@ -185,7 +185,7 @@ jobs:
         # blocking PRs on them. Runs even if the gating scan above failed,
         # so we still get a record of what tripped CI.
         if: always()
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: tradenet-backend:ci
           format: sarif
@@ -205,7 +205,7 @@ jobs:
         # incident response (which versions of which libs shipped in
         # which CI build). Doesn't gate the build.
         if: always()
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: tradenet-backend:ci
           format: cyclonedx
