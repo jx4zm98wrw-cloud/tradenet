@@ -17,5 +17,9 @@
     "paths": { "@/*": ["./*"] }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  // Exclude Playwright e2e specs + config from the Next.js typecheck —
+  // they pull in @playwright/test (a devDep only present in test runs)
+  // and don't belong in the Next.js bundle graph. Playwright runs its
+  // own ts-node-based check at test time.
+  "exclude": ["node_modules", "tests/e2e", "playwright.config.ts"]
 }
