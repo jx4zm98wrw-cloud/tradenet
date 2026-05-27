@@ -178,6 +178,10 @@ jobs:
           exit-code: "1"
           # OS packages + python wheels both count.
           vuln-type: os,library
+          # Allow-list documented in .trivyignore at the repo root. Each
+          # entry carries a "needs vX.Y.Z" sunset condition; review when
+          # Dependabot bumps the relevant package and the line auto-stales.
+          trivyignores: .trivyignore
 
       - name: Trivy SARIF (for GitHub Security tab)
         # Second pass — same scan, SARIF output, never fails the job. We
@@ -192,6 +196,7 @@ jobs:
           output: trivy-results.sarif
           ignore-unfixed: true
           vuln-type: os,library
+          trivyignores: .trivyignore
 
       - name: Upload SARIF to GitHub Security
         if: always() && hashFiles('trivy-results.sarif') != ''
