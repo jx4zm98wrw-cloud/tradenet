@@ -37,7 +37,7 @@ slowapi==0.1.9
 
 # === Worker ===
 redis==5.2.0
-rq==1.16.2
+rq==2.9.0
 
 # === Observability ===
 structlog==24.4.0
