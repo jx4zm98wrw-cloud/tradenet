@@ -149,9 +149,14 @@ jobs:
     # Trivy needs to write SARIF; SBOM upload needs artifact write.
     # security-events: write lets us push findings into the GitHub
     # "Code scanning alerts" view so reviewers see them inline on PRs.
+    # actions: read is required by codeql-action/upload-sarif's telemetry
+    # path (GET /repos/.../actions/runs/{id}); without it the step emits
+    # ##[error]Resource not accessible by integration and fails the job
+    # *after* a successful scan.
     permissions:
       contents: read
       security-events: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
 
