@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, delete
 from sqlalchemy.orm import Session, sessionmaker
 
 from api.db.models import Gazette, GazetteStatus, GazetteType, Trademark
@@ -193,11 +193,60 @@ def _resolve_logo_path(section: dict, image_subdir_rel: str, image_root: Path) -
     return None
 
 
+def _purge_trademarks(session: Session, gazette_id: uuid.UUID) -> int:
+    """Delete every Trademark row for the given gazette and commit.
+
+    Used in two places:
+      1. On ingest entry, to give the new attempt a clean slate (whether
+         the prior state was `uploaded`, `failed`, or stuck `processing`).
+      2. In the error handler, to roll back any rows committed in earlier
+         batches before flipping the gazette to `failed` — keeps the DB
+         from holding "half a gazette" while the row says it failed.
+
+    Returns the row count purged (informational; safe-to-ignore).
+    """
+    result = session.execute(delete(Trademark).where(Trademark.gazette_id == gazette_id))
+    purged = result.rowcount or 0
+    session.commit()
+    return purged
+
+
 def ingest_pdf(gazette_id: str) -> dict:
     """Run extraction for an existing `gazettes` row and write `trademarks` rows.
 
     Intended to be called as an RQ job. `gazette_id` is the UUID string of an
-    already-persisted Gazette in status='uploaded'. Updates status as it runs.
+    already-persisted Gazette. Updates status as it runs.
+
+    **Atomicity & idempotency** (H8):
+    Re-running with the same `gazette_id` is safe — the job is idempotent.
+    Per starting status:
+      - `completed` → no-op success (admin must purge first if they really
+        want to re-ingest).
+      - `uploaded` → normal first attempt.
+      - `failed` → previous attempt errored; this one purges any partial
+        rows then ingests from scratch.
+      - `processing` → previous worker died mid-job (SIGKILL, OOM, job
+        timeout before the except handler ran). Treated as a recoverable
+        state: purge partial rows, log a warning, restart.
+
+    On any in-loop crash, the except handler deletes any rows committed
+    in earlier batches before flipping the gazette to `status=failed`.
+    The DB never holds "half a gazette" while the row says it failed.
+
+    Filesystem side: extracted PNGs use deterministic filenames
+    `<id>.png` derived from (210)/(111)/(116) WIPO codes. Retries
+    overwrite, so no per-attempt filesystem cleanup is needed.
+
+    Caller contract: the RQ retry/dead-letter policy is set up in
+    `app/backend/api/routes/gazettes.py` (3 attempts, then to RQ's
+    failed registry for forensic retention).
+
+    Known limitation — concurrent worker safety: this code does not
+    take a row lock, so two workers processing the same gazette_id
+    concurrently could double-write. RQ's at-least-once delivery makes
+    that rare (a job is reserved before being processed), but a strict
+    fix would use SELECT FOR UPDATE NOWAIT on the gazette row and
+    skip on lock conflict. Deferred.
     """
     settings = get_settings()
     session = _sync_session()
@@ -206,11 +255,43 @@ def ingest_pdf(gazette_id: str) -> dict:
         gazette = session.get(Gazette, gid)
         if gazette is None:
             raise ValueError(f"Gazette {gazette_id} not found")
-        if gazette.status != GazetteStatus.uploaded:
-            logger.warning("Gazette %s status=%s; skipping", gazette_id, gazette.status)
-            return {"gazette_id": gazette_id, "status": gazette.status.value, "skipped": True}
 
+        # Idempotent skip on already-completed gazettes. Admin must
+        # explicitly delete prior trademarks before re-running.
+        if gazette.status == GazetteStatus.completed:
+            logger.info(
+                "Gazette %s already completed (row_count=%d); skipping",
+                gazette_id,
+                gazette.row_count or 0,
+            )
+            return {
+                "gazette_id": gazette_id,
+                "row_count": gazette.row_count or 0,
+                "status": "completed",
+                "skipped": True,
+            }
+
+        # Distinguish recoverable starting states in the log so operators
+        # can tell a normal first attempt from a recovery / retry.
+        if gazette.status == GazetteStatus.processing:
+            logger.warning(
+                "Gazette %s was stuck in 'processing' (likely prior worker "
+                "crash / job timeout). Purging partial rows and restarting.",
+                gazette_id,
+            )
+        elif gazette.status == GazetteStatus.failed:
+            logger.info("Gazette %s previously failed; retrying after purge", gazette_id)
+
+        # Clean slate. Drops any rows from a prior attempt and resets
+        # the gazette's bookkeeping in a single transaction so the API
+        # never sees a "0 rows + processing" intermediate state.
+        purged = _purge_trademarks(session, gid)
+        if purged:
+            logger.info("Purged %d prior trademark rows for gazette %s", purged, gazette_id)
         gazette.status = GazetteStatus.processing
+        gazette.error_message = None
+        gazette.row_count = 0
+        gazette.processed_at = None
         session.add(gazette)
         session.commit()
 
@@ -277,15 +358,32 @@ def ingest_pdf(gazette_id: str) -> dict:
 
     except Exception as e:
         logger.exception("Ingest failed for gazette %s", gazette_id)
+        # The error handler needs a fresh session state — any SQLAlchemy
+        # error leaves the prior transaction unusable. Roll back first.
         try:
+            session.rollback()
             g = session.get(Gazette, uuid.UUID(gazette_id))
             if g is not None:
+                # Roll back any rows committed in earlier batches so the DB
+                # never holds half a gazette under status=failed.
+                purged_on_fail = _purge_trademarks(session, g.id)
+                if purged_on_fail:
+                    logger.info(
+                        "Rolled back %d partial rows after ingest failure",
+                        purged_on_fail,
+                    )
                 g.status = GazetteStatus.failed
                 g.error_message = str(e)[:4000]
+                g.row_count = 0
+                g.processed_at = None
                 session.add(g)
                 session.commit()
         except Exception:
             session.rollback()
+            logger.exception(
+                "Could not flip gazette to failed-state after ingest error; "
+                "row may be stuck in 'processing' until manual cleanup"
+            )
         raise
     finally:
         session.close()
