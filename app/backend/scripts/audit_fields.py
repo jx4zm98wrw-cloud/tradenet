@@ -51,10 +51,15 @@ def _conn():
 
 
 def check_madrid_number_in_applicant() -> list[dict]:
-    """B-rows where applicant_name starts with a 7-digit Madrid reg#.
+    """B-rows where applicant_name is JUST a Madrid reg# (no further text).
 
     Pattern: "(732) 1529250 (DE) Jack Wolfskin …" — the extractor split
-    on the wrong delimiter and kept the number as if it were the name.
+    on the wrong delimiter and kept just the number as the name.
+
+    Strict regex: applicant_name is *purely* digits (optionally followed
+    by " (CC)" country code) — no other text. This avoids false-positives
+    like "12998131 CANADA INC." where digits are a legit Canadian
+    corporation prefix on a full company name.
     """
     with _conn() as conn:
         rows = conn.execute(
@@ -67,8 +72,9 @@ def check_madrid_number_in_applicant() -> list[dict]:
             ).where(
                 and_(
                     Trademark.applicant_name.is_not(None),
-                    # Starts with 6-8 digits, possibly followed by " (XX) "
-                    Trademark.applicant_name.op("~")(r"^[0-9]{6,8}([\s(]|$)"),
+                    # Whole string is 6-8 digits, optionally followed by
+                    # whitespace + (XX) country code, then end.
+                    Trademark.applicant_name.op("~")(r"^[0-9]{6,8}(\s+\([A-Z]{2}\))?\s*$"),
                 )
             )
         ).all()
@@ -82,15 +88,22 @@ def check_madrid_number_in_applicant() -> list[dict]:
     ]
 
 
-_ADDRESS_FRAGMENT_PREFIX = re.compile(
-    r"^\d+[A-Za-z]?[-\s,.]"  # "503-ho,", "12 ", "10th,"
-    r"|^(SỐ|Số|No\.?|Apt|Suite|Floor|Lô|Lot)\b",
+_ADDRESS_FRAGMENT_STRONG = re.compile(
+    # Strong signals only — avoid false-positives on legit names that
+    # happen to start with a digit ("123 Industries Co.").
+    r"^\d+[-\s]?[a-z]{2,4}[,]"          # "503-ho, ..." (Korean address)
+    r"|^(SỐ|Số|No\.\s*\d|Apt\s|Suite\s|Floor\s|Lô\s|Lot\s)",
     re.IGNORECASE,
 )
 
 
 def check_address_fragment_in_applicant() -> list[dict]:
-    """B-rows where applicant_name is clearly an address fragment, not a name."""
+    """B-rows where applicant_name is clearly an address fragment, not a name.
+
+    Strict regex: matches obvious address-prefix patterns ("503-ho,",
+    "Số 12 Nguyễn Du", "Apt 4B,") but NOT legit company names that
+    happen to start with a digit ("123 Industries Co.", "3M Company").
+    """
     with _conn() as conn:
         rows = conn.execute(
             select(
@@ -103,7 +116,7 @@ def check_address_fragment_in_applicant() -> list[dict]:
     suspects = []
     for r in rows:
         name = (r.applicant_name or "").strip()
-        if _ADDRESS_FRAGMENT_PREFIX.match(name):
+        if _ADDRESS_FRAGMENT_STRONG.match(name):
             suspects.append(
                 {
                     "id": str(r.id),
@@ -173,19 +186,23 @@ def check_neither_540_nor_logo() -> list[dict]:
 
 
 def check_b_missing_registration_date() -> list[dict]:
-    """B-domestic / B-Madrid rows missing the (151) registration date.
-    Every B-row should have one — its absence implies parser miss."""
+    """B-domestic rows missing the (151) registration date.
+
+    B_domestic gazettes publish the cert with its issuance date — every
+    row should have it. B_Madrid is different: the IR# is published with
+    renewal/expansion data, not the original IR registration date, so
+    (151) is legitimately often NULL for Madrid rows.
+    """
     with _conn() as conn:
         rows = conn.execute(
             select(
                 Trademark.id,
                 Trademark.certificate_number,
-                Trademark.madrid_number,
                 Trademark.applicant_name,
                 Trademark.record_type,
             ).where(
                 and_(
-                    Trademark.record_type != RecordType.A,
+                    Trademark.record_type == RecordType.B_domestic,
                     Trademark.registration_date_151.is_(None),
                 )
             )
@@ -193,7 +210,7 @@ def check_b_missing_registration_date() -> list[dict]:
     return [
         {
             "id": str(r.id),
-            "cert_or_madrid": r.certificate_number or r.madrid_number,
+            "cert": r.certificate_number,
             "applicant_name": r.applicant_name,
             "record_type": r.record_type.value if r.record_type else None,
         }
