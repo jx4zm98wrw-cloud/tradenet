@@ -1,0 +1,1802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Tradenet — Vietnam Trademark Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="marketing/marketing.css"/>
+  <!-- React + Babel for Tweaks panel only -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body data-theme="oxblood">
+
+<!-- ============================================================
+     TOP NAV (shared)
+     ============================================================ -->
+<header class="mk-nav">
+  <div class="container mk-nav-inner">
+    <a href="#/" class="mk-brand" data-view-link="landing">
+      <span class="mk-brand-mark" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M5 4 H19 V8 L12 9.5 L5 8 Z" fill="white" opacity="0.95"/>
+          <path d="M11 9 H13 V20 H11 Z" fill="white" opacity="0.95"/>
+        </svg>
+      </span>
+      <span class="mk-brand-name">Tradenet<span class="mk-brand-tld">.vn</span></span>
+    </a>
+    <nav class="mk-nav-links">
+      <button class="mk-nav-link" data-view-link="landing">Product</button>
+      <button class="mk-nav-link" data-view-link="pricing">Pricing</button>
+      <button class="mk-nav-link" data-view-link="coverage">Coverage</button>
+      <button class="mk-nav-link" data-view-link="docs">Docs</button>
+    </nav>
+    <div class="mk-nav-cta">
+      <button class="btn btn-link" data-view-link="login">Sign in</button>
+      <button class="btn btn-primary" data-view-link="login">Start free trial</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ============================================================
+     VIEW: LANDING
+     ============================================================ -->
+<section class="view active" data-view="landing" data-screen-label="Landing">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-bg"></div>
+    <div class="container hero-inner">
+      <div class="hero-left">
+        <span class="eyebrow hero-eyebrow">Vietnam Trademark Intelligence</span>
+        <h1 class="hero-h1">
+          Catch every <span class="stamp">conflict</span> in the Vietnamese gazette — <span class="strike">before</span> the opposition window closes.
+        </h1>
+        <p class="hero-sub">
+          Tradenet ingests every Vietnam IP issue the day it publishes, runs your watchlists against it, and surfaces the ten marks you actually need to look at this morning. No more reading 4,000-page PDFs.
+        </p>
+        <div class="hero-ctas">
+          <button class="btn btn-primary btn-lg" data-view-link="login">Start free 14-day trial</button>
+          <button class="btn btn-ghost btn-lg">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            Watch 2-min tour
+          </button>
+        </div>
+        <p class="hero-microcopy">No credit card · 46,758 marks already indexed · Live coverage of T1–T4 weekly issues</p>
+      </div>
+
+      <!-- Hero demo: conflict scorecard preview -->
+      <aside class="hero-demo" aria-label="Conflict scorecard preview">
+        <div class="hero-demo-head">
+          <span class="hero-demo-title">Conflict scorecard · live</span>
+          <span class="hero-demo-status">Watching NEUREX</span>
+        </div>
+
+        <div class="hero-demo-mark-row">
+          <div class="hd-mark">
+            <div class="hd-mark-plate">
+              <span class="hd-mark-tick" style="top:3px;left:3px;border-top:1px solid var(--mute);border-left:1px solid var(--mute)"></span>
+              <span class="hd-mark-tick" style="top:3px;right:3px;border-top:1px solid var(--mute);border-right:1px solid var(--mute)"></span>
+              <span class="hd-mark-tick" style="bottom:3px;left:3px;border-bottom:1px solid var(--mute);border-left:1px solid var(--mute)"></span>
+              <span class="hd-mark-tick" style="bottom:3px;right:3px;border-bottom:1px solid var(--mute);border-right:1px solid var(--mute)"></span>
+              <svg viewBox="0 0 200 60" preserveAspectRatio="xMidYMid meet"><text x="100" y="30" text-anchor="middle" dominant-baseline="central" font-family="Be Vietnam Pro, sans-serif" font-weight="800" font-size="36" letter-spacing="1.2" fill="var(--stamp)">NEUREX</text></svg>
+            </div>
+            <div class="hd-mark-name">NEUREX</div>
+            <div class="hd-mark-meta">Your mark · CR-2024-118</div>
+          </div>
+          <div class="hd-vs">
+            <span>VS</span>
+            <div class="hd-vs-line"></div>
+          </div>
+          <div class="hd-mark">
+            <div class="hd-mark-plate">
+              <span class="hd-mark-tick" style="top:3px;left:3px;border-top:1px solid var(--mute);border-left:1px solid var(--mute)"></span>
+              <span class="hd-mark-tick" style="top:3px;right:3px;border-top:1px solid var(--mute);border-right:1px solid var(--mute)"></span>
+              <span class="hd-mark-tick" style="bottom:3px;left:3px;border-bottom:1px solid var(--mute);border-left:1px solid var(--mute)"></span>
+              <span class="hd-mark-tick" style="bottom:3px;right:3px;border-bottom:1px solid var(--mute);border-right:1px solid var(--mute)"></span>
+              <svg viewBox="0 0 200 60" preserveAspectRatio="xMidYMid meet"><text x="100" y="30" text-anchor="middle" dominant-baseline="central" font-family="Be Vietnam Pro, sans-serif" font-weight="800" font-size="32" letter-spacing="1.2" fill="var(--ink)">NEUROFAX</text></svg>
+            </div>
+            <div class="hd-mark-name">NEUROFAX</div>
+            <div class="hd-mark-meta">Pharmasia SG · A_T2_2026</div>
+          </div>
+        </div>
+
+        <div class="hero-demo-mark-row" style="grid-template-columns: repeat(3, 1fr);">
+          <div class="hd-ring-wrap">
+            <div class="simring" data-score="0.88" data-size="44"></div>
+            <span style="font-size:10px;color:var(--mute);font-family:JetBrains Mono,monospace;text-transform:uppercase;letter-spacing:0.08em;">Phonetic</span>
+          </div>
+          <div class="hd-ring-wrap">
+            <div class="simring" data-score="0.71" data-size="44"></div>
+            <span style="font-size:10px;color:var(--mute);font-family:JetBrains Mono,monospace;text-transform:uppercase;letter-spacing:0.08em;">Visual</span>
+          </div>
+          <div class="hd-ring-wrap">
+            <div class="simring" data-score="1.00" data-size="44"></div>
+            <span style="font-size:10px;color:var(--mute);font-family:JetBrains Mono,monospace;text-transform:uppercase;letter-spacing:0.08em;">Class 5,10</span>
+          </div>
+        </div>
+
+        <div class="hero-demo-foot">
+          <span class="hd-verdict">
+            <span class="hd-verdict-dot"></span>
+            Likely conflict · 94% composite
+          </span>
+          <span style="font-size:11px;color:var(--mute);font-family:JetBrains Mono,monospace;">
+            Opposition closes in <strong style="color:var(--stamp)">19 days</strong>
+          </span>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <section class="stats">
+    <div class="container stats-grid">
+      <div class="stat">
+        <div class="stat-value">46,758</div>
+        <div class="stat-label">Vietnamese marks indexed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">8</div>
+        <div class="stat-label">Weekly gazettes / quarter</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">5,283</div>
+        <div class="stat-label">Opposition windows tracked</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">1.4<span style="font-size:0.5em;color:var(--mute)">s</span></div>
+        <div class="stat-label">Avg search time across corpus</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">What you get</span>
+        <h2 class="section-h2">Built for the way trademark work actually happens.</h2>
+        <p class="section-sub">Not a generic search box on a PDF dump. Four core surfaces — each shaped around a job IP professionals do every week.</p>
+      </div>
+
+      <div class="features">
+        <article class="feature-card">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>
+          </div>
+          <h3 class="feature-h3">Image-similarity search</h3>
+          <p class="feature-body">
+            Drop a specimen image. We compute perceptual hash + OCR + Vienna code inference, then surface every visually adjacent mark — even when the text reads differently.
+          </p>
+          <div class="feature-foot">pHash · OCR · Vienna 5.1</div>
+        </article>
+
+        <article class="feature-card">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>
+          </div>
+          <h3 class="feature-h3">Watchlists that watch themselves</h3>
+          <p class="feature-body">
+            Save a query — fuzzy name, image, class, applicant — once. It re-runs against every new gazette automatically. Monday morning you get a digest of what landed and what matters.
+          </p>
+          <div class="feature-foot">Auto re-run · Per-matter · Slack/email</div>
+        </article>
+
+        <article class="feature-card">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v4M9 16h6"/></svg>
+          </div>
+          <h3 class="feature-h3">Opposition calendar</h3>
+          <p class="feature-body">
+            Every published application opens a 5-month opposition window under Article 112. We surface yours sorted by days-remaining, with urgency colors and one-click filing handoff.
+          </p>
+          <div class="feature-foot">Vietnam Article 112 · Auto-track</div>
+        </article>
+
+        <article class="feature-card">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          </div>
+          <h3 class="feature-h3">Side-by-side conflict scorecard</h3>
+          <p class="feature-body">
+            Pick two or three marks. Get a composite similarity score broken down across phonetic, visual, and class-overlap dimensions — with a recommendation you can defend in a client memo.
+          </p>
+          <div class="feature-foot">40% phonetic · 30% visual · 30% class</div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEEP DIVE: Image similarity -->
+  <section class="section" style="background: var(--paper-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);">
+    <div class="container split">
+      <div class="viz">
+        <div class="viz-eyebrow">
+          <span>Image search · 0.87 threshold</span>
+          <span>7 matches</span>
+        </div>
+        <div class="spec-mosaic">
+          <div class="spec-mosaic-cell matched">
+            <span class="score-tag">100%</span>
+            <svg viewBox="0 0 200 80"><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="Be Vietnam Pro,sans-serif" font-weight="800" font-size="34" fill="var(--stamp)">NEUREX</text></svg>
+          </div>
+          <div class="spec-mosaic-cell matched">
+            <span class="score-tag">94%</span>
+            <svg viewBox="0 0 200 80"><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="Be Vietnam Pro,sans-serif" font-weight="800" font-size="30" fill="var(--ink)">NEUROFAX</text></svg>
+          </div>
+          <div class="spec-mosaic-cell matched">
+            <span class="score-tag">88%</span>
+            <svg viewBox="0 0 200 80"><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="Source Serif 4,serif" font-weight="600" font-size="32" fill="var(--ink)">NEURAXIS</text></svg>
+          </div>
+          <div class="spec-mosaic-cell">
+            <span class="score-tag">81%</span>
+            <svg viewBox="0 0 200 80"><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="Source Serif 4,serif" font-weight="600" font-size="30" fill="var(--ink)">BIVAXIS</text></svg>
+          </div>
+          <div class="spec-mosaic-cell">
+            <span class="score-tag">79%</span>
+            <svg viewBox="0 0 200 80"><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="Be Vietnam Pro,sans-serif" font-weight="700" font-size="28" letter-spacing="3" fill="var(--ink)">VEXARIS</text></svg>
+          </div>
+          <div class="spec-mosaic-cell">
+            <span class="score-tag">71%</span>
+            <svg viewBox="0 0 200 80"><text x="100" y="40" text-anchor="middle" dominant-baseline="central" font-family="Be Vietnam Pro,sans-serif" font-weight="800" font-size="34" fill="var(--ink)">ZENPHARM</text></svg>
+          </div>
+        </div>
+      </div>
+      <div>
+        <span class="eyebrow">Image similarity</span>
+        <h3 class="split-h3">Find lookalikes you'd never spell-check your way into.</h3>
+        <p class="split-body">
+          Trademark conflict isn't a string match. A logo can be visually identical to yours and read "NEUROFAX" instead of "NEUREX" — and a typist-only search misses it entirely.
+        </p>
+        <p class="split-body">
+          Our pipeline extracts perceptual hashes from every specimen, runs OCR on the wordmarks, and infers Vienna codes — so one upload finds visual, typographic, and semantic neighbours in the same query.
+        </p>
+        <ul class="split-bullets">
+          <li>Drop a PNG, JPG, or PDF — we handle the rest</li>
+          <li>Tunable similarity threshold per query, saved per watchlist</li>
+          <li>Vienna-code 5.1 inference for figurative-only marks</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEEP DIVE: Opposition calendar -->
+  <section class="section">
+    <div class="container split reverse">
+      <div class="viz">
+        <div class="viz-eyebrow">
+          <span>Opposition · open windows</span>
+          <span>5 closing in 30d</span>
+        </div>
+        <div class="opp-cal">
+          <div class="opp-cal-row">
+            <div class="opp-cal-days urgent">8<small>days</small></div>
+            <div>
+              <div class="opp-cal-mark">NUROFEN PLUS · Class 5</div>
+              <div class="opp-cal-meta">Reckitt Benckiser · closes 28 May</div>
+              <div class="opp-cal-bar" style="margin-top:6px;"><div class="opp-cal-bar-fill" style="width:8%;background:var(--stamp);"></div></div>
+            </div>
+            <button class="btn btn-sm btn-ghost">File</button>
+          </div>
+          <div class="opp-cal-row">
+            <div class="opp-cal-days urgent">8<small>days</small></div>
+            <div>
+              <div class="opp-cal-mark">VEXIS · Class 5</div>
+              <div class="opp-cal-meta">Vexis Labs Pvt · closes 28 May</div>
+              <div class="opp-cal-bar" style="margin-top:6px;"><div class="opp-cal-bar-fill" style="width:8%;background:var(--stamp);"></div></div>
+            </div>
+            <button class="btn btn-sm btn-ghost">File</button>
+          </div>
+          <div class="opp-cal-row">
+            <div class="opp-cal-days" style="color:var(--warn)">19<small>days</small></div>
+            <div>
+              <div class="opp-cal-mark">NEUROFAX · Class 5, 10</div>
+              <div class="opp-cal-meta">Pharmasia Holdings · closes 8 Jun</div>
+              <div class="opp-cal-bar" style="margin-top:6px;"><div class="opp-cal-bar-fill" style="width:18%;background:var(--warn);"></div></div>
+            </div>
+            <button class="btn btn-sm btn-ghost">Open</button>
+          </div>
+          <div class="opp-cal-row">
+            <div class="opp-cal-days" style="color:var(--warn)">19<small>days</small></div>
+            <div>
+              <div class="opp-cal-mark">VEXARIS · Class 5, 10, 44</div>
+              <div class="opp-cal-meta">Bayer AG · closes 8 Jun</div>
+              <div class="opp-cal-bar" style="margin-top:6px;"><div class="opp-cal-bar-fill" style="width:18%;background:var(--warn);"></div></div>
+            </div>
+            <button class="btn btn-sm btn-ghost">Open</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <span class="eyebrow">Opposition windows</span>
+        <h3 class="split-h3">Five months is shorter than you remember at month four.</h3>
+        <p class="split-body">
+          Vietnam gives you 150 days from publication to oppose. Miss it and your only option is invalidation proceedings — slower, more expensive, more uncertain.
+        </p>
+        <p class="split-body">
+          Every match against a watchlist creates a deadline. We sort by days-remaining, escalate the colour at 14 and 30 days, and hand off cleanly to your filing template.
+        </p>
+        <ul class="split-bullets">
+          <li>Article 112 timer on every published application</li>
+          <li>Madrid-protocol windows tracked separately</li>
+          <li>Calendar export to Outlook, Google, ICS</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEEP DIVE: Scorecard -->
+  <section class="section" style="background: var(--paper-2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);">
+    <div class="container split">
+      <div class="viz">
+        <div class="viz-eyebrow">
+          <span>Scorecard · NEUREX vs. NEUROFAX</span>
+          <span>Composite 0.94</span>
+        </div>
+
+        <div style="display:flex;align-items:flex-start;gap:18px;margin-bottom:18px;">
+          <div>
+            <div style="font-family:Source Serif 4,serif;font-size:20px;font-weight:600;">NEUROFAX</div>
+            <div style="font-size:11.5px;color:var(--mute);margin-top:2px;">Pharmasia Holdings SG</div>
+          </div>
+          <div class="simring" data-score="0.94" data-size="52" style="margin-left:auto;"></div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+          <span class="pill pill-stamp">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--stamp);display:inline-block;"></span>
+            Likely conflict
+          </span>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:grid;grid-template-columns:100px 1fr 32px;gap:8px;align-items:center;font-size:12px;">
+            <span style="color:var(--mute);">Phonetic</span>
+            <div style="height:5px;background:var(--paper-3);border-radius:3px;overflow:hidden;"><div style="width:88%;height:100%;background:var(--stamp);"></div></div>
+            <span class="mono tnum" style="text-align:right;font-weight:700;">88</span>
+          </div>
+          <div style="display:grid;grid-template-columns:100px 1fr 32px;gap:8px;align-items:center;font-size:12px;">
+            <span style="color:var(--mute);">Visual</span>
+            <div style="height:5px;background:var(--paper-3);border-radius:3px;overflow:hidden;"><div style="width:71%;height:100%;background:var(--warn);"></div></div>
+            <span class="mono tnum" style="text-align:right;font-weight:700;">71</span>
+          </div>
+          <div style="display:grid;grid-template-columns:100px 1fr 32px;gap:8px;align-items:center;font-size:12px;">
+            <span style="color:var(--mute);">Class overlap</span>
+            <div style="height:5px;background:var(--paper-3);border-radius:3px;overflow:hidden;"><div style="width:100%;height:100%;background:var(--stamp);"></div></div>
+            <span class="mono tnum" style="text-align:right;font-weight:700;">100</span>
+          </div>
+          <div style="display:grid;grid-template-columns:100px 1fr 32px;gap:8px;align-items:center;font-size:12px;">
+            <span style="color:var(--mute);">Semantic</span>
+            <div style="height:5px;background:var(--paper-3);border-radius:3px;overflow:hidden;"><div style="width:81%;height:100%;background:var(--stamp);"></div></div>
+            <span class="mono tnum" style="text-align:right;font-weight:700;">81</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <span class="eyebrow">Conflict scorecard</span>
+        <h3 class="split-h3">A defensible answer, not a vibe check.</h3>
+        <p class="split-body">
+          Every "is this a conflict?" question gets a composite score broken down across four dimensions — phonetic distance, visual hash, Nice-class overlap, and semantic similarity in the goods/services text.
+        </p>
+        <p class="split-body">
+          Weights are tunable per matter, and every score traces back to its evidence: the actual edit distance, the matched specimen, the overlapping class headings. Drop it straight into a memo.
+        </p>
+        <ul class="split-bullets">
+          <li>Composite + per-channel scores you can defend in court</li>
+          <li>Tunable weights per client matter</li>
+          <li>One-click export to PDF memo or Word</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- COVERAGE -->
+  <section class="section" id="coverage">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">Coverage</span>
+        <h2 class="section-h2">Every Vietnam IP issue, the day it publishes.</h2>
+        <p class="section-sub">Vietnam's Cục Sở hữu trí tuệ publishes weekly applications (Section A) and registrations (Section B). We OCR, deduplicate, and index all of it within hours of release.</p>
+      </div>
+
+      <div class="coverage">
+        <div class="coverage-cell">
+          <span class="coverage-issue"><span class="coverage-dot"></span>B / T4 · 2026</span>
+          <span class="coverage-count">9,499</span>
+          <span class="coverage-meta">Registrations · 2m ago</span>
+        </div>
+        <div class="coverage-cell">
+          <span class="coverage-issue"><span class="coverage-dot"></span>B / T3 · 2026</span>
+          <span class="coverage-count">5,326</span>
+          <span class="coverage-meta">Registrations · 8m ago</span>
+        </div>
+        <div class="coverage-cell">
+          <span class="coverage-issue"><span class="coverage-dot"></span>B / T2 · 2026</span>
+          <span class="coverage-count">5,913</span>
+          <span class="coverage-meta">Registrations · 11m ago</span>
+        </div>
+        <div class="coverage-cell">
+          <span class="coverage-issue"><span class="coverage-dot"></span>B / T1 · 2026</span>
+          <span class="coverage-count">6,608</span>
+          <span class="coverage-meta">Registrations · 17m ago</span>
+        </div>
+        <div class="coverage-cell">
+          <span class="coverage-issue"><span class="coverage-dot"></span>A / T4 · 2026</span>
+          <span class="coverage-count">8,331</span>
+          <span class="coverage-meta">Applications · 21m ago</span>
+        </div>
+        <div class="coverage-cell">
+          <span class="coverage-issue"><span class="coverage-dot"></span>A / T3 · 2026</span>
+          <span class="coverage-count">3,273</span>
+          <span class="coverage-meta">Applications · 28m ago</span>
+        </div>
+        <div class="coverage-cell">
+          <span class="coverage-issue"><span class="coverage-dot"></span>A / T2 · 2026</span>
+          <span class="coverage-count">3,159</span>
+          <span class="coverage-meta">Applications · 1h ago</span>
+        </div>
+        <div class="coverage-cell">
+          <span class="coverage-issue"><span class="coverage-dot"></span>A / T1 · 2026</span>
+          <span class="coverage-count">4,649</span>
+          <span class="coverage-meta">Applications · 1h ago</span>
+        </div>
+      </div>
+
+      <p class="text-center mt-24" style="font-size:13px;color:var(--mute);">
+        Madrid Protocol coverage included on Firm and Enterprise plans · WIPO Global Brand Database mirrored daily
+      </p>
+    </div>
+  </section>
+
+  <!-- CTA STRIP -->
+  <section class="container">
+    <div class="cta-strip">
+      <div>
+        <h2 class="cta-h2">See what landed in the gazette this week.</h2>
+        <p class="cta-sub">Free 14-day trial. No credit card. Upload one mark, get your first watchlist running in five minutes.</p>
+      </div>
+      <div class="cta-actions">
+        <button class="btn btn-primary btn-lg" data-view-link="login">Start free trial</button>
+        <button class="btn btn-ghost btn-lg" data-view-link="pricing">View pricing</button>
+      </div>
+    </div>
+  </section>
+
+</section>
+
+<!-- ============================================================
+     VIEW: PRICING
+     ============================================================ -->
+<section class="view" data-view="pricing" data-screen-label="Pricing">
+  <div class="container pricing-head">
+    <span class="eyebrow">Pricing</span>
+    <h1 class="section-h2" style="margin-top:12px;font-size:48px;">Priced for the work, not the dashboard.</h1>
+    <p class="section-sub">Pick the plan that matches your matter volume. Upgrade or cancel any time. Annual saves you 17%.</p>
+
+    <div class="pricing-toggles">
+      <div class="pricing-seg" id="seg-period">
+        <button class="active" data-period="annual">Annual · save 17%</button>
+        <button data-period="monthly">Monthly</button>
+      </div>
+      <div class="pricing-seg" id="seg-currency">
+        <button class="active" data-currency="USD">USD</button>
+        <button data-currency="VND">VND</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container pricing-tiers">
+
+    <article class="tier">
+      <div>
+        <div class="tier-name">Solo</div>
+        <div class="tier-tagline">Independent IP counsel, single-matter watching</div>
+      </div>
+      <div>
+        <div class="tier-price">
+          <span class="tier-currency" data-currency-symbol>$</span>
+          <span class="tier-amount" data-price="solo">49</span>
+          <span class="tier-period">/ mo</span>
+        </div>
+        <div class="tier-billnote" data-billnote="solo">Billed annually · $588/yr · 1 seat</div>
+      </div>
+      <div class="tier-cta"><button class="btn btn-ghost btn-lg" data-view-link="login">Start free trial</button></div>
+      <div class="tier-divider"></div>
+      <div class="tier-includes-label">Includes</div>
+      <ul class="tier-list">
+        <li><strong>5</strong> active watchlists</li>
+        <li><strong>500</strong> searches / month</li>
+        <li>Phonetic + image search</li>
+        <li>Opposition calendar</li>
+        <li>Email digest, weekly</li>
+        <li class="muted">Madrid Protocol coverage</li>
+        <li class="muted">Side-by-side scorecard</li>
+        <li class="muted">Client-facing PDF reports</li>
+      </ul>
+    </article>
+
+    <article class="tier featured">
+      <span class="tier-badge">Most popular</span>
+      <div>
+        <div class="tier-name">Firm</div>
+        <div class="tier-tagline">IP boutiques and in-house teams · 3–25 seats</div>
+      </div>
+      <div>
+        <div class="tier-price">
+          <span class="tier-currency" data-currency-symbol>$</span>
+          <span class="tier-amount" data-price="firm">179</span>
+          <span class="tier-period">/ seat / mo</span>
+        </div>
+        <div class="tier-billnote" data-billnote="firm">Billed annually · from $6,444/yr · 3 seats min</div>
+      </div>
+      <div class="tier-cta"><button class="btn btn-primary btn-lg" data-view-link="login">Start free trial</button></div>
+      <div class="tier-divider"></div>
+      <div class="tier-includes-label">Everything in Solo, plus</div>
+      <ul class="tier-list">
+        <li><strong>Unlimited</strong> watchlists &amp; searches</li>
+        <li>Side-by-side conflict scorecard</li>
+        <li>Madrid Protocol &amp; WIPO mirror</li>
+        <li>Per-matter weight tuning</li>
+        <li>Client-facing PDF reports</li>
+        <li>Slack &amp; Microsoft Teams alerts</li>
+        <li>Shared watchlists across firm</li>
+        <li>Calendar sync (Google, Outlook, ICS)</li>
+      </ul>
+    </article>
+
+    <article class="tier">
+      <div>
+        <div class="tier-name">Enterprise</div>
+        <div class="tier-tagline">Large firms, IP departments, alliances</div>
+      </div>
+      <div>
+        <div class="tier-price">
+          <span class="tier-amount" style="font-size:36px;">Custom</span>
+        </div>
+        <div class="tier-billnote">Volume pricing · annual contract · SLA-backed</div>
+      </div>
+      <div class="tier-cta"><button class="btn btn-ghost btn-lg">Contact sales</button></div>
+      <div class="tier-divider"></div>
+      <div class="tier-includes-label">Everything in Firm, plus</div>
+      <ul class="tier-list">
+        <li><strong>API access</strong> &amp; webhooks</li>
+        <li>SSO (SAML 2.0, OIDC)</li>
+        <li>Audit log + data residency in VN</li>
+        <li>99.9% uptime SLA</li>
+        <li>Dedicated onboarding &amp; training</li>
+        <li>Custom Vienna code training</li>
+        <li>White-label client reports</li>
+        <li>Priority support · 1-hr response</li>
+      </ul>
+    </article>
+  </div>
+
+  <!-- Comparison table -->
+  <div class="container">
+    <h2 class="section-h2 text-center" style="font-size:28px;margin-top:32px;margin-bottom:24px;">Compare in detail</h2>
+    <div class="compare-table-wrap">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Solo</th>
+            <th class="featured">Firm</th>
+            <th>Enterprise</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="compare-section-row"><td colspan="4">Search</td></tr>
+          <tr><td class="row-label">Active watchlists</td><td>5</td><td class="featured">Unlimited</td><td>Unlimited</td></tr>
+          <tr><td class="row-label">Searches per month</td><td>500</td><td class="featured">Unlimited</td><td>Unlimited</td></tr>
+          <tr><td class="row-label">Phonetic / fuzzy search</td><td><span class="check">✓</span></td><td class="featured"><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">Image-similarity search</td><td><span class="check">✓</span></td><td class="featured"><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">Vienna code search</td><td><span class="check">✓</span></td><td class="featured"><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">Side-by-side scorecard</td><td><span class="dash">—</span></td><td class="featured"><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+
+          <tr class="compare-section-row"><td colspan="4">Coverage</td></tr>
+          <tr><td class="row-label">Vietnamese gazette (Vietnam IP)</td><td><span class="check">✓</span></td><td class="featured"><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">Madrid Protocol marks</td><td><span class="dash">—</span></td><td class="featured"><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">WIPO Global Brand DB mirror</td><td><span class="dash">—</span></td><td class="featured"><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">Historical archive</td><td>2 years</td><td class="featured">10 years</td><td>Full</td></tr>
+
+          <tr class="compare-section-row"><td colspan="4">Workflow</td></tr>
+          <tr><td class="row-label">Opposition calendar</td><td><span class="check">✓</span></td><td class="featured"><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">Email digest</td><td>Weekly</td><td class="featured">Daily + weekly</td><td>Configurable</td></tr>
+          <tr><td class="row-label">Slack / Teams alerts</td><td><span class="dash">—</span></td><td class="featured"><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">Client-facing PDF reports</td><td><span class="dash">—</span></td><td class="featured"><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">White-label reports</td><td><span class="dash">—</span></td><td class="featured"><span class="dash">—</span></td><td><span class="check">✓</span></td></tr>
+
+          <tr class="compare-section-row"><td colspan="4">Team &amp; security</td></tr>
+          <tr><td class="row-label">Seats included</td><td>1</td><td class="featured">From 3</td><td>Unlimited</td></tr>
+          <tr><td class="row-label">Shared watchlists</td><td><span class="dash">—</span></td><td class="featured"><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">SSO (SAML, OIDC)</td><td><span class="dash">—</span></td><td class="featured"><span class="dash">—</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">Audit log</td><td><span class="dash">—</span></td><td class="featured"><span class="dash">—</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">API access</td><td><span class="dash">—</span></td><td class="featured"><span class="dash">—</span></td><td><span class="check">✓</span></td></tr>
+          <tr><td class="row-label">Uptime SLA</td><td><span class="dash">—</span></td><td class="featured">99.5%</td><td>99.9%</td></tr>
+
+          <tr class="compare-section-row"><td colspan="4">Support</td></tr>
+          <tr><td class="row-label">Onboarding</td><td>Self-serve</td><td class="featured">Live, 1 hour</td><td>Dedicated CSM</td></tr>
+          <tr><td class="row-label">Support</td><td>Email</td><td class="featured">Email + chat</td><td>Priority · 1-hr</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="container faq">
+    <div class="faq-grid">
+      <div>
+        <h2 class="faq-h2">Questions, answered.</h2>
+        <p style="color:var(--mute);font-size:14px;">Anything else? <a href="#" style="color:var(--stamp);" onclick="event.preventDefault()">Talk to sales</a> or email <a href="mailto:hello@tradenet.vn" style="color:var(--stamp);">hello@tradenet.vn</a>.</p>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item" open>
+          <summary>What does a "seat" mean on the Firm plan?</summary>
+          <p>One named user with their own login, watchlists, and saved searches. Watchlists can be shared across seats inside the same firm — assignment and ownership stay clear in the audit log.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Do you cover Madrid Protocol designations?</summary>
+          <p>Yes, on Firm and Enterprise. We ingest WIPO's Romarin output and surface Vietnam designations the moment they hit the gazette — so a US or DE applicant's mark shows up alongside domestic filings.</p>
+        </details>
+        <details class="faq-item">
+          <summary>How quickly do new gazette issues appear?</summary>
+          <p>Vietnam IP publishes weekly issues T1–T4. We typically have a new issue OCR'd, deduplicated, and searchable within 4 hours of release. Watchlists re-run automatically once the issue lands.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Can we file oppositions through Tradenet?</summary>
+          <p>Not directly — opposition filing happens through Vietnam IP or your IP agent. We export a pre-filled brief (mark, grounds, prior rights, evidence pack) that drops into your filing template. Direct e-filing is on the roadmap for late 2026.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Is the data hosted in Vietnam?</summary>
+          <p>Enterprise customers get data residency in Vietnam (Viettel IDC, Hanoi). Solo and Firm are hosted in Singapore on AWS ap-southeast-1.</p>
+        </details>
+        <details class="faq-item">
+          <summary>What's your refund policy?</summary>
+          <p>14-day money-back guarantee on annual plans, no questions asked. Cancel monthly plans at any point with no cancellation fee.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Do you offer discounts for solo practitioners or NGOs?</summary>
+          <p>Yes — 50% off Solo for early-career attorneys (first 3 years post-qualification) and 100% off for registered legal aid organisations. Email us with proof of status.</p>
+        </details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     VIEW: COVERAGE
+     ============================================================ -->
+<section class="view" data-view="coverage" data-screen-label="Coverage">
+  <div class="container coverage-hero">
+    <span class="eyebrow">Data Coverage</span>
+    <h1 class="section-h2" style="font-size: 48px; margin-top: 14px;">
+      Every Vietnam IP issue, every Madrid designation, every week.
+    </h1>
+    <p class="section-sub" style="max-width: 680px; margin: 8px auto 0;">
+      We ingest the Vietnamese trademark gazette directly from Vietnam IP — the agency formerly known as NOIP, officially Cục Sở hữu trí tuệ — the day each issue publishes — plus Madrid Protocol designations from WIPO. Here's exactly what's in the corpus, how fresh it is, and how we measure quality.
+    </p>
+
+    <div class="coverage-stats">
+      <div class="coverage-stat">
+        <div class="coverage-stat-label">Marks indexed</div>
+        <div class="coverage-stat-value">46,758</div>
+        <div class="coverage-stat-meta">Vietnam · all classes · 2018→</div>
+      </div>
+      <div class="coverage-stat">
+        <div class="coverage-stat-label">Issues this year</div>
+        <div class="coverage-stat-value">20<span style="font-size:0.5em;color:var(--mute);"> / 52</span></div>
+        <div class="coverage-stat-meta">8 sections A · 12 sections B</div>
+      </div>
+      <div class="coverage-stat">
+        <div class="coverage-stat-label">Ingest lag · median</div>
+        <div class="coverage-stat-value">3.8<span style="font-size:0.5em;color:var(--mute);">h</span></div>
+        <div class="coverage-stat-meta">From Vietnam IP publication to searchable</div>
+      </div>
+      <div class="coverage-stat">
+        <div class="coverage-stat-label">OCR confidence · avg</div>
+        <div class="coverage-stat-value">99.4<span style="font-size:0.5em;color:var(--mute);">%</span></div>
+        <div class="coverage-stat-meta">Rows below 0.85 flagged for review</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sources -->
+  <div class="container">
+    <div style="text-align: center; margin-bottom: 32px;">
+      <h2 class="section-h2" style="font-size: 30px; margin: 0;">What's in the corpus</h2>
+      <p class="section-sub" style="margin-top: 8px;">Five data sources, normalized into one searchable index.</p>
+    </div>
+
+    <div class="coverage-sources">
+      <article class="source-card primary">
+        <div class="source-card-head">
+          <div>
+            <h3 class="source-card-name">Vietnam IP · Section A — Applications published</h3>
+            <p class="source-card-sub">Cục Sở hữu trí tuệ · A_T*_YYYY.pdf</p>
+          </div>
+          <span class="pill pill-stamp">Primary source</span>
+        </div>
+        <p class="source-card-body">
+          Every application that passes formal examination and gets published to open its opposition window. T1–T4 weekly issues, ~3,000–8,000 marks per issue, including all 45 Nice classes and Vietnam-designated Madrid filings.
+        </p>
+        <dl class="source-card-kv">
+          <div><dt>Frequency</dt><dd>Weekly · T1, T2, T3, T4</dd></div>
+          <div><dt>Lag</dt><dd>2–6 hours from PDF release</dd></div>
+          <div><dt>Fields</dt><dd>26 WIPO INID codes</dd></div>
+          <div><dt>Available on</dt><dd>All plans</dd></div>
+        </dl>
+      </article>
+
+      <article class="source-card primary">
+        <div class="source-card-head">
+          <div>
+            <h3 class="source-card-name">Vietnam IP · Section B — Registered marks</h3>
+            <p class="source-card-sub">Cục Sở hữu trí tuệ · B_T*_YYYY.pdf</p>
+          </div>
+          <span class="pill pill-stamp">Primary source</span>
+        </div>
+        <p class="source-card-body">
+          Granted registrations, post-opposition. Includes certificate number, 10-year term, renewals, and partial cancellations. The authoritative record of who owns what mark, in what class, in Vietnam.
+        </p>
+        <dl class="source-card-kv">
+          <div><dt>Frequency</dt><dd>Weekly · T1, T2, T3, T4</dd></div>
+          <div><dt>Lag</dt><dd>2–6 hours from PDF release</dd></div>
+          <div><dt>Renewals</dt><dd>Tracked automatically</dd></div>
+          <div><dt>Available on</dt><dd>All plans</dd></div>
+        </dl>
+      </article>
+
+      <article class="source-card">
+        <div class="source-card-head">
+          <div>
+            <h3 class="source-card-name">Madrid Protocol designations</h3>
+            <p class="source-card-sub">WIPO ROMARIN · daily delta feed</p>
+          </div>
+          <span class="pill">Firm + Enterprise</span>
+        </div>
+        <p class="source-card-body">
+          International Registrations designating Vietnam — straight from WIPO before they appear in the local gazette. Catches conflicts 4–12 weeks earlier than waiting for Vietnam IP publication.
+        </p>
+        <dl class="source-card-kv">
+          <div><dt>Frequency</dt><dd>Daily delta sync</dd></div>
+          <div><dt>Lag</dt><dd>~24 hours from WIPO</dd></div>
+          <div><dt>Coverage</dt><dd>All 130 Madrid members</dd></div>
+          <div><dt>Available on</dt><dd>Firm, Enterprise</dd></div>
+        </dl>
+      </article>
+
+      <article class="source-card">
+        <div class="source-card-head">
+          <div>
+            <h3 class="source-card-name">WIPO Global Brand Database mirror</h3>
+            <p class="source-card-sub">WIPO GBD · weekly snapshot</p>
+          </div>
+          <span class="pill">Firm + Enterprise</span>
+        </div>
+        <p class="source-card-body">
+          Full mirror of WIPO's GBD covering 70M+ marks across 89 jurisdictions, for global prior-art searches. Updated weekly, with image specimens and full Vienna codes.
+        </p>
+        <dl class="source-card-kv">
+          <div><dt>Records</dt><dd>~70M global marks</dd></div>
+          <div><dt>Lag</dt><dd>7 days</dd></div>
+          <div><dt>Jurisdictions</dt><dd>89 IP offices</dd></div>
+          <div><dt>Available on</dt><dd>Firm, Enterprise</dd></div>
+        </dl>
+      </article>
+    </div>
+  </div>
+
+  <!-- Recent issues timeline -->
+  <div class="container" style="margin-top: 48px;">
+    <div class="timeline-band">
+      <div class="timeline-band-head">
+        <div>
+          <h3 class="tl-h3">Ingest timeline · last 12 months</h3>
+          <p class="tl-sub">Every cell is one weekly gazette issue. Color intensity = mark count.</p>
+        </div>
+        <div class="tl-legend">
+          <span>Volume:</span>
+          <span><span class="tl-legend-swatch" style="background: var(--paper-3);"></span>0</span>
+          <span><span class="tl-legend-swatch" style="background: oklch(0.86 0.04 28);"></span>&lt; 2k</span>
+          <span><span class="tl-legend-swatch" style="background: oklch(0.72 0.09 28);"></span>2–5k</span>
+          <span><span class="tl-legend-swatch" style="background: var(--stamp);"></span>5–8k</span>
+          <span><span class="tl-legend-swatch" style="background: var(--stamp-deep);"></span>&gt; 8k</span>
+        </div>
+      </div>
+      <div id="tl-grid" class="tl-grid">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Data quality -->
+  <section class="section" style="padding: 64px 0 56px;">
+    <div class="container">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h2 class="section-h2" style="font-size: 30px; margin: 0;">Data quality, openly measured</h2>
+        <p class="section-sub" style="margin-top: 8px;">We don't claim "complete" coverage. We publish our actual numbers.</p>
+      </div>
+      <div class="dq-grid">
+        <div class="dq-card">
+          <div class="dq-card-h">OCR confidence</div>
+          <div class="dq-card-value">99.4<span style="font-size:0.5em;color:var(--mute);">%</span></div>
+          <div class="dq-bar"><div class="dq-bar-fill" style="width: 99.4%;"></div></div>
+          <p class="dq-card-meta">14 rows below threshold this month. Flagged for human review before search.</p>
+        </div>
+        <div class="dq-card">
+          <div class="dq-card-h">Duplicate detection</div>
+          <div class="dq-card-value">99.92<span style="font-size:0.5em;color:var(--mute);">%</span></div>
+          <div class="dq-bar"><div class="dq-bar-fill" style="width: 99.92%; background: var(--ok);"></div></div>
+          <p class="dq-card-meta">Same mark appearing in multiple issues collapsed to one record, with full history.</p>
+        </div>
+        <div class="dq-card">
+          <div class="dq-card-h">Image extraction</div>
+          <div class="dq-card-value">94.1<span style="font-size:0.5em;color:var(--mute);">%</span></div>
+          <div class="dq-bar"><div class="dq-bar-fill" style="width: 94.1%; background: var(--warn);"></div></div>
+          <p class="dq-card-meta">Specimens extracted from PDF and indexed for visual search. Fallback wordmark rendered when extraction fails.</p>
+        </div>
+        <div class="dq-card">
+          <div class="dq-card-h">Vienna code accuracy</div>
+          <div class="dq-card-value">87.6<span style="font-size:0.5em;color:var(--mute);">%</span></div>
+          <div class="dq-bar"><div class="dq-bar-fill" style="width: 87.6%; background: var(--warn);"></div></div>
+          <p class="dq-card-meta">Inferred via classifier when not provided. Verified manually on Enterprise.</p>
+        </div>
+        <div class="dq-card">
+          <div class="dq-card-h">Status currency</div>
+          <div class="dq-card-value">&lt; 24<span style="font-size:0.5em;color:var(--mute);">h</span></div>
+          <div class="dq-bar"><div class="dq-bar-fill" style="width: 100%; background: var(--ok);"></div></div>
+          <p class="dq-card-meta">Mark status (pending → registered → opposed → abandoned) updates within 24 hours of Vietnam IP change.</p>
+        </div>
+        <div class="dq-card">
+          <div class="dq-card-h">Historical archive</div>
+          <div class="dq-card-value">2018<span style="font-size:0.5em;color:var(--mute);">→</span></div>
+          <div class="dq-bar"><div class="dq-bar-fill" style="width: 100%;"></div></div>
+          <p class="dq-card-meta">Complete back-archive to 2018. Pre-2018 data available on Enterprise via dedicated import.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- API access teaser -->
+  <div class="container">
+    <div class="cta-strip">
+      <div>
+        <h2 class="cta-h2">Need the raw data? We have an API.</h2>
+        <p class="cta-sub">Every mark, every status change, every match against your watchlist — available as JSON over HTTPS or as a webhook. Enterprise customers only.</p>
+      </div>
+      <div class="cta-actions">
+        <button class="btn btn-primary btn-lg" data-view-link="docs">View API docs</button>
+        <button class="btn btn-ghost btn-lg">Talk to sales</button>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================
+     VIEW: DOCS
+     ============================================================ -->
+<section class="view" data-view="docs" data-screen-label="Docs">
+  <div class="container docs-shell">
+
+    <!-- Sidebar -->
+    <aside class="docs-sidebar">
+      <div class="docs-sb-group">
+        <h4>Getting started</h4>
+        <ul>
+          <li><button class="docs-sb-link active" data-doc="getting-started">Introduction <span class="docs-sb-num">5 min</span></button></li>
+          <li><button class="docs-sb-link" data-doc="first-watchlist">Your first watchlist <span class="docs-sb-num">3 min</span></button></li>
+          <li><button class="docs-sb-link" data-doc="team-invite">Inviting your team <span class="docs-sb-num">2 min</span></button></li>
+        </ul>
+      </div>
+      <div class="docs-sb-group">
+        <h4>Searching</h4>
+        <ul>
+          <li><button class="docs-sb-link" data-doc="text-search">Text &amp; operators</button></li>
+          <li><button class="docs-sb-link" data-doc="phonetic-search">Phonetic / fuzzy</button></li>
+          <li><button class="docs-sb-link" data-doc="image-search">Image similarity</button></li>
+          <li><button class="docs-sb-link" data-doc="vienna-search">Vienna codes</button></li>
+        </ul>
+      </div>
+      <div class="docs-sb-group">
+        <h4>Workflow</h4>
+        <ul>
+          <li><button class="docs-sb-link" data-doc="watchlists">Watchlists</button></li>
+          <li><button class="docs-sb-link" data-doc="opposition">Opposition workflow</button></li>
+          <li><button class="docs-sb-link" data-doc="reports">Client reports</button></li>
+          <li><button class="docs-sb-link" data-doc="article-112">Article 112 guide <span class="docs-sb-num">↗</span></button></li>
+        </ul>
+      </div>
+      <div class="docs-sb-group">
+        <h4>API</h4>
+        <ul>
+          <li><button class="docs-sb-link" data-doc="api">REST reference <span class="docs-sb-num">Ent</span></button></li>
+          <li><button class="docs-sb-link" data-doc="webhooks">Webhooks <span class="docs-sb-num">Ent</span></button></li>
+          <li><button class="docs-sb-link" data-doc="sso">SSO setup <span class="docs-sb-num">Ent</span></button></li>
+        </ul>
+      </div>
+      <div class="docs-sb-group">
+        <h4>Reference</h4>
+        <ul>
+          <li><button class="docs-sb-link" data-doc="vienna-ref">Vienna 5.1 codes</button></li>
+          <li><button class="docs-sb-link" data-doc="nice-ref">Nice classification</button></li>
+          <li><button class="docs-sb-link" data-doc="glossary">Vietnam IP glossary</button></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="docs-main">
+
+      <!-- DOC: Getting started -->
+      <article class="docs-doc" data-doc-content="getting-started">
+        <span class="docs-eyebrow">Getting started · 5 min read</span>
+        <h1 class="docs-h1">Introduction to Tradenet</h1>
+        <p class="docs-lede">
+          Tradenet is a search-and-watch tool for the Vietnamese trademark gazette. This guide walks through what the product does, how the four main surfaces fit together, and how to set up your first watchlist in under five minutes.
+        </p>
+
+        <div class="docs-toc">
+          <div class="docs-toc-label">On this page</div>
+          <ol>
+            <li><a href="#what">What Tradenet does</a></li>
+            <li><a href="#how">How the four surfaces fit together</a></li>
+            <li><a href="#first-search">Your first search</a></li>
+            <li><a href="#next">What to do next</a></li>
+          </ol>
+        </div>
+
+        <h2 class="docs-h2" id="what"><span class="docs-h2-num">01</span> What Tradenet does</h2>
+        <p class="docs-p">
+          Vietnam IP — formally Cục Sở hữu trí tuệ, and previously branded NOIP — publishes a weekly gazette in two sections: <strong>Section A</strong> for newly-published applications (opening their 5-month opposition window), and <strong>Section B</strong> for newly-granted registrations. Each issue runs 80–4,000 pages of dense PDF.
+        </p>
+        <p class="docs-p">
+          Tradenet ingests every issue the day it publishes, extracts the marks, and gives you four surfaces:
+        </p>
+        <ul class="docs-list">
+          <li><strong>Today</strong> — a digest of what landed since you last checked, anchored on your watchlists</li>
+          <li><strong>Search</strong> — text, phonetic, image, and Vienna-code search across the entire corpus</li>
+          <li><strong>Detail</strong> — every fact about one mark, including its procedural timeline and opposition window</li>
+          <li><strong>Compare</strong> — side-by-side conflict review for 2–3 marks</li>
+        </ul>
+
+        <div class="docs-callout">
+          <strong>Tip</strong>
+          The fastest way to understand the product is to set up a watchlist for one of your client's brands and let it run for a week. The Monday-morning digest is the moment Tradenet earns its keep.
+        </div>
+
+        <h2 class="docs-h2" id="how"><span class="docs-h2-num">02</span> How the four surfaces fit together</h2>
+        <p class="docs-p">
+          The product is built around one loop: <strong>watch → find → analyze → act</strong>. A watchlist saves a search. Each new gazette issue re-runs the search and surfaces matches on <strong>Today</strong>. You click into <strong>Detail</strong> to investigate, optionally pull two or three marks into <strong>Compare</strong> for a scorecard, then act — usually by filing opposition before the 5-month window closes.
+        </p>
+
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead>
+              <tr><th>Surface</th><th>What it answers</th><th>When you use it</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Today</td><td>What's new this week?</td><td>Monday morning, daily</td></tr>
+              <tr><td>Search</td><td>Is this name / image / class clear?</td><td>Pre-filing clearance</td></tr>
+              <tr><td>Detail</td><td>Everything about this mark</td><td>Conflict investigation</td></tr>
+              <tr><td>Compare</td><td>How conflicting are these?</td><td>Opposition decision memo</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 class="docs-h2" id="first-search"><span class="docs-h2-num">03</span> Your first search</h2>
+        <p class="docs-p">
+          The fastest way to see Tradenet in action: search for a brand you know, then save the search as a watchlist.
+        </p>
+        <ol style="padding-left: 22px; font-size: 14.5px; color: var(--ink-2); line-height: 1.8;">
+          <li>Click <strong>Search</strong> in the top nav (or press <kbd>⌘K</kbd>)</li>
+          <li>Switch to the <strong>Phonetic / fuzzy</strong> mode tab</li>
+          <li>Type <span class="mono">neur*</span> and pick Class 5 in the rail</li>
+          <li>Drag the similarity threshold up to ~75%</li>
+          <li>Click <strong>Save as watchlist</strong> in the active-filters bar</li>
+        </ol>
+        <p class="docs-p">
+          That's it. Every new gazette issue, Tradenet will run that exact query and surface matches on your Today screen.
+        </p>
+
+        <div class="docs-callout">
+          <strong>API equivalent</strong>
+          Every action you take in the UI maps 1:1 to a REST endpoint. The above is two API calls: <span class="mono">POST /v1/search</span> followed by <span class="mono">POST /v1/watchlists</span>. See the API reference for the full schema.
+        </div>
+
+        <pre class="docs-code"><span class="docs-code-lang">cURL</span><span class="c"># Create a watchlist from a phonetic search</span>
+curl <span class="s">"https://api.tradenet.vn/v1/watchlists"</span> \
+  -H <span class="s">"Authorization: Bearer </span><span class="p">$TRADENET_API_KEY</span><span class="s">"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{
+    "name": "NEUREX family",
+    "query": {
+      "mode": "phonetic",
+      "q": "neur*",
+      "classes": [5],
+      "threshold": 0.75
+    },
+    "matter": "CR-2024-118",
+    "alerts": ["email-weekly", "slack"]
+  }'</span></pre>
+
+        <h2 class="docs-h2" id="next"><span class="docs-h2-num">04</span> What to do next</h2>
+        <ul class="docs-list">
+          <li>Read <strong>Your first watchlist</strong> for the full setup walkthrough</li>
+          <li>Bookmark the <strong>Article 112 guide</strong> for opposition rules</li>
+          <li>Connect Slack so your team sees findings in real time</li>
+          <li>Enterprise admins: set up SSO and configure data residency</li>
+        </ul>
+
+        <div class="docs-footer">
+          <span style="font-size: 12px; color: var(--mute);">Was this helpful?</span>
+          <a href="#" class="docs-nav-btn next" data-doc-link="first-watchlist">
+            <span class="docs-nav-btn-label">Next →</span>
+            <span class="docs-nav-btn-title">Your first watchlist</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- DOC: First watchlist (shorter) -->
+      <article class="docs-doc" data-doc-content="first-watchlist" style="display:none">
+        <span class="docs-eyebrow">Getting started · 3 min read</span>
+        <h1 class="docs-h1">Your first watchlist</h1>
+        <p class="docs-lede">
+          Watchlists are saved queries that re-run automatically against every new gazette issue. Setting one up is the single highest-value action in Tradenet.
+        </p>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">01</span> Pick a brand to watch</h2>
+        <p class="docs-p">
+          Start with a brand you know well — usually one of your client's registered marks. The clearer you are about what conflicts <em>look like</em>, the easier it is to dial in the watchlist's sensitivity.
+        </p>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">02</span> Decide your match criteria</h2>
+        <p class="docs-p">
+          A watchlist combines four kinds of criteria: name (text or phonetic), image (upload a specimen), classes (Nice classification), and applicant filters. Most clearance watchlists use all four.
+        </p>
+
+        <div class="docs-callout">
+          <strong>Recommendation</strong>
+          Start broad and tighten. A watchlist that returns 12 false positives the first week is better than one that misses the real conflict on week three.
+        </div>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">03</span> Tune the similarity threshold</h2>
+        <p class="docs-p">
+          The threshold slider controls how aggressive the matcher is. For pharmaceutical brands (Class 5) we recommend starting at <strong>0.75</strong>; for retail (Class 35) you can go as low as <strong>0.60</strong> without drowning in noise.
+        </p>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">04</span> Set up alerts</h2>
+        <p class="docs-p">
+          Email digests are on by default. On Firm and Enterprise plans, connect Slack or Microsoft Teams so the whole matter team sees findings in the same place you're already working.
+        </p>
+
+        <div class="docs-footer">
+          <a href="#" class="docs-nav-btn" data-doc-link="getting-started">
+            <span class="docs-nav-btn-label">← Previous</span>
+            <span class="docs-nav-btn-title">Introduction</span>
+          </a>
+          <a href="#" class="docs-nav-btn next" data-doc-link="image-search">
+            <span class="docs-nav-btn-label">Next →</span>
+            <span class="docs-nav-btn-title">Image similarity</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- DOC: Image search -->
+      <article class="docs-doc" data-doc-content="image-search" style="display:none">
+        <span class="docs-eyebrow">Searching · 4 min read</span>
+        <h1 class="docs-h1">Image similarity search</h1>
+        <p class="docs-lede">
+          Image search is the fastest way to find visual lookalikes — including marks that read differently but look the same. It works on uploaded PNGs, JPGs, or PDFs.
+        </p>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">01</span> How it works</h2>
+        <p class="docs-p">
+          When you upload a specimen, three pipelines run in parallel: a <strong>perceptual hash</strong> for visual similarity, <strong>OCR</strong> to extract the wordmark text, and a <strong>Vienna code classifier</strong> for figurative elements. Results combine all three.
+        </p>
+
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Channel</th><th>What it catches</th><th>Weight (default)</th></tr></thead>
+            <tbody>
+              <tr><td>pHash</td><td>Visually identical / near-identical marks</td><td>40%</td></tr>
+              <tr><td>OCR</td><td>Marks that read the same word</td><td>35%</td></tr>
+              <tr><td>Vienna</td><td>Same figurative category (e.g. "stylized V")</td><td>25%</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">02</span> What to upload</h2>
+        <ul class="docs-list">
+          <li>The cleanest specimen you have — ideally the one you'd submit to Vietnam IP</li>
+          <li>PNG with transparent background works best for visual matching</li>
+          <li>For figurative-only marks (no text), the Vienna classifier carries more weight</li>
+          <li>For wordmarks, OCR-cleanness matters most — avoid stylized fonts when possible</li>
+        </ul>
+
+        <div class="docs-callout">
+          <strong>Pro tip</strong>
+          You can upload multiple specimens at once and Tradenet will treat them as a single query. Useful for marks with multiple registered variants (color, B&W, with/without tagline).
+        </div>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">03</span> Tuning weights</h2>
+        <p class="docs-p">
+          On the Firm plan and above, you can override the default weights per matter. Pharmaceutical clearance often weights phonetic and visual evenly. Logo conflicts for sports brands weight visual + Vienna heavily, with OCR near zero.
+        </p>
+
+        <div class="docs-footer">
+          <a href="#" class="docs-nav-btn" data-doc-link="first-watchlist">
+            <span class="docs-nav-btn-label">← Previous</span>
+            <span class="docs-nav-btn-title">Your first watchlist</span>
+          </a>
+          <a href="#" class="docs-nav-btn next" data-doc-link="api">
+            <span class="docs-nav-btn-label">Next →</span>
+            <span class="docs-nav-btn-title">REST API reference</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- DOC: API -->
+      <article class="docs-doc" data-doc-content="api" style="display:none">
+        <span class="docs-eyebrow">API · Enterprise only</span>
+        <h1 class="docs-h1">REST API reference</h1>
+        <p class="docs-lede">
+          Tradenet exposes every action in the UI as a REST endpoint. JSON in, JSON out, HTTP Bearer auth. Webhooks available for async events (watchlist hits, status changes).
+        </p>
+
+        <div class="docs-callout">
+          <strong>Base URL</strong>
+          <span class="mono" style="color: var(--ink);">https://api.tradenet.vn/v1</span>
+          <br/>All requests must include <span class="mono">Authorization: Bearer YOUR_TOKEN</span>. Tokens are issued in your Enterprise admin console.
+        </div>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">01</span> Authentication</h2>
+        <pre class="docs-code"><span class="docs-code-lang">cURL</span>curl <span class="s">"https://api.tradenet.vn/v1/me"</span> \
+  -H <span class="s">"Authorization: Bearer </span><span class="p">$TRADENET_API_KEY</span><span class="s">"</span></pre>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">02</span> Search</h2>
+        <p class="docs-p">
+          <span class="mono"><strong>POST</strong> /v1/search</span> — run a one-off search. Returns up to 200 results per call; paginate via the <span class="mono">cursor</span> field.
+        </p>
+        <pre class="docs-code"><span class="docs-code-lang">JSON</span><span class="k">POST</span> /v1/search
+{
+  <span class="s">"mode"</span>: <span class="s">"phonetic"</span>,
+  <span class="s">"q"</span>: <span class="s">"neur*"</span>,
+  <span class="s">"filters"</span>: {
+    <span class="s">"classes"</span>: [<span class="p">5</span>, <span class="p">10</span>],
+    <span class="s">"countries"</span>: [<span class="s">"VN"</span>, <span class="s">"SG"</span>],
+    <span class="s">"period"</span>: { <span class="s">"from"</span>: <span class="s">"2026-01-01"</span> }
+  },
+  <span class="s">"threshold"</span>: <span class="p">0.75</span>,
+  <span class="s">"sort"</span>: <span class="s">"similarity"</span>,
+  <span class="s">"limit"</span>: <span class="p">50</span>
+}</pre>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">03</span> Watchlists</h2>
+        <p class="docs-p">
+          <span class="mono"><strong>POST</strong> /v1/watchlists</span> creates a saved query that re-runs each gazette issue. Findings are delivered via webhook, email, or by polling the watchlist endpoint.
+        </p>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">04</span> Webhooks</h2>
+        <p class="docs-p">
+          Subscribe to events at <span class="mono">POST /v1/webhooks</span>. All webhook payloads are signed with HMAC-SHA256 — verify the <span class="mono">X-TM-Signature</span> header.
+        </p>
+
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Event</th><th>Triggered when</th></tr></thead>
+            <tbody>
+              <tr><td>watchlist.hit</td><td>A new mark matches a watchlist</td></tr>
+              <tr><td>opposition.window_closing</td><td>14 days before an opposition window closes</td></tr>
+              <tr><td>mark.status_changed</td><td>A tracked mark changes status</td></tr>
+              <tr><td>gazette.ingested</td><td>A new gazette issue is fully indexed</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">05</span> Rate limits</h2>
+        <ul class="docs-list">
+          <li><strong>Search:</strong> 100 requests/min · 10,000/day</li>
+          <li><strong>Watchlists:</strong> no rate limit on writes; reads paginated</li>
+          <li><strong>Webhook delivery:</strong> at-least-once, exponential backoff up to 24h</li>
+        </ul>
+
+        <div class="docs-footer">
+          <a href="#" class="docs-nav-btn" data-doc-link="image-search">
+            <span class="docs-nav-btn-label">← Previous</span>
+            <span class="docs-nav-btn-title">Image similarity</span>
+          </a>
+          <span></span>
+        </div>
+      </article>
+
+      <!-- DOC: Article 112 -->
+      <article class="docs-doc" data-doc-content="article-112" style="display:none">
+        <span class="docs-eyebrow">Reference · 6 min read</span>
+        <h1 class="docs-h1">Article 112 — Opposition rules in Vietnam</h1>
+        <p class="docs-lede">
+          A practical guide to opposition windows under Vietnamese IP law. Not legal advice — always confirm with qualified counsel, especially for Madrid-protocol designations and edge cases.
+        </p>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">01</span> The 5-month rule</h2>
+        <p class="docs-p">
+          Under Article 112 of the IP Law (as amended 2019, 2022), any third party may file opposition to a published application within <strong>five months from the publication date</strong>. The clock starts on the date the application appears in the gazette, not the application date.
+        </p>
+
+        <div class="docs-callout">
+          <strong>Important</strong>
+          The 5-month window is calendar months, not 150 days. February publications get a slightly shorter window than July ones.
+        </div>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">02</span> What you can oppose on</h2>
+        <ul class="docs-list">
+          <li>Identity or confusing similarity with an earlier registered or applied-for mark</li>
+          <li>Bad faith (especially common with well-known foreign marks)</li>
+          <li>Descriptive or generic content</li>
+          <li>Conflict with a geographical indication</li>
+          <li>Misleading character (origin, quality, nature of goods)</li>
+        </ul>
+
+        <h2 class="docs-h2"><span class="docs-h2-num">03</span> Filing logistics</h2>
+        <p class="docs-p">
+          Oppositions are filed with Vietnam IP, usually through an authorized IP agent. Filing fees are modest (VND 550,000–2,200,000 depending on classes), but the substantive workload — gathering prior-rights evidence, drafting the opposition brief — is where the cost lives.
+        </p>
+
+        <div class="docs-callout">
+          <strong>After the window closes</strong>
+          If you miss the 5-month opposition window, your only recourse is invalidation proceedings — slower (typically 18–36 months), more expensive, and with a higher evidentiary bar. The opposition window is genuinely your best shot.
+        </div>
+
+        <div class="docs-footer">
+          <a href="#" class="docs-nav-btn" data-doc-link="getting-started">
+            <span class="docs-nav-btn-label">← Back to intro</span>
+            <span class="docs-nav-btn-title">Introduction</span>
+          </a>
+          <span></span>
+        </div>
+      </article>
+
+      <!-- DOC: Vienna 5.1 codes -->
+      <article class="docs-doc" data-doc-content="vienna-ref" style="display:none">
+        <span class="docs-eyebrow">Reference · Vienna 5.1</span>
+        <h1 class="docs-h1">Vienna classification — figurative codes</h1>
+        <p class="docs-lede">
+          The Vienna Classification is the international standard for classifying the figurative elements of trademarks. Tradenet supports search by Vienna code and auto-classifies uploaded images against the current 5.1 edition.
+        </p>
+
+        <div class="docs-toc">
+          <div class="docs-toc-label">On this page</div>
+          <ol>
+            <li><a href="#v-what">What Vienna codes are</a></li>
+            <li><a href="#v-format">Reading the code format</a></li>
+            <li><a href="#v-search">Searching by Vienna code</a></li>
+            <li><a href="#v-cats">Category reference (1–29)</a></li>
+          </ol>
+        </div>
+
+        <h2 class="docs-h2" id="v-what"><span class="docs-h2-num">01</span> What Vienna codes are</h2>
+        <p class="docs-p">
+          Vienna codes classify the <strong>figurative content</strong> of a mark — what you see in it, not what it spells. A logo containing a stylized "V" and a circle gets coded against two categories simultaneously. The same mark might carry 5–15 codes in a thorough classification.
+        </p>
+        <p class="docs-p">
+          The classification is maintained by WIPO and revised every few years. Tradenet uses <strong>Vienna 5.1</strong> (2023 revision). Older marks classified under 4.x or 3.x are auto-mapped where the categories are equivalent; flagged for review where they aren't.
+        </p>
+
+        <h2 class="docs-h2" id="v-format"><span class="docs-h2-num">02</span> Reading the code format</h2>
+        <p class="docs-p">
+          Codes are three-level and dotted: <span class="mono">CC.DD.SS</span> — Category, Division, Section. For example, <span class="mono">26.04.04</span> means category 26 (geometric figures), division 04 (quadrilaterals), section 04 (rectangles).
+        </p>
+
+        <div class="docs-callout">
+          <strong>Auxiliary codes</strong>
+          A leading <span class="mono">A</span> on the last digit (e.g. <span class="mono">26.04.04 A.1</span>) is an auxiliary code — finer-grained sub-classification that's optional but improves recall in image search.
+        </div>
+
+        <h2 class="docs-h2" id="v-search"><span class="docs-h2-num">03</span> Searching by Vienna code</h2>
+        <p class="docs-p">
+          On the Search page, switch to the <strong>Vienna code</strong> mode tab. You can search by a single full code, a partial code (e.g. <span class="mono">26.04</span> matches everything under category 26 / division 04), or a combination with boolean operators.
+        </p>
+        <pre class="docs-code"><span class="docs-code-lang">DSL</span><span class="c"># Find all marks combining a stylized V with a circle</span>
+27.05.21 AND 26.01.03
+
+<span class="c"># All animals (category 3) except common breeds</span>
+3.* NOT 3.04.01
+
+<span class="c"># Geometric containers (typeface-agnostic)</span>
+24.17.* OR 26.04.*</pre>
+
+        <h2 class="docs-h2" id="v-cats"><span class="docs-h2-num">04</span> Category reference</h2>
+        <p class="docs-p">
+          The 29 top-level categories. Each links to the WIPO official definition.
+        </p>
+
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Cat.</th><th>Subject</th><th>Common examples</th></tr></thead>
+            <tbody>
+              <tr><td>01</td><td>Celestial bodies, natural phenomena</td><td>Stars, moons, lightning, rainbows</td></tr>
+              <tr><td>02</td><td>Human beings</td><td>Heads, hands, silhouettes, figures</td></tr>
+              <tr><td>03</td><td>Animals</td><td>Mammals, birds, fish, insects</td></tr>
+              <tr><td>04</td><td>Supernatural, fabulous beings</td><td>Dragons, angels, mythical creatures</td></tr>
+              <tr><td>05</td><td>Plants</td><td>Trees, leaves, flowers, grain</td></tr>
+              <tr><td>06</td><td>Landscapes</td><td>Mountains, water, scenery</td></tr>
+              <tr><td>07</td><td>Constructions, structures, maps</td><td>Buildings, bridges, towers, maps</td></tr>
+              <tr><td>08</td><td>Foodstuffs</td><td>Bread, dairy, prepared meals</td></tr>
+              <tr><td>09</td><td>Textiles, clothing</td><td>Garments, footwear, headwear</td></tr>
+              <tr><td>10</td><td>Tobacco, smokers' articles, matches</td><td>Cigarettes, pipes, lighters</td></tr>
+              <tr><td>11</td><td>Household utensils</td><td>Cutlery, glassware, kitchenware</td></tr>
+              <tr><td>12</td><td>Furniture, sanitary installations</td><td>Chairs, tables, plumbing fixtures</td></tr>
+              <tr><td>13</td><td>Lighting, heating, cooking</td><td>Lamps, stoves, radiators</td></tr>
+              <tr><td>14</td><td>Hardware, tools, ladders</td><td>Nails, hammers, fasteners</td></tr>
+              <tr><td>15</td><td>Machinery, motors, engines</td><td>Gears, turbines, mechanical parts</td></tr>
+              <tr><td>16</td><td>Telecommunications, recording</td><td>Antennas, microphones, screens</td></tr>
+              <tr><td>17</td><td>Horological, jewelry, weights</td><td>Clocks, watches, gems, scales</td></tr>
+              <tr><td>18</td><td>Transport, anchors, signaling</td><td>Cars, ships, planes, road signs</td></tr>
+              <tr><td>19</td><td>Containers, packaging</td><td>Bottles, boxes, bags, jars</td></tr>
+              <tr><td>20</td><td>Writing materials, books</td><td>Pens, paper, scrolls, libraries</td></tr>
+              <tr><td>21</td><td>Games, toys, sporting articles</td><td>Cards, dice, equipment, mascots</td></tr>
+              <tr><td>22</td><td>Musical instruments &amp; accessories</td><td>Strings, percussion, brass</td></tr>
+              <tr><td>23</td><td>Arms, ammunition, armor</td><td>Swords, shields, firearms</td></tr>
+              <tr><td>24</td><td>Heraldry, coins, emblems, symbols</td><td>Crests, crowns, flags, badges</td></tr>
+              <tr><td>25</td><td>Ornamental motifs, surfaces, frames</td><td>Patterns, borders, decorations</td></tr>
+              <tr><td>26</td><td>Geometric figures &amp; solids</td><td>Circles, squares, triangles, polygons</td></tr>
+              <tr><td>27</td><td>Forms of writing, numerals</td><td>Letters, numbers, typographic styling</td></tr>
+              <tr><td>28</td><td>Inscriptions in non-Latin alphabets</td><td>Chinese, Arabic, Cyrillic, Vietnamese diacritics</td></tr>
+              <tr><td>29</td><td>Colors</td><td>Color claims, multi-color schemes</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="docs-callout">
+          <strong>Auto-classification</strong>
+          When you upload a specimen, our classifier emits Vienna codes automatically. Accuracy is 87.6% against gold-standard human classification. Enterprise customers can override and persist corrections back to the trained model.
+        </div>
+
+        <div class="docs-footer">
+          <a href="#" class="docs-nav-btn" data-doc-link="api">
+            <span class="docs-nav-btn-label">← Previous</span>
+            <span class="docs-nav-btn-title">REST API reference</span>
+          </a>
+          <a href="#" class="docs-nav-btn next" data-doc-link="nice-ref">
+            <span class="docs-nav-btn-label">Next →</span>
+            <span class="docs-nav-btn-title">Nice classification</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- DOC: Nice classification -->
+      <article class="docs-doc" data-doc-content="nice-ref" style="display:none">
+        <span class="docs-eyebrow">Reference · Nice 12-2026</span>
+        <h1 class="docs-h1">Nice classification — goods &amp; services</h1>
+        <p class="docs-lede">
+          The Nice Classification is a 45-class system describing the goods and services a trademark covers. A mark registered for "Class 5" (pharmaceuticals) gives you no protection in "Class 30" (foodstuffs) — even for the same wordmark. Getting the class right is the single most common conflict pivot.
+        </p>
+
+        <div class="docs-toc">
+          <div class="docs-toc-label">On this page</div>
+          <ol>
+            <li><a href="#n-overview">The 45-class split</a></li>
+            <li><a href="#n-common">Commonly confused classes</a></li>
+            <li><a href="#n-search">Searching across classes</a></li>
+            <li><a href="#n-goods">Goods reference (1–34)</a></li>
+            <li><a href="#n-services">Services reference (35–45)</a></li>
+          </ol>
+        </div>
+
+        <h2 class="docs-h2" id="n-overview"><span class="docs-h2-num">01</span> The 45-class split</h2>
+        <p class="docs-p">
+          Classes 1–34 cover <strong>goods</strong> (tangible products). Classes 35–45 cover <strong>services</strong>. The split matters because conflict analysis usually starts with: are these marks in the same or related classes? A pharmaceutical (Class 5) and a restaurant (Class 43) sharing the same name rarely conflict; two food brands in Class 30 almost always do.
+        </p>
+
+        <h2 class="docs-h2" id="n-common"><span class="docs-h2-num">02</span> Commonly confused classes</h2>
+        <p class="docs-p">
+          Three pairs that trip up filers and create avoidable opposition windows:
+        </p>
+        <ul class="docs-list">
+          <li><strong>Class 35 (Retail services) vs. the class of the goods sold.</strong> A clothing brand selling its own line files in Class 25 (the clothes). A department store selling many brands' clothes files in Class 35.</li>
+          <li><strong>Class 9 (Software) vs. Class 42 (SaaS / cloud).</strong> Downloaded apps go in Class 9. Hosted, browser-delivered services go in Class 42. Many filings need both.</li>
+          <li><strong>Class 5 (Pharmaceuticals) vs. Class 44 (Medical services).</strong> A drug is a Class 5 good. A clinic that prescribes it is a Class 44 service. Often filed together for healthcare brands.</li>
+        </ul>
+
+        <div class="docs-callout">
+          <strong>Cross-class conflict</strong>
+          Vietnamese examiners sometimes find conflict across "related classes" even without direct overlap — e.g. Class 32 (beverages) and Class 33 (alcoholic beverages). Tradenet surfaces these via the semantic-similarity channel in the conflict scorecard.
+        </div>
+
+        <h2 class="docs-h2" id="n-search"><span class="docs-h2-num">03</span> Searching across classes</h2>
+        <p class="docs-p">
+          In the search rail, the Nice classes group has an <strong>ANY / ALL</strong> toggle. Default is ANY — match marks covering any selected class. Switch to ALL when you need marks that cover the full set (e.g. food brands that cover Classes 29, 30, <em>and</em> 32 together).
+        </p>
+
+        <h2 class="docs-h2" id="n-goods"><span class="docs-h2-num">04</span> Goods reference (Classes 1–34)</h2>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Class</th><th>Heading</th><th>Typical contents</th></tr></thead>
+            <tbody>
+              <tr><td>01</td><td>Chemicals</td><td>Industrial chemicals, fertilizers, unprocessed plastics</td></tr>
+              <tr><td>02</td><td>Paints</td><td>Coatings, dyes, pigments, anti-corrosion</td></tr>
+              <tr><td>03</td><td>Cosmetics &amp; cleaning</td><td>Soap, perfume, toothpaste, detergents</td></tr>
+              <tr><td>04</td><td>Lubricants &amp; fuels</td><td>Oils, greases, candles, fuels</td></tr>
+              <tr><td>05</td><td>Pharmaceuticals</td><td>Medicines, vitamins, supplements, dental preps</td></tr>
+              <tr><td>06</td><td>Metal goods</td><td>Common metals, hardware, pipes (non-electric)</td></tr>
+              <tr><td>07</td><td>Machinery</td><td>Industrial machines, motors, robots</td></tr>
+              <tr><td>08</td><td>Hand tools</td><td>Cutlery, manual tools, razors</td></tr>
+              <tr><td>09</td><td>Software &amp; electronics</td><td>Phones, software (downloaded), batteries, optics</td></tr>
+              <tr><td>10</td><td>Medical apparatus</td><td>Surgical instruments, prosthetics, medical devices</td></tr>
+              <tr><td>11</td><td>Lighting, heating, cooking</td><td>Lamps, HVAC, appliances, water filters</td></tr>
+              <tr><td>12</td><td>Vehicles</td><td>Cars, motorcycles, bicycles, parts</td></tr>
+              <tr><td>13</td><td>Firearms</td><td>Weapons, ammunition, explosives</td></tr>
+              <tr><td>14</td><td>Jewelry &amp; horology</td><td>Precious metals, watches, jewelry</td></tr>
+              <tr><td>15</td><td>Musical instruments</td><td>Instruments, music stands, cases</td></tr>
+              <tr><td>16</td><td>Paper &amp; printed matter</td><td>Books, stationery, art supplies, packaging paper</td></tr>
+              <tr><td>17</td><td>Rubber &amp; plastics</td><td>Insulating materials, semi-processed plastics, hoses</td></tr>
+              <tr><td>18</td><td>Leather goods</td><td>Bags, luggage, leather, umbrellas</td></tr>
+              <tr><td>19</td><td>Building materials</td><td>Non-metallic: stone, timber, mortar, glass</td></tr>
+              <tr><td>20</td><td>Furniture</td><td>Beds, tables, mirrors, picture frames</td></tr>
+              <tr><td>21</td><td>Household utensils</td><td>Kitchenware, glassware, cleaning tools</td></tr>
+              <tr><td>22</td><td>Ropes &amp; textiles (raw)</td><td>Tents, sails, raw fibers, padding</td></tr>
+              <tr><td>23</td><td>Yarns &amp; threads</td><td>Textile yarns, threads, embroidery</td></tr>
+              <tr><td>24</td><td>Textiles (finished)</td><td>Bed linen, towels, curtains, fabric</td></tr>
+              <tr><td>25</td><td>Clothing</td><td>Apparel, footwear, headwear</td></tr>
+              <tr><td>26</td><td>Lace &amp; trimmings</td><td>Buttons, zippers, ribbons, hair accessories</td></tr>
+              <tr><td>27</td><td>Carpets &amp; floor coverings</td><td>Rugs, mats, wallpaper, linoleum</td></tr>
+              <tr><td>28</td><td>Games &amp; sporting goods</td><td>Toys, games, sports equipment, fishing gear</td></tr>
+              <tr><td>29</td><td>Meat, dairy, processed food</td><td>Meat, fish, dairy, oils, preserves</td></tr>
+              <tr><td>30</td><td>Coffee, tea, foodstuffs</td><td>Coffee, tea, sugar, rice, bread, condiments, instant noodles</td></tr>
+              <tr><td>31</td><td>Agriculture &amp; live animals</td><td>Raw produce, seeds, live plants &amp; animals</td></tr>
+              <tr><td>32</td><td>Beverages (non-alcoholic)</td><td>Beer, soft drinks, mineral water, juices</td></tr>
+              <tr><td>33</td><td>Alcoholic beverages</td><td>Wine, spirits, liqueurs (excluding beer)</td></tr>
+              <tr><td>34</td><td>Tobacco &amp; smokers' articles</td><td>Cigarettes, vapes, matches, lighters</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 class="docs-h2" id="n-services"><span class="docs-h2-num">05</span> Services reference (Classes 35–45)</h2>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Class</th><th>Heading</th><th>Typical contents</th></tr></thead>
+            <tbody>
+              <tr><td>35</td><td>Advertising &amp; retail</td><td>Marketing, retail services, business consulting, HR</td></tr>
+              <tr><td>36</td><td>Insurance &amp; finance</td><td>Banking, insurance, real estate, payment processing</td></tr>
+              <tr><td>37</td><td>Construction &amp; repair</td><td>Building, installation, vehicle repair, cleaning</td></tr>
+              <tr><td>38</td><td>Telecommunications</td><td>Mobile services, streaming, internet access, messaging</td></tr>
+              <tr><td>39</td><td>Transport &amp; logistics</td><td>Shipping, travel agencies, warehousing, distribution</td></tr>
+              <tr><td>40</td><td>Material treatment</td><td>Manufacturing, recycling, printing, food preservation</td></tr>
+              <tr><td>41</td><td>Education &amp; entertainment</td><td>Training, publishing, sports, music, online content</td></tr>
+              <tr><td>42</td><td>Scientific &amp; technology</td><td>R&amp;D, SaaS, cloud computing, design, IT consulting</td></tr>
+              <tr><td>43</td><td>Food, drink, accommodation</td><td>Restaurants, cafés, hotels, catering</td></tr>
+              <tr><td>44</td><td>Medical &amp; agriculture services</td><td>Clinics, pharmacies, vets, beauty salons, landscaping</td></tr>
+              <tr><td>45</td><td>Legal &amp; personal services</td><td>Law firms, security, dating, social services</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="docs-footer">
+          <a href="#" class="docs-nav-btn" data-doc-link="vienna-ref">
+            <span class="docs-nav-btn-label">← Previous</span>
+            <span class="docs-nav-btn-title">Vienna codes</span>
+          </a>
+          <a href="#" class="docs-nav-btn next" data-doc-link="glossary">
+            <span class="docs-nav-btn-label">Next →</span>
+            <span class="docs-nav-btn-title">Vietnam IP glossary</span>
+          </a>
+        </div>
+      </article>
+
+      <!-- DOC: Vietnam IP glossary -->
+      <article class="docs-doc" data-doc-content="glossary" style="display:none">
+        <span class="docs-eyebrow">Reference · Glossary</span>
+        <h1 class="docs-h1">Vietnam IP glossary &amp; INID codes</h1>
+        <p class="docs-lede">
+          The vocabulary of the Vietnamese trademark system — Vietnamese terminology, Vietnam IP's specific conventions, and the WIPO INID numerical field codes that appear in every gazette entry. Bookmark this page.
+        </p>
+
+        <div class="docs-toc">
+          <div class="docs-toc-label">On this page</div>
+          <ol>
+            <li><a href="#g-vn">Vietnamese terms</a></li>
+            <li><a href="#g-issues">Gazette issue conventions</a></li>
+            <li><a href="#g-inid">WIPO INID codes</a></li>
+            <li><a href="#g-international">International instruments</a></li>
+          </ol>
+        </div>
+
+        <h2 class="docs-h2" id="g-vn"><span class="docs-h2-num">01</span> Vietnamese terms</h2>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Term</th><th>English</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td>Cục Sở hữu trí tuệ</td><td>Intellectual Property Office of Vietnam</td><td>The IP office, now branded <strong>Vietnam IP</strong> (formerly <strong>NOIP</strong> until the 2024 reorganization). Based in Hà Nội.</td></tr>
+              <tr><td>Nhãn hiệu</td><td>Trademark</td><td>Generic term for any registered or applied-for mark.</td></tr>
+              <tr><td>Đơn đăng ký</td><td>Application</td><td>A pending mark not yet registered. Section A of the gazette.</td></tr>
+              <tr><td>Văn bằng bảo hộ</td><td>Certificate of protection</td><td>The grant document. Issued after successful examination + no opposition.</td></tr>
+              <tr><td>Phản đối</td><td>Opposition</td><td>Third-party challenge filed within the 5-month window.</td></tr>
+              <tr><td>Huỷ bỏ hiệu lực</td><td>Invalidation</td><td>Post-grant challenge. Slower and more expensive than opposition.</td></tr>
+              <tr><td>Người nộp đơn</td><td>Applicant</td><td>The party seeking registration.</td></tr>
+              <tr><td>Đại diện sở hữu công nghiệp</td><td>IP agent</td><td>Authorized representative. Often a law firm.</td></tr>
+              <tr><td>Phân loại Nice</td><td>Nice classification</td><td>The 45-class goods/services system.</td></tr>
+              <tr><td>Phân loại Vienna</td><td>Vienna classification</td><td>The figurative-element classification system.</td></tr>
+              <tr><td>Gia hạn</td><td>Renewal</td><td>Marks are renewable indefinitely in 10-year increments.</td></tr>
+              <tr><td>Bị từ chối</td><td>Refused</td><td>Status after substantive examination rejects the mark.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 class="docs-h2" id="g-issues"><span class="docs-h2-num">02</span> Gazette issue conventions</h2>
+        <p class="docs-p">
+          Vietnam IP publishes a weekly bulletin in two parallel streams. Filenames follow a strict convention: <span class="mono">{SECTION}_{ISSUE}_{YEAR}.pdf</span>.
+        </p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Code</th><th>Meaning</th><th>Example</th></tr></thead>
+            <tbody>
+              <tr><td>A</td><td>Section A · Published applications (opens opposition windows)</td><td>A_T2_2026.pdf</td></tr>
+              <tr><td>B</td><td>Section B · Granted registrations (post-opposition)</td><td>B_T4_2026.pdf</td></tr>
+              <tr><td>T1</td><td>First weekly issue of the month</td><td>—</td></tr>
+              <tr><td>T2</td><td>Second weekly issue of the month</td><td>—</td></tr>
+              <tr><td>T3</td><td>Third weekly issue of the month</td><td>—</td></tr>
+              <tr><td>T4</td><td>Fourth weekly issue of the month</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="docs-callout">
+          <strong>Application numbers</strong>
+          Vietnamese app numbers follow <span class="mono">4-YYYY-NNNNN</span>. The leading "4" is the IP-right type (4 = trademark). Certificate numbers (granted marks) follow <span class="mono">4-NNNNNNN</span> with no year.
+        </div>
+
+        <h2 class="docs-h2" id="g-inid"><span class="docs-h2-num">03</span> WIPO INID codes</h2>
+        <p class="docs-p">
+          INID = <em>Internationally agreed Numbers for the Identification of bibliographic Data</em>. Every field in a gazette entry is tagged with a numerical code so the entry can be parsed without knowing the publication's language. Tradenet extracts these directly.
+        </p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>INID</th><th>Field</th><th>What it contains</th></tr></thead>
+            <tbody>
+              <tr><td>(111)</td><td>Registration number</td><td>The certificate № once granted</td></tr>
+              <tr><td>(151)</td><td>Date of registration</td><td>Effective date of protection</td></tr>
+              <tr><td>(181)</td><td>Expected expiration</td><td>10 years from registration</td></tr>
+              <tr><td>(210)</td><td>Application number</td><td>Pre-grant identifier</td></tr>
+              <tr><td>(220)</td><td>Filing date</td><td>Date application was filed</td></tr>
+              <tr><td>(310)</td><td>Priority application №</td><td>For Paris Convention priority claims</td></tr>
+              <tr><td>(320)</td><td>Priority date</td><td>Earliest priority date claimed</td></tr>
+              <tr><td>(330)</td><td>Priority country</td><td>Where priority application was filed</td></tr>
+              <tr><td>(442)</td><td>Publication date · Section A</td><td>Opposition window starts here</td></tr>
+              <tr><td>(450)</td><td>Publication date · Section B</td><td>Registration announced</td></tr>
+              <tr><td>(511)</td><td>Nice classes</td><td>Goods/services classes covered</td></tr>
+              <tr><td>(526)</td><td>Disclaimers</td><td>Non-exclusive elements within the mark</td></tr>
+              <tr><td>(531)</td><td>Vienna codes</td><td>Figurative element classification</td></tr>
+              <tr><td>(540)</td><td>Reproduction of mark</td><td>The specimen image / wordmark</td></tr>
+              <tr><td>(550)</td><td>Mark type</td><td>Wordmark, figurative, 3D, color, sound, etc.</td></tr>
+              <tr><td>(551)</td><td>Collective mark indication</td><td>True if a collective or certification mark</td></tr>
+              <tr><td>(554)</td><td>Three-dimensional mark</td><td>Flag for 3D marks</td></tr>
+              <tr><td>(561)</td><td>Transliteration</td><td>For non-Latin marks</td></tr>
+              <tr><td>(566)</td><td>Translation</td><td>For non-Latin marks</td></tr>
+              <tr><td>(571)</td><td>Mark description</td><td>Verbal description of figurative elements</td></tr>
+              <tr><td>(591)</td><td>Color claim</td><td>Specific colors claimed as part of the mark</td></tr>
+              <tr><td>(730)</td><td>Applicant / owner</td><td>Name and address of the holder</td></tr>
+              <tr><td>(740)</td><td>Authorized representative</td><td>The IP agent of record</td></tr>
+              <tr><td>(750)</td><td>Address for correspondence</td><td>Where Vietnam IP sends notices</td></tr>
+              <tr><td>(811)</td><td>Designating Contracting Party</td><td>For Madrid Protocol designations</td></tr>
+              <tr><td>(891)</td><td>Madrid subsequent designation date</td><td>Vietnam-designation date for international registrations</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 class="docs-h2" id="g-international"><span class="docs-h2-num">04</span> International instruments</h2>
+        <p class="docs-p">
+          Vietnam is a member of several international IP treaties that affect how marks are filed and protected.
+        </p>
+        <div class="docs-table-wrap">
+          <table class="docs-table">
+            <thead><tr><th>Instrument</th><th>What it does</th><th>Vietnam joined</th></tr></thead>
+            <tbody>
+              <tr><td>Paris Convention</td><td>6-month priority claim from first foreign filing</td><td>1949</td></tr>
+              <tr><td>Madrid Agreement</td><td>Centralized international registration via WIPO</td><td>1949</td></tr>
+              <tr><td>Madrid Protocol</td><td>More flexible companion treaty to the Agreement</td><td>2006</td></tr>
+              <tr><td>Nice Agreement</td><td>The 45-class goods/services system</td><td>2007</td></tr>
+              <tr><td>Vienna Agreement</td><td>The figurative classification system</td><td>2007</td></tr>
+              <tr><td>TRIPS (WTO)</td><td>Minimum IP standards for WTO members</td><td>2007</td></tr>
+              <tr><td>Hague Agreement</td><td>International registration of industrial designs</td><td>2019</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="docs-callout">
+          <strong>Article 112</strong>
+          The opposition provision of Vietnam's IP Law (Luật Sở hữu trí tuệ). Sets the 5-month window from publication and the grounds on which opposition may be filed. See the <a href="#" data-doc-link="article-112" style="color: var(--stamp);">Article 112 guide</a> for the practitioner's view.
+        </div>
+
+        <div class="docs-footer">
+          <a href="#" class="docs-nav-btn" data-doc-link="nice-ref">
+            <span class="docs-nav-btn-label">← Previous</span>
+            <span class="docs-nav-btn-title">Nice classification</span>
+          </a>
+          <span></span>
+        </div>
+      </article>
+
+      <!-- Fallback for docs not yet written -->
+      <article class="docs-doc" data-doc-content="placeholder" style="display:none">
+        <span class="docs-eyebrow">Documentation</span>
+        <h1 class="docs-h1">Coming soon</h1>
+        <p class="docs-lede">
+          This page is being written. In the meantime, the Introduction and Getting Started guides cover most of what you need to start using Tradenet productively.
+        </p>
+        <div class="docs-callout">
+          <strong>Need help now?</strong>
+          Email <a href="mailto:support@tradenet.vn" style="color: var(--stamp);">support@tradenet.vn</a> — we typically respond within 2 hours during business hours (GMT+7).
+        </div>
+        <a href="#" class="docs-nav-btn" data-doc-link="getting-started" style="display: inline-flex; margin-top: 16px;">
+          <span class="docs-nav-btn-label">← Back</span>
+          <span class="docs-nav-btn-title">Introduction</span>
+        </a>
+      </article>
+
+    </main>
+  </div>
+</section>
+
+<section class="view" data-view="login" data-screen-label="Login">
+  <div class="login">
+    <!-- Left brand pane -->
+    <aside class="login-left">
+      <div class="login-left-bg"></div>
+      <div class="login-left-content">
+        <a href="#/" class="login-brand" data-view-link="landing">
+          <span class="mk-brand-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 4 H19 V8 L12 9.5 L5 8 Z" fill="white" opacity="0.95"/><path d="M11 9 H13 V20 H11 Z" fill="white" opacity="0.95"/></svg></span>
+          <span class="mk-brand-name">Tradenet<span class="mk-brand-tld">.vn</span></span>
+        </a>
+
+        <div class="login-stamp-mosaic">
+          <div class="login-stamp-cell"><svg viewBox="0 0 100 60"><text x="50" y="30" text-anchor="middle" dominant-baseline="central" font-family="Be Vietnam Pro,sans-serif" font-weight="800" font-size="18" fill="var(--ink)">NEUREX</text></svg></div>
+          <div class="login-stamp-cell accent"><svg viewBox="0 0 100 60"><text x="50" y="30" text-anchor="middle" dominant-baseline="central" font-family="Source Serif 4,serif" font-weight="600" font-size="18" fill="var(--stamp)">VEXIS</text></svg></div>
+          <div class="login-stamp-cell"><svg viewBox="0 0 100 60"><path d="M30 12 L50 48 L70 12" fill="none" stroke="var(--ink)" stroke-width="6" stroke-linejoin="miter"/></svg></div>
+          <div class="login-stamp-cell"><svg viewBox="0 0 100 60"><text x="50" y="30" text-anchor="middle" dominant-baseline="central" font-family="Source Serif 4,serif" font-weight="500" font-style="italic" font-size="20" fill="var(--ink)">Masan</text></svg></div>
+          <div class="login-stamp-cell"><svg viewBox="0 0 100 60"><circle cx="50" cy="30" r="20" fill="none" stroke="var(--stamp)" stroke-width="2.5"/><text x="50" y="30" text-anchor="middle" dominant-baseline="central" font-family="Be Vietnam Pro,sans-serif" font-weight="800" font-size="16" fill="var(--stamp)">VX</text></svg></div>
+          <div class="login-stamp-cell"><svg viewBox="0 0 100 60"><text x="50" y="30" text-anchor="middle" dominant-baseline="central" font-family="Be Vietnam Pro,sans-serif" font-weight="700" font-size="14" letter-spacing="2" fill="var(--ink)">VEXARIS</text></svg></div>
+          <div class="login-stamp-cell accent"><svg viewBox="0 0 100 60"><text x="50" y="30" text-anchor="middle" dominant-baseline="central" font-family="Be Vietnam Pro,sans-serif" font-weight="800" font-size="14" fill="var(--stamp)">NUROFEN+</text></svg></div>
+          <div class="login-stamp-cell"><svg viewBox="0 0 100 60"><text x="50" y="30" text-anchor="middle" dominant-baseline="central" font-family="Be Vietnam Pro,sans-serif" font-weight="800" font-size="14" fill="var(--ink)">ZENPHARM</text></svg></div>
+          <div class="login-stamp-cell"><svg viewBox="0 0 100 60"><text x="50" y="30" text-anchor="middle" dominant-baseline="central" font-family="Source Serif 4,serif" font-weight="600" font-size="16" fill="var(--ink)">BIVAXIS</text></svg></div>
+        </div>
+      </div>
+
+      <div class="login-quote">
+        <span class="login-quote-mark">"</span>
+        <p class="login-quote-text">
+          We used to read the gazette PDF cover to cover every Friday. Tradenet caught a NEUROFAX filing we would have missed entirely — we filed opposition with eleven days to spare.
+        </p>
+        <p class="login-quote-author"><strong>Nguyễn Thị Lan</strong> · Senior Associate, Trần &amp; Partners IP</p>
+      </div>
+    </aside>
+
+    <!-- Right form pane -->
+    <div class="login-right">
+      <a href="#/" class="login-back" data-view-link="landing">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back
+      </a>
+      <div class="login-form">
+        <a href="#/" class="login-mobile-brand" data-view-link="landing">
+          <span class="mk-brand-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 4 H19 V8 L12 9.5 L5 8 Z" fill="white" opacity="0.95"/><path d="M11 9 H13 V20 H11 Z" fill="white" opacity="0.95"/></svg></span>
+          <span class="mk-brand-name">Tradenet<span class="mk-brand-tld">.vn</span></span>
+        </a>
+        <h1 class="login-h1">Welcome back.</h1>
+        <p class="login-sub">Sign in to your firm's Tradenet workspace.</p>
+
+        <button class="sso-btn" type="button">
+          <svg class="sso-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.5 12.27c0-.79-.07-1.54-.2-2.27H12v4.51h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.32z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Continue with Google Workspace
+          <span class="sso-hint">SSO</span>
+        </button>
+        <button class="sso-btn" type="button">
+          <svg class="sso-icon" viewBox="0 0 24 24"><rect width="10" height="10" x="1" y="1" fill="#F25022"/><rect width="10" height="10" x="13" y="1" fill="#7FBA00"/><rect width="10" height="10" x="1" y="13" fill="#00A4EF"/><rect width="10" height="10" x="13" y="13" fill="#FFB900"/></svg>
+          Continue with Microsoft 365
+          <span class="sso-hint">SSO</span>
+        </button>
+
+        <div class="login-divider">or</div>
+
+        <form onsubmit="event.preventDefault(); alert('Magic link sent to ' + this.email.value);">
+          <div class="login-field">
+            <label for="login-email">Work email</label>
+            <input type="email" id="login-email" name="email" placeholder="lan.nguyen@tranpartners.vn" autocomplete="email" required/>
+          </div>
+          <p class="login-magic">We'll email you a one-time sign-in link. <a href="#" onclick="event.preventDefault()">Use password instead</a></p>
+          <button type="submit" class="btn btn-primary btn-lg login-cta">Email me a sign-in link</button>
+        </form>
+
+        <p class="login-foot">
+          Don't have an account? <a href="#" onclick="event.preventDefault()">Start your 14-day trial →</a>
+        </p>
+
+        <div class="login-trust">
+          <span class="login-trust-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            SOC 2 Type II
+          </span>
+          <span class="login-trust-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            GDPR
+          </span>
+          <span class="login-trust-item">
+            VN Data Residency
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============================================================
+     FOOTER (hidden on login)
+     ============================================================ -->
+<footer class="mk-footer" id="footer">
+  <div class="container">
+    <div class="mk-footer-grid">
+      <div class="mk-footer-col">
+        <a href="#/" class="mk-brand" data-view-link="landing"><span class="mk-brand-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 4 H19 V8 L12 9.5 L5 8 Z" fill="white" opacity="0.95"/><path d="M11 9 H13 V20 H11 Z" fill="white" opacity="0.95"/></svg></span><span class="mk-brand-name">Tradenet<span class="mk-brand-tld">.vn</span></span></a>
+        <p class="mk-footer-tag">Vietnamese trademark gazette intelligence for IP professionals.</p>
+      </div>
+      <div class="mk-footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#" data-view-link="pricing">Pricing</a></li>
+          <li><a href="#" data-view-link="coverage">Coverage</a></li>
+          <li><a href="#">Changelog</a></li>
+          <li><a href="#" data-view-link="docs">API</a></li>
+        </ul>
+      </div>
+      <div class="mk-footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="#">About</a></li>
+          <li><a href="#">Customers</a></li>
+          <li><a href="#">Careers</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+      <div class="mk-footer-col">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="#" data-view-link="docs">Documentation</a></li>
+          <li><a href="#" data-view-link="docs">Article 112 guide</a></li>
+          <li><a href="#" data-view-link="docs">Vienna code reference</a></li>
+          <li><a href="#">Status</a></li>
+        </ul>
+      </div>
+      <div class="mk-footer-col">
+        <h4>Legal</h4>
+        <ul>
+          <li><a href="#">Terms of service</a></li>
+          <li><a href="#">Privacy</a></li>
+          <li><a href="#">DPA</a></li>
+          <li><a href="#">Security</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="mk-footer-bottom">
+      <span>© 2026 Tradenet Pte. Ltd. · Singapore · Operating in Vietnam under license from Vietnam IP</span>
+      <span class="mono" style="font-size:11px;letter-spacing:0.08em;">v 2.4.1 · Made in HCMC</span>
+    </div>
+  </div>
+</footer>
+
+<div id="tweaks-root"></div>
+
+<script src="marketing/marketing.js"></script>
+<script type="text/babel" src="app/tweaks-panel.jsx"></script>
+<script type="text/babel" src="marketing/tweaks.jsx"></script>
+</body>
+</html>

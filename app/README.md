@@ -26,7 +26,11 @@ app/
 │   ├── requirements-dev.txt Lint/test/type-check deps
 │   ├── Dockerfile          Multi-stage build, non-root user, HEALTHCHECK
 │   └── .dockerignore
-├── frontend/               Next.js 15 (App Router), React 19, Tailwind 3
+├── frontend/               Next.js 15 (App Router), React 19, Tailwind 4
+│   │                       Marketing site (Landing / Pricing / Coverage /
+│   │                       Docs / Login) is planned to ship into this same
+│   │                       codebase as a (marketing)/ Route Group — see
+│   │                       ../design_handoff_tradenet_marketing/IMPLEMENTATION_PLAN.md
 │   ├── app/                File-based routes (Today / Search / Detail / …)
 │   ├── components/         UI primitives, specimen renderer, Cmd-K
 │   ├── lib/                Typed API client + helpers

@@ -27,9 +27,22 @@ claude_csvbuilder/
 │   │   ├── pyproject.toml          Lint, type-check, package config
 │   │   ├── requirements.txt        Pinned runtime deps (includes pymupdf etc. for image_extractor)
 │   │   └── Dockerfile              Multi-stage prod build (PYTHONPATH-based)
-│   ├── frontend/                   Next.js 15 (App Router) + Tailwind
+│   ├── frontend/                   Next.js 15 (App Router) + Tailwind 4
+│   │                               In-product UI today. Marketing site
+│   │                               (Landing/Pricing/Coverage/Docs/Login) ships
+│   │                               into this same app as a `(marketing)/`
+│   │                               Route Group — see
+│   │                               design_handoff_tradenet_marketing/IMPLEMENTATION_PLAN.md
 │   ├── docker-compose.yml          Local dev stack (postgres :5435, redis :6380)
 │   └── README.md                   Setup + dev workflow
+├── design_handoff_trademark_gazette/   In-app design reference (already implemented)
+├── design_handoff_tradenet_marketing/  Marketing site design reference (planned)
+│                                       README.md describes the design;
+│                                       IMPLEMENTATION_PLAN.md captures the
+│                                       architecture decision (Route Groups),
+│                                       PR sequence (Landing → Pricing → Login
+│                                       → Coverage → Docs), and CMS choice
+│                                       (MDX-in-repo + TS config).
 ├── config_image_extractor.yaml     Runtime config for image_extractor (read by worker.ingest)
 ├── input/                          Source PDFs
 ├── csv/                            Legacy CSV outputs (still produced by tm_extractor for parity)
@@ -202,3 +215,32 @@ A full reset + re-audit ran 2026-05-27 — surfaced and fixed a real
 dropping small-raster logos (e.g., gazette wordmark strips at 100×12-18 px).
 Recovered 21 lost logos across A_T3/A_T4/B_T2/B_T3/B_T4. The 7
 unrecoverable NEITHER cases above match the documented list exactly.
+
+## Marketing site (planned, not yet implemented)
+
+The public marketing site (Landing / Pricing / Coverage / Docs / Login) ships
+into the **same `app/frontend/` Next.js codebase** as a `(marketing)/`
+Route Group, alongside an `(app)/` group for the existing authenticated
+pages. Same tokens, same Tailwind 4 config, same CI gates — one app, two
+layouts.
+
+**Design reference:** `design_handoff_tradenet_marketing/` — open
+`Tradenet - Marketing.html` via a local HTTP server (`python3 -m http.server 8765`)
+and click through the top nav to see all five routes.
+
+**Plan of record:** [`design_handoff_tradenet_marketing/IMPLEMENTATION_PLAN.md`](design_handoff_tradenet_marketing/IMPLEMENTATION_PLAN.md)
+— architecture decision (Route Groups in the existing Next.js app), CMS
+choice (MDX-in-repo + TS config, no external service), open-question
+resolutions, and the PR sequence:
+
+  - **PR 0** — Token reconciliation (`--container`, `--radius-lg`,
+    `--radius-xl`, `--shadow-lg`)
+  - **PR 1** — Landing (`/`)
+  - **PR 2** — Pricing (`/pricing`)
+  - **PR 3** — Login two-pane (`/login`, replaces current simple form)
+  - **PR 4** — Coverage (`/coverage`)
+  - **PR 5** — Docs (`/docs/<slug>`) with `@next/mdx`
+
+Total estimated effort ~20 hours across 5 independently-mergeable PRs.
+A future session should start by re-reading the IMPLEMENTATION_PLAN
+end-to-end, then branching off `main` to start PR 0.
