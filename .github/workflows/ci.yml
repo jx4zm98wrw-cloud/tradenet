@@ -38,9 +38,9 @@ jobs:
       TM_REDIS_URL: redis://localhost:6379/0
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -81,12 +81,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with: { version: 10 }
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: pnpm
@@ -108,8 +108,8 @@ jobs:
     name: Security audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
         with: { version: 10 }
       # No `cache: pnpm` here — this job runs `pnpm audit` (which queries
       # the registry directly from the lockfile) without `pnpm install`,
@@ -117,7 +117,7 @@ jobs:
       # setup-node's post-job save step errors out with "Path Validation
       # Error: Path(s) specified in the action for caching do(es) not
       # exist" on any cache-miss (i.e. any lockfile-changing PR).
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
       - name: pnpm audit
@@ -125,7 +125,7 @@ jobs:
         # Fail the job on high-severity vulns so the team sees them.
         # Previously appended `|| true` which silently swallowed warnings.
         run: pnpm audit --prod --audit-level=high
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with: { python-version: "3.11" }
       - name: pip-audit
         # Fail the job on any reported vuln. Previously appended `|| true`
@@ -162,7 +162,7 @@ jobs:
       security-events: write
       actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build backend image
         # Build context = app/backend so the COPY layers match the prod build
@@ -176,7 +176,7 @@ jobs:
       - name: Trivy vulnerability scan (fail on HIGH/CRITICAL)
         # Pinned to a release tag (not @master) so a compromised upstream
         # can't silently change scan behavior on us. Bump deliberately.
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: tradenet-backend:ci
           format: table
@@ -198,7 +198,7 @@ jobs:
         # blocking PRs on them. Runs even if the gating scan above failed,
         # so we still get a record of what tripped CI.
         if: always()
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: tradenet-backend:ci
           format: sarif
@@ -218,7 +218,7 @@ jobs:
         # scanning → Set up.
         if: always() && hashFiles('trivy-results.sarif') != ''
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
           category: trivy-backend-image
@@ -228,7 +228,7 @@ jobs:
         # incident response (which versions of which libs shipped in
         # which CI build). Doesn't gate the build.
         if: always()
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: tradenet-backend:ci
           format: cyclonedx
@@ -236,7 +236,7 @@ jobs:
 
       - name: Upload SBOM artifact
         if: always() && hashFiles('sbom.cdx.json') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-backend-cyclonedx
           path: sbom.cdx.json
@@ -283,10 +283,10 @@ jobs:
       PLAYWRIGHT_ADMIN_PASSWORD: ci-playwright-password-1234567890
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # ---- Backend setup ----
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -339,10 +339,10 @@ jobs:
           exit 1
 
       # ---- Frontend setup ----
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with: { version: 10 }
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: pnpm
@@ -396,7 +396,7 @@ jobs:
       # ---- Diagnostics on failure ----
       - name: Upload Playwright HTML report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: app/frontend/playwright-report/
@@ -407,7 +407,7 @@ jobs:
         # full timeline (DOM snapshots, network, console) for failing
         # tests. Worth their weight in gold when debugging flakes.
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-traces
           path: app/frontend/test-results/
@@ -415,7 +415,7 @@ jobs:
 
       - name: Upload backend/frontend logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-server-logs
           path: |
