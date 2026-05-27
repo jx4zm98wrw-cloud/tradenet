@@ -173,9 +173,32 @@ Curated `STRONG_COMPANY_SUFFIXES` and `TYPO_TOLERANT_COMPANY_PATTERNS` live in `
 
 These are PDF-source-level artifacts that no parser can fix without external data:
 
-- **~14 B rows have a Madrid registration number in `(732)`**, e.g. `"(732) 1529250 (DE) Jack Wolfskin …"` — the NOIP PDF itself transcribed a previous-registration cross-reference into the (732) line.
-- **~7 B rows have only an address fragment in `(732)`** (e.g., `"503-ho, Gasan Hanwha BizMetro 2nd, …"`) — the company name simply isn't in the PDF text layer (likely rasterized image area).
-- **~31 VN rows have no `Applicant City`** — both the city matcher and the `tỉnh X` province fallback found nothing. Mostly truncated addresses. (Was ~18 before the 2026-05-25 fix that narrowed the city-matcher corpus from full applicant text to the parsed address only — the higher count is the real residual; the old number was inflated by false-positive city matches from personal-name fragments like `Hồng Lĩnh`.)
+- **12 B rows have a Madrid registration number in `(732)`** (was ~14), e.g. `"(732) 1529250 (DE) Jack Wolfskin …"` — the NOIP PDF itself transcribed a previous-registration cross-reference into the (732) line. Detected by `scripts/audit_fields.check_madrid_number_in_applicant`.
+- **0 B rows have only an address fragment in `(732)`** (was ~7) — cleared. The CLAUDE.md baseline was inflated by an over-eager detection regex; the tightened pattern (`scripts/audit_fields.check_address_fragment_in_applicant`) finds none post-reset.
+- **31 VN rows have no `Applicant City`** — both the city matcher and the `tỉnh X` province fallback found nothing. Mostly truncated addresses.
 - **7 B rows have neither a logo PNG nor `(540)` text** (CARMEDA, ALLM, CASTROL, TOPPAN HOLDINGS, TOPGOLF CALLAWAY, EGIS, TOTO). The gazette page has no figurative-element metadata at all — no Vienna `(531)`, no protected colors `(591)`, no transcribed wordmark. Unrecoverable without re-OCRing the original NOIP PDF pages.
 
 Combined-mark coverage (logo OR `(540)`): **99.985%** across 46,758 rows over 8 gazettes (4 A-files at 100.00%, B-files 99.92-100%). Applicant-data residuals are separate from mark-display residuals and add ~0.1% more rows with degraded fields.
+
+### Audit tooling
+
+Two scripts under `app/backend/scripts/` exist for periodic data-quality
+re-audit (e.g., after extractor changes or a fresh ingest):
+
+- **`audit_logos.py`** — PyMuPDF ground-truth scan that walks each input
+  PDF, counts image XObjects per INID section using the same nearest-marker-
+  above mapping the extractor's saver uses, and flags any section where the
+  PDF has an image but the DB row has `logo_path = NULL`. Tunable threshold
+  via `AUDIT_MIN_IMAGE_PX` env var (default 50 px; drop to 20 for stricter).
+- **`audit_fields.py`** — eight automated checks codifying the residual
+  patterns above (Madrid# in applicant, address fragment in applicant,
+  VN missing city, NEITHER (540) nor logo, B-domestic missing (151),
+  invalid Nice classes, marker leakage in (540), year/month vs pub date).
+  Each check reports count vs documented baseline + delta — delta > 0
+  flags a regression.
+
+A full reset + re-audit ran 2026-05-27 — surfaced and fixed a real
+`MIN_SLICE_PX = 20` regression in the image extractor that was
+dropping small-raster logos (e.g., gazette wordmark strips at 100×12-18 px).
+Recovered 21 lost logos across A_T3/A_T4/B_T2/B_T3/B_T4. The 7
+unrecoverable NEITHER cases above match the documented list exactly.
