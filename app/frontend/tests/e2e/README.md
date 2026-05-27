@@ -42,8 +42,31 @@ pnpm test:e2e
 
 `.auth/admin.json` is gitignored. If anything looks off, delete it and re-run; the setup spec will recreate it.
 
+## Visual regression (opt-in)
+
+`visual.spec.ts` captures screenshots of 5 chrome states (home, /search, /compare, /admin/gazettes, /watchlists, /login) and compares against committed baselines. **Skipped by default** — set `PLAYWRIGHT_VISUAL=1` to run.
+
+### Why opt-in
+
+Playwright screenshots are platform-specific (macOS vs Linux render differently due to font hinting + sub-pixel positioning). Baselines committed from one platform fail in CI on the other. Opt-in keeps the default suite portable and the visual checks tied to a single canonical environment.
+
+### One-time bake (Linux / CI only)
+
+```bash
+# Bring up backend + frontend per the Run section above
+PLAYWRIGHT_VISUAL=1 pnpm test:e2e --update-snapshots visual
+# Inspect generated PNGs under tests/e2e/visual.spec.ts-snapshots/
+git add tests/e2e/visual.spec.ts-snapshots/
+git commit -m "test(visual): bake baselines on $(uname -s)"
+```
+
+After committing baselines, subsequent runs with `PLAYWRIGHT_VISUAL=1` enforce the diff. Any visual change of >1% pixel ratio fails.
+
+### Enabling in CI
+
+Add `PLAYWRIGHT_VISUAL: "1"` to the `e2e` job's `env:` block in `.github/workflows/ci.yml` once baselines exist. The HTML report artifact already surfaces visual diffs on failure (uses the existing upload step).
+
 ## What's intentionally not covered
 
 - **Specific gazette content**. Search/detail/compare tests use whatever is in the DB; they skip cleanly if there are <1 / <2 marks. Adding a "minimum seeded data" fixture is a separate task.
-- **CI execution**. The config is CI-aware (sets `forbidOnly: !!process.env.CI`, retries=1) but no GitHub Actions job runs Playwright yet. Wiring CI requires Postgres+Redis services + alembic migrate + uvicorn + the user bootstrap — tracked separately.
-- **Visual diffs**. Playwright supports screenshot regression, but the spec set here is structural.
+- **Visual baselines pre-committed**. See "Visual regression" above — opt-in scaffolding lands now, baselines are a separate deliberate commit on Linux.
