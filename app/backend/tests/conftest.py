@@ -20,6 +20,12 @@ from httpx import ASGITransport, AsyncClient
 os.environ.setdefault("TM_DATABASE_URL", "postgresql+asyncpg://tm:tm@localhost:5435/tm")
 os.environ.setdefault("TM_DATABASE_URL_SYNC", "postgresql+psycopg2://tm:tm@localhost:5435/tm")
 os.environ.setdefault("TM_REDIS_URL", "redis://localhost:6380/0")
+# Force NullPool in the session engine (session.py keys off this env). Tests
+# create a new event loop per test (pytest-asyncio default), and asyncpg pool
+# connections are bound to whichever loop opened them — a shared QueuePool
+# across loops raises "Future attached to a different loop". Production code
+# uses QueuePool because uvicorn workers own a durable loop per process.
+os.environ.setdefault("TM_ENV", "test")
 
 
 @pytest_asyncio.fixture
