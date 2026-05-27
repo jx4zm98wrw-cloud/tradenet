@@ -15,6 +15,13 @@ from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Whitelist of TM_ENV values where the dev default secret_key is accepted.
+# Anything outside this set — including a blank/missing env, "staging",
+# "production", or any typo — must override TM_SECRET_KEY or the app
+# refuses to start. Module-scope (not class-scope) because Pydantic v2 treats
+# bare class attrs on BaseSettings models as ModelPrivateAttr.
+_SAFE_DEV_ENVS = frozenset({"development", "dev", "test", "testing", "local", "ci"})
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="TM_", extra="ignore")
@@ -71,21 +78,31 @@ class Settings(BaseSettings):
     @field_validator("secret_key", mode="after")
     @classmethod
     def _warn_default_secret(cls, v: str, info) -> str:
-        # Crash hard in prod; emit a one-line stderr warning in dev so the
-        # default doesn't silently bleed into a non-local environment that
-        # forgot to set TM_SECRET_KEY (e.g. a staging instance running with
-        # env=development by accident).
-        env = info.data.get("env", "").lower()
-        if "dev-only" in v:
-            if env == "production":
-                raise ValueError("TM_SECRET_KEY must be set to a long random string in production")
-            import sys
+        # Dev default is acceptable only in whitelisted envs (development,
+        # dev, test, testing, local, ci). Any other value — including blank,
+        # "staging", "production", "prod", "uat", or any typo — must override
+        # TM_SECRET_KEY or the app refuses to start. This closes the previous
+        # loophole where a misconfigured TM_ENV="staging" passed with only a
+        # stderr warning, silently shipping the dev key to hosted environments.
+        if "dev-only" not in v:
+            return v
 
-            print(
-                "WARNING: TM_SECRET_KEY is the dev default. "
-                "Set it to a long random value before any non-local deployment.",
-                file=sys.stderr,
+        env = (info.data.get("env") or "").lower().strip()
+        if env not in _SAFE_DEV_ENVS:
+            raise ValueError(
+                f"TM_SECRET_KEY must be set to a long random string when "
+                f"TM_ENV={env!r}. The dev-default key is only allowed when "
+                f"TM_ENV is one of {sorted(_SAFE_DEV_ENVS)}."
             )
+
+        # Safe dev env — keep the warning so the operator notices on first run.
+        import sys
+
+        print(
+            "WARNING: TM_SECRET_KEY is the dev default. "
+            "Set it to a long random value before any non-local deployment.",
+            file=sys.stderr,
+        )
         return v
 
 
