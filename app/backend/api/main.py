@@ -71,13 +71,34 @@ def create_app() -> FastAPI:
     # ---- Middleware (ordered: outer-most first; runs in reverse on response) ----
     app.add_middleware(RequestIDMiddleware)
     app.add_middleware(SlowAPIMiddleware)
+    # Explicit allow_headers (not ["*"]) — combined with allow_credentials=True,
+    # a wildcard headers list lets any whitelisted origin send arbitrary headers
+    # (including Authorization, Content-Type overrides, custom auth headers).
+    # Listing only what the frontend actually sends shrinks the cross-origin
+    # attack surface without breaking legitimate usage. If you add a new
+    # client header (e.g. X-Client-Version), add it here explicitly.
+    #
+    # CSRF posture: when cookie-based auth lands (sprint 1 C1), the cookie
+    # must be `SameSite=Lax` + `Secure` + `HttpOnly`, AND state-changing
+    # endpoints (POST/PUT/DELETE) must validate a CSRF token submitted as
+    # a header (double-submit-cookie pattern). The combination of
+    # allow_credentials=True + same-site cookies + CSRF header is the
+    # standard browser-app defense.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["*"],
+        allow_headers=[
+            "Accept",
+            "Accept-Language",
+            "Authorization",
+            "Content-Type",
+            "X-Request-ID",
+            "X-CSRF-Token",  # reserved for future CSRF wiring (C1)
+        ],
         expose_headers=["X-Request-ID"],
+        max_age=600,  # cache preflight 10 minutes — reduces OPTIONS chatter
     )
 
     # ---- Error handlers ----
