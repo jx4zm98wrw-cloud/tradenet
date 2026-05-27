@@ -5,9 +5,9 @@
 # === Library deps (preserved from monolithic extractor) ===
 pdfplumber==0.11.9         # was 0.11.4, bump pulls patched pdfminer.six (CVE-2025-64512 + 70559)
 pandas==2.2.3
-numpy==2.1.3
+numpy==2.4.6
 colorama==0.4.6
-tqdm==4.67.1
+tqdm==4.67.3
 
 # === Image extractor (app/backend/image_extractor/, lazy-imported by worker) ===
 pymupdf==1.27.2.3
@@ -16,19 +16,19 @@ psutil==7.2.2
 pyyaml==6.0.3
 
 # === API + DB ===
-fastapi==0.128.8              # was 0.115.5
+fastapi==0.136.3              # was 0.115.5
 starlette==0.49.3             # explicit pin (fastapi only constrains <1.0,>=0.40 — without
                               # this, pip-audit caught starlette 0.41 still in the lockfile
                               # with PYSEC-2026-161 + CVE-2025-54121 + 62727 unpatched)
-uvicorn[standard]==0.32.1
-sqlalchemy[asyncio]==2.0.36
-alembic==1.14.0
-asyncpg==0.30.0
-psycopg2-binary==2.9.10
-python-multipart==0.0.20      # was 0.0.17; latest available. Future CVE-2026-* require >=0.0.22
+uvicorn[standard]==0.48.0
+sqlalchemy[asyncio]==2.0.50
+alembic==1.18.4
+asyncpg==0.31.0
+psycopg2-binary==2.9.12
+python-multipart==0.0.29      # was 0.0.17; latest available. Future CVE-2026-* require >=0.0.22
                               # which isn't on PyPI yet — ignored in pip-audit per ci.yml
-pydantic==2.10.3
-pydantic-settings==2.7.0
+pydantic==2.13.4
+pydantic-settings==2.14.1
 
 # === Auth / security ===
 python-jose[cryptography]==3.5.0  # was 3.3.0, clears PYSEC-2024-232 + 233 + 2025-185
@@ -41,8 +41,8 @@ rq==1.16.2
 
 # === Observability ===
 structlog==24.4.0
-sentry-sdk[fastapi]==2.19.0
-prometheus-fastapi-instrumentator==7.0.0
+sentry-sdk[fastapi]==2.60.0
+prometheus-fastapi-instrumentator==7.1.0
 
 # === File handling ===
 python-magic==0.4.27
@@ -54,5 +54,5 @@ python-magic==0.4.27
 # imagehash on the existing Pillow install — extracted PNGs already live in
 # the data dir, so pHash compares the actual specimens rather than wordmark
 # text alone.
-jellyfish==1.1.3
+jellyfish==1.2.1
 imagehash==4.3.2
