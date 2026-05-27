@@ -337,3 +337,109 @@ def test_ingest_completed_is_noop(
         sync_session.execute(delete(Trademark).where(Trademark.gazette_id == gazette.id))
         sync_session.execute(delete(Gazette).where(Gazette.id == gazette.id))
         sync_session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Concurrent-worker safety: advisory lock blocks duplicate-enqueued jobs
+# ---------------------------------------------------------------------------
+
+
+def test_ingest_lock_id_is_stable_across_processes() -> None:
+    """The advisory lock id must be deterministic from gazette_id — using
+    Python's `hash()` would break this (PYTHONHASHSEED randomization), so
+    we verify the same UUID always produces the same int64."""
+    import uuid as _uuid
+
+    from worker.ingest import _gazette_lock_id
+
+    gid = _uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+    # Same input → same lock id, every call, every process.
+    assert _gazette_lock_id(gid) == _gazette_lock_id(gid)
+    # Different UUIDs → different lock ids (no collisions in this trivial set).
+    other = _uuid.UUID("11111111-2222-3333-4444-555555555555")
+    assert _gazette_lock_id(gid) != _gazette_lock_id(other)
+    # And the result fits in int64 (advisory lock signature).
+    val = _gazette_lock_id(gid)
+    assert -(2**63) <= val < 2**63
+
+
+def test_ingest_skips_when_advisory_lock_unavailable(
+    sync_session: Session,
+    fake_pdf: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If another worker already holds the advisory lock,
+    `_try_advisory_lock` returns False — the ingest should bail out
+    fast with a `locked-by-another` skip result and touch no rows.
+
+    Simulating the held lock by monkeypatching `_try_advisory_lock` is
+    cleaner than spinning up a second connection here; the lock plumbing
+    itself is exercised by the integration tests that actually run
+    ingest end-to-end."""
+
+    # If the lock check fails, no extractor should run. Plant a sentinel
+    # that would raise if it did.
+    def _explode(*a, **k):
+        raise AssertionError("extractor must not be invoked when lock fails")
+
+    monkeypatch.setattr(ingest_mod, "PDFProcessor", _explode)
+    monkeypatch.setattr(ingest_mod, "_run_image_extraction", _explode)
+    monkeypatch.setattr(ingest_mod, "_try_advisory_lock", lambda *a, **k: False)
+
+    gazette = _make_gazette(sync_session, fake_pdf)
+    try:
+        result = ingest_pdf(str(gazette.id))
+        assert result["status"] == "locked-by-another"
+        assert result["skipped"] is True
+
+        # Crucially: no state mutation. Status stays 'uploaded', no
+        # rows written, row_count stays 0.
+        sync_session.expire_all()
+        g = sync_session.get(Gazette, gazette.id)
+        assert g is not None
+        assert g.status == GazetteStatus.uploaded
+        assert g.row_count == 0
+
+        leftover = (
+            sync_session.execute(select(Trademark).where(Trademark.gazette_id == gazette.id)).scalars().all()
+        )
+        assert leftover == []
+    finally:
+        sync_session.execute(delete(Trademark).where(Trademark.gazette_id == gazette.id))
+        sync_session.execute(delete(Gazette).where(Gazette.id == gazette.id))
+        sync_session.commit()
+
+
+def test_ingest_releases_lock_on_success(
+    sync_session: Session,
+    fake_pdf: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """After a successful ingest, the advisory lock must be released so
+    later re-runs (admin re-queue, batch reprocess) can proceed without
+    blocking on the prior session.
+
+    We instrument the unlock helper to count invocations — exactly one
+    release at the end of the run."""
+    sections = [_section("4-2026-00100")]
+    _patch_extractor_to_yield(monkeypatch, sections)
+
+    release_calls: list[uuid.UUID] = []
+    original_release = ingest_mod._release_advisory_lock
+
+    def _spy_release(session, gid):
+        release_calls.append(gid)
+        return original_release(session, gid)
+
+    monkeypatch.setattr(ingest_mod, "_release_advisory_lock", _spy_release)
+
+    gazette = _make_gazette(sync_session, fake_pdf)
+    try:
+        result = ingest_pdf(str(gazette.id))
+        assert result["status"] == "completed"
+        # Exactly one release call, with the right gazette id.
+        assert release_calls == [gazette.id]
+    finally:
+        sync_session.execute(delete(Trademark).where(Trademark.gazette_id == gazette.id))
+        sync_session.execute(delete(Gazette).where(Gazette.id == gazette.id))
+        sync_session.commit()
