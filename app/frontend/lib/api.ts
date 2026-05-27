@@ -108,13 +108,39 @@ function qs(p: Record<string, unknown>): string {
 }
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(url, init);
+  // Lazy import to avoid pulling auth into the module-load graph for tests
+  // that don't go through the API. Also dodges a potential circular-import
+  // with auth.ts if it ever needs `api` for something.
+  const { getAccessToken, refresh } = await import("./auth");
+
+  const withAuth = (): RequestInit => {
+    const token = getAccessToken();
+    const headers = new Headers(init?.headers);
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return { ...init, headers, credentials: "include" };
+  };
+
+  let r = await fetch(url, withAuth());
+  // 401 → try to refresh the access token once, then retry. If refresh fails
+  // (no valid refresh cookie, token revoked), redirect to /login.
+  if (r.status === 401 && !url.includes("/auth/")) {
+    const user = await refresh();
+    if (user) {
+      r = await fetch(url, withAuth());
+    } else if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      // Preserve return path so the user lands back where they were.
+      const next = encodeURIComponent(window.location.pathname + window.location.search);
+      window.location.href = `/login?next=${next}`;
+      // Throw to short-circuit any caller; navigation is in flight.
+      throw new Error("Authentication required");
+    }
+  }
   if (!r.ok) {
     // FastAPI returns structured errors as `{detail: "..."}`. Surface that to
     // the caller (toast / error UI) instead of swallowing it into a bare status
     // code. .catch handles non-JSON error bodies (e.g. an HTML 502 page).
-    const body = (await r.json().catch(() => null)) as { detail?: string } | null;
-    throw new Error(body?.detail ?? `${url} -> ${r.status}`);
+    const body = (await r.json().catch(() => null)) as { detail?: string; error?: { message?: string } } | null;
+    throw new Error(body?.error?.message ?? body?.detail ?? `${url} -> ${r.status}`);
   }
   return r.json();
 }
