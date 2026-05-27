@@ -241,3 +241,184 @@ jobs:
           name: sbom-backend-cyclonedx
           path: sbom.cdx.json
           retention-days: 90
+
+  e2e:
+    # End-to-end Playwright smoke against a full live stack (Postgres +
+    # Redis services, real backend via uvicorn, real frontend via
+    # `pnpm start` after `pnpm build`). Catches regressions the unit
+    # tests can't — broken login flow, mis-wired API contract,
+    # client-side routing surprises.
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tm
+          POSTGRES_PASSWORD: tm
+          POSTGRES_DB: tm
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tm -d tm"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+
+    env:
+      # Bind backend to 127.0.0.1:8000 + frontend to :3000 so Playwright's
+      # default base URL works without env overrides in the specs.
+      TM_DATABASE_URL: postgresql+asyncpg://tm:tm@localhost:5432/tm
+      TM_DATABASE_URL_SYNC: postgresql+psycopg2://tm:tm@localhost:5432/tm
+      TM_REDIS_URL: redis://localhost:6379/0
+      # `ci` is in the `_SAFE_DEV_ENVS` allowlist (settings.py), so the
+      # dev-default TM_SECRET_KEY is accepted. Production envs reject it.
+      TM_ENV: ci
+      PLAYWRIGHT_ADMIN_EMAIL: playwright@ci.local
+      # 32+ chars to satisfy the schema's min-length validator.
+      PLAYWRIGHT_ADMIN_PASSWORD: ci-playwright-password-1234567890
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---- Backend setup ----
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install backend deps
+        run: pip install -r app/backend/requirements-dev.txt
+
+      - name: Apply migrations
+        working-directory: app/backend
+        run: alembic upgrade head
+
+      - name: Bootstrap Playwright test user
+        working-directory: app/backend
+        # Same credentials Playwright's auth.setup.ts logs in with
+        # (via env overrides). Idempotent: create_user errors on
+        # duplicate email, but on a fresh CI postgres there's no
+        # duplicate to hit.
+        run: |
+          python -m scripts.create_user \
+            --email "$PLAYWRIGHT_ADMIN_EMAIL" \
+            --name "CI Playwright" \
+            --role admin \
+            --password "$PLAYWRIGHT_ADMIN_PASSWORD"
+
+      - name: Start backend (uvicorn, background)
+        working-directory: app/backend
+        # Background with & — GitHub Actions keeps backgrounded
+        # processes alive across steps within the same job. We capture
+        # stdout/stderr to a file so the upload-on-failure step can
+        # grab it for diagnostics.
+        run: |
+          nohup uvicorn api.main:app --host 127.0.0.1 --port 8000 \
+            --log-level warning > /tmp/backend.log 2>&1 &
+          echo $! > /tmp/backend.pid
+
+      - name: Wait for backend /health
+        # Poll up to 60s. uvicorn cold-start on CI runners is ~3-5s,
+        # but pip-installed C extensions can take longer on a cache
+        # miss. 60s is comfortable headroom.
+        run: |
+          for i in {1..60}; do
+            if curl -sf http://127.0.0.1:8000/health >/dev/null; then
+              echo "Backend ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Backend never came up. Tail of backend.log:"
+          tail -50 /tmp/backend.log
+          exit 1
+
+      # ---- Frontend setup ----
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: app/frontend/pnpm-lock.yaml
+
+      - name: Install frontend deps
+        working-directory: app/frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: app/frontend
+        run: pnpm build
+
+      - name: Start frontend (production build, background)
+        working-directory: app/frontend
+        # pnpm start serves the production build — closer to what'll
+        # actually ship than `pnpm dev`. PLAYWRIGHT_SKIP_WEBSERVER=1
+        # (set on the test step below) tells the playwright.config.ts
+        # not to spawn its own dev server.
+        run: |
+          nohup pnpm start > /tmp/frontend.log 2>&1 &
+          echo $! > /tmp/frontend.pid
+
+      - name: Wait for frontend
+        run: |
+          for i in {1..60}; do
+            if curl -sf http://127.0.0.1:3000/ >/dev/null; then
+              echo "Frontend ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Frontend never came up. Tail of frontend.log:"
+          tail -50 /tmp/frontend.log
+          exit 1
+
+      # ---- Playwright ----
+      - name: Install Playwright browsers
+        working-directory: app/frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright suite
+        working-directory: app/frontend
+        env:
+          # The frontend is already running on :3000 from the step
+          # above; without this, playwright.config.ts would try to
+          # spawn a second `pnpm dev` that races on the port.
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
+        run: pnpm test:e2e
+
+      # ---- Diagnostics on failure ----
+      - name: Upload Playwright HTML report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: app/frontend/playwright-report/
+          retention-days: 14
+
+      - name: Upload Playwright traces on failure
+        # `trace: retain-on-failure` in playwright.config.ts saves the
+        # full timeline (DOM snapshots, network, console) for failing
+        # tests. Worth their weight in gold when debugging flakes.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: app/frontend/test-results/
+          retention-days: 14
+
+      - name: Upload backend/frontend logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-server-logs
+          path: |
+            /tmp/backend.log
+            /tmp/frontend.log
+          retention-days: 14
