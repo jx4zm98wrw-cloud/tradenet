@@ -4,8 +4,10 @@
  *
  * Daily users live on Today. This view is for monitoring ingest health: per-issue
  * status, OCR confidence, flagged rows needing manual review, and the
- * upload-new-gazette dropzone. Gated behind /api/admin/check (always-true stub
- * until auth lands). */
+ * upload-new-gazette dropzone. Client-side gate: /api/admin/check returns
+ * isAdmin=false for non-admin roles → we redirect to "/". Backend defense-
+ * in-depth: GET /api/v1/gazettes itself is `require_admin`, so a viewer
+ * who bypasses the redirect still gets 403s. */
 
 import Link from "next/link";
 import * as React from "react";

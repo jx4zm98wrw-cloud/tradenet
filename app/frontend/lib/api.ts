@@ -18,7 +18,7 @@ export type Gazette = {
   needs_review: boolean;
 };
 
-export type AdminCheck = { isAdmin: boolean; reason: string };
+export type AdminCheck = { isAdmin: boolean; role: "admin" | "editor" | "viewer"; reason: string };
 
 export type Trademark = {
   id: string;

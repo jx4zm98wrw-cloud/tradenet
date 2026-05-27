@@ -24,12 +24,25 @@ async def test_openapi_schema_present(client: AsyncClient) -> None:
 # ---------- gazettes ----------
 
 
-async def test_list_gazettes_returns_list(client: AsyncClient) -> None:
-    r = await client.get("/api/v1/gazettes")
+async def test_list_gazettes_returns_list(authed_client: AsyncClient) -> None:
+    """Listing is now admin-only — authed_client is an admin user."""
+    r = await authed_client.get("/api/v1/gazettes")
     assert r.status_code == 200
     body = r.json()
     assert "items" in body and "total" in body
     assert isinstance(body["items"], list)
+
+
+async def test_list_gazettes_unauthenticated_returns_401(client: AsyncClient) -> None:
+    """Defense-in-depth: anonymous clients can't enumerate the pipeline."""
+    r = await client.get("/api/v1/gazettes")
+    assert r.status_code == 401
+
+
+async def test_list_gazettes_viewer_returns_403(viewer_client: AsyncClient) -> None:
+    """A logged-in viewer is rejected (admin-only)."""
+    r = await viewer_client.get("/api/v1/gazettes")
+    assert r.status_code == 403
 
 
 async def test_upload_rejects_non_pdf(authed_client: AsyncClient) -> None:
@@ -43,6 +56,22 @@ async def test_upload_unauthenticated_returns_401(client: AsyncClient) -> None:
     files = {"file": ("plain.txt", b"not a pdf", "text/plain")}
     r = await client.post("/api/v1/gazettes", files=files)
     assert r.status_code == 401
+
+
+async def test_upload_viewer_returns_403(viewer_client: AsyncClient) -> None:
+    """Viewer role can't trigger ingest (require_role(admin, editor))."""
+    files = {"file": ("plain.txt", b"not a pdf", "text/plain")}
+    r = await viewer_client.post("/api/v1/gazettes", files=files)
+    assert r.status_code == 403
+
+
+async def test_upload_editor_passes_role_check(editor_client: AsyncClient) -> None:
+    """Editor passes role gate; non-PDF then 400s on the magic-byte check.
+    The 400 here proves the request reached the body validation path,
+    which only happens after the role check passes."""
+    files = {"file": ("plain.txt", b"not a pdf", "text/plain")}
+    r = await editor_client.post("/api/v1/gazettes", files=files)
+    assert r.status_code == 400
 
 
 # ---------- search + facets ----------
@@ -134,7 +163,26 @@ async def test_watchlists_crud(authed_client: AsyncClient) -> None:
 # ---------- admin ----------
 
 
-async def test_admin_check(client: AsyncClient) -> None:
+async def test_admin_check_requires_auth(client: AsyncClient) -> None:
+    """Anonymous → 401 (no longer a hardcoded `true`)."""
     r = await client.get("/api/v1/admin/check")
+    assert r.status_code == 401
+
+
+async def test_admin_check_admin_returns_true(authed_client: AsyncClient) -> None:
+    """Authed admin user → isAdmin=true with role=admin."""
+    r = await authed_client.get("/api/v1/admin/check")
     assert r.status_code == 200
-    assert "isAdmin" in r.json()
+    body = r.json()
+    assert body["isAdmin"] is True
+    assert body["role"] == "admin"
+
+
+async def test_admin_check_viewer_returns_false(viewer_client: AsyncClient) -> None:
+    """Viewer is logged in but isAdmin=false (200, not 403 — frontend uses
+    the response to redirect, not error)."""
+    r = await viewer_client.get("/api/v1/admin/check")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["isAdmin"] is False
+    assert body["role"] == "viewer"

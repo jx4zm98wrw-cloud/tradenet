@@ -9,8 +9,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .._filename import parse_filename_meta
-from ..auth import User, require_user
+from ..auth import User, require_admin, require_role
 from ..db import Gazette, GazetteStatus, get_session
+from ..db.models import UserRole
 from ..rate_limit import limiter
 from ..schemas import GazetteListOut, GazetteOut
 from ..settings import get_settings
@@ -46,7 +47,10 @@ async def upload_gazette(
     request: Request,  # required for slowapi
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(require_user),
+    # Admins + editors can upload; viewers cannot (read-only role).
+    # Ingest spins up worker jobs, image extraction, and DB writes — mutating
+    # operations should never be reachable by viewer accounts.
+    user: User = Depends(require_role(UserRole.admin, UserRole.editor)),
 ) -> GazetteOut:
     """Upload a PDF — stores on disk, persists a Gazette row, enqueues ingest.
 
@@ -169,6 +173,10 @@ async def list_gazettes(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
+    # Admin-only — this endpoint feeds /admin/gazettes, exposes per-issue
+    # OCR confidence, error messages, raw filenames, and processing
+    # internals. Defense-in-depth alongside the client-side gate.
+    _admin: User = Depends(require_admin),
 ) -> GazetteListOut:
     q = select(Gazette)
     cq = select(func.count()).select_from(Gazette)
@@ -185,7 +193,12 @@ async def list_gazettes(
 
 
 @router.get("/{gazette_id}", response_model=GazetteOut)
-async def get_gazette(gazette_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> GazetteOut:
+async def get_gazette(
+    gazette_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    # Admin-only for the same reasons as list_gazettes.
+    _admin: User = Depends(require_admin),
+) -> GazetteOut:
     g = await session.get(Gazette, gazette_id)
     if g is None:
         raise HTTPException(404, "Gazette not found")

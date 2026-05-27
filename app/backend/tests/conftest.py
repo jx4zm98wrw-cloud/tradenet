@@ -13,9 +13,13 @@ from __future__ import annotations
 
 import os
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+
+if TYPE_CHECKING:
+    from api.db.models import UserRole
 
 os.environ.setdefault("TM_DATABASE_URL", "postgresql+asyncpg://tm:tm@localhost:5435/tm")
 os.environ.setdefault("TM_DATABASE_URL_SYNC", "postgresql+psycopg2://tm:tm@localhost:5435/tm")
@@ -36,14 +40,13 @@ async def client() -> AsyncIterator[AsyncClient]:
         yield c
 
 
-@pytest_asyncio.fixture
-async def authed_client() -> AsyncIterator[AsyncClient]:
-    """Yields an AsyncClient pre-authenticated as an admin user.
+async def _make_role_client(role: UserRole) -> AsyncIterator[AsyncClient]:
+    """Shared body for the role-specific fixtures below.
 
-    Tests that hit endpoints requiring auth (POST /watchlists, gazettes
-    upload, /admin/*, etc.) should use this fixture instead of `client`.
-    The user is created fresh per test, logged in, given the bearer token
-    on every subsequent request, and deleted on teardown.
+    Creates a fresh user with the requested role, logs them in, attaches
+    the bearer token to every subsequent request, and deletes the user
+    on teardown. Each test gets its own user so parallel runs and
+    fixture teardown can't interfere.
     """
     import uuid
 
@@ -51,11 +54,11 @@ async def authed_client() -> AsyncIterator[AsyncClient]:
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     from api.auth import hash_password
-    from api.db.models import User, UserRole
+    from api.db.models import User
     from api.main import app
     from api.settings import get_settings
 
-    email = f"authed-client-{uuid.uuid4()}@test.local"
+    email = f"role-{role.value}-{uuid.uuid4()}@test.local"
     password = "test-password-1234567890"  # 22 chars, passes min-length
 
     engine = create_async_engine(get_settings().database_url)
@@ -66,8 +69,8 @@ async def authed_client() -> AsyncIterator[AsyncClient]:
                 id=uuid.uuid4(),
                 email=email,
                 password_hash=hash_password(password),
-                name="Test Admin",
-                role=UserRole.admin,
+                name=f"Test {role.value.title()}",
+                role=role,
                 is_active=True,
                 token_version=0,
             )
@@ -86,3 +89,35 @@ async def authed_client() -> AsyncIterator[AsyncClient]:
                 await s.execute(delete(User).where(User.email == email))
                 await s.commit()
             await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def authed_client() -> AsyncIterator[AsyncClient]:
+    """AsyncClient pre-authenticated as an admin user. Use for endpoints
+    requiring auth where role doesn't matter (POST /watchlists), or for
+    explicitly-admin endpoints (GET /gazettes)."""
+    from api.db.models import UserRole
+
+    async for c in _make_role_client(UserRole.admin):
+        yield c
+
+
+@pytest_asyncio.fixture
+async def editor_client() -> AsyncIterator[AsyncClient]:
+    """AsyncClient pre-authenticated as an editor. Used to test the
+    admin/editor split — editors should pass role checks like
+    require_role(admin, editor) but be rejected by require_admin."""
+    from api.db.models import UserRole
+
+    async for c in _make_role_client(UserRole.editor):
+        yield c
+
+
+@pytest_asyncio.fixture
+async def viewer_client() -> AsyncIterator[AsyncClient]:
+    """AsyncClient pre-authenticated as a read-only viewer. Used to assert
+    403s on mutation/admin endpoints — proves the role gate fires."""
+    from api.db.models import UserRole
+
+    async for c in _make_role_client(UserRole.viewer):
+        yield c
