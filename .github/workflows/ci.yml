@@ -146,3 +146,98 @@ jobs:
             --ignore-vuln CVE-2026-40347   `# python-multipart, needs unreleased 0.0.26` \
             --ignore-vuln CVE-2026-42561   `# python-multipart, needs unreleased 0.0.27` \
             --ignore-vuln PYSEC-2026-161   `# starlette, needs 1.0.1; fastapi caps at <1.0`
+
+  image-scan:
+    name: Backend image scan (Trivy)
+    runs-on: ubuntu-latest
+    # Trivy needs to write SARIF; SBOM upload needs artifact write.
+    # security-events: write lets us push findings into the GitHub
+    # "Code scanning alerts" view so reviewers see them inline on PRs.
+    # actions: read is required by codeql-action/upload-sarif's telemetry
+    # path (GET /repos/.../actions/runs/{id}); without it the step emits
+    # ##[error]Resource not accessible by integration and fails the job
+    # *after* a successful scan.
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        # Build context = app/backend so the COPY layers match the prod build
+        # exactly. Tagged for-ci-only — never pushed.
+        run: |
+          docker build \
+            -f app/backend/Dockerfile \
+            -t tradenet-backend:ci \
+            app/backend
+
+      - name: Trivy vulnerability scan (fail on HIGH/CRITICAL)
+        # Pinned to a release tag (not @master) so a compromised upstream
+        # can't silently change scan behavior on us. Bump deliberately.
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: tradenet-backend:ci
+          format: table
+          severity: HIGH,CRITICAL
+          # Only flag fixed CVEs — unfixed ones are noise we can't act on
+          # until upstream ships a patch.
+          ignore-unfixed: true
+          exit-code: "1"
+          # OS packages + python wheels both count.
+          vuln-type: os,library
+          # Allow-list documented in .trivyignore at the repo root. Each
+          # entry carries a "needs vX.Y.Z" sunset condition; review when
+          # Dependabot bumps the relevant package and the line auto-stales.
+          trivyignores: .trivyignore
+
+      - name: Trivy SARIF (for GitHub Security tab)
+        # Second pass — same scan, SARIF output, never fails the job. We
+        # surface findings (incl. MEDIUM/LOW) in the Security tab without
+        # blocking PRs on them. Runs even if the gating scan above failed,
+        # so we still get a record of what tripped CI.
+        if: always()
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: tradenet-backend:ci
+          format: sarif
+          output: trivy-results.sarif
+          ignore-unfixed: true
+          vuln-type: os,library
+          trivyignores: .trivyignore
+
+      - name: Upload SARIF to GitHub Security
+        # Best-effort — surfaces findings in the Security tab when Code
+        # Scanning is enabled on the repo. If it isn't (free private
+        # repos without GHAS, or first-time enablement pending), the
+        # step 403s with "Code scanning is not enabled for this
+        # repository" and we don't want that to fail the job. The
+        # gating Trivy scan above is the real security policy gate.
+        # To enable: Settings → Code security and analysis → Code
+        # scanning → Set up.
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-backend-image
+
+      - name: Generate SBOM (CycloneDX)
+        # SBOM is a separate Trivy invocation — useful artifact for
+        # incident response (which versions of which libs shipped in
+        # which CI build). Doesn't gate the build.
+        if: always()
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: tradenet-backend:ci
+          format: cyclonedx
+          output: sbom.cdx.json
+
+      - name: Upload SBOM artifact
+        if: always() && hashFiles('sbom.cdx.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-backend-cyclonedx
+          path: sbom.cdx.json
+          retention-days: 90

@@ -1,0 +1,30 @@
+# Trivy CVE allow-list — mirrors the pip-audit ignore policy in .github/workflows/ci.yml.
+#
+# Every entry MUST carry a rationale + "until …" sunset condition. Review
+# periodically — once a patched release ships, drop the line and let CI
+# enforce the upgrade.
+#
+# Format: one CVE id per line, `#` for comments.
+
+# python-multipart — runtime dep of fastapi for multipart/form-data uploads.
+# All three advisories require versions that aren't published on PyPI yet
+# (0.0.20 is currently the latest). The pip-audit step in CI ignores these
+# with identical rationale; this file keeps the Trivy image scan consistent.
+CVE-2026-24486   # python-multipart, needs unreleased 0.0.22
+CVE-2026-40347   # python-multipart, needs unreleased 0.0.26
+CVE-2026-42561   # python-multipart, needs unreleased 0.0.27
+
+# jaraco.context — transitive dep pulled in by setuptools / build-system
+# chain. The advisory is path-traversal via malicious tar archives; the
+# runtime image doesn't unpack untrusted tar archives anywhere (it only
+# unpacks the wheels we shipped at build time). Sunset: bump when
+# `jaraco.context >= 6.1.0` is a transitive resolved version.
+CVE-2026-23949
+
+# wheel — transitive dep also leftover from the build stage. The runtime
+# image installs with `pip install --no-index --find-links=/wheels` so
+# the wheel package itself never runs at runtime. The advisory is
+# privilege escalation via malicious wheel files — not reachable because
+# we never invoke `wheel` from runtime code. Sunset: bump when
+# `wheel >= 0.46.2` lands in the resolved tree.
+CVE-2026-24049
