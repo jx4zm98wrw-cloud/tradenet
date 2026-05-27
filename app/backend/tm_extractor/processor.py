@@ -445,7 +445,8 @@ class PDFProcessor:
 
         def add_date_fields(section: dict[str, str | int]) -> None:
             if first_date and isinstance(first_date, str):
-                month, day, year = first_date.split("/")
+                # MM/DD/YYYY split — only Month + Year are consumed downstream.
+                month, _day, year = first_date.split("/")
                 section["Month"] = month
                 section["Year"] = year
                 section["DateCombined_441_450"] = first_date
@@ -484,7 +485,9 @@ class PDFProcessor:
                     f"{Fore.YELLOW}Progress: iteration {iteration_count}, line {i}/{len(page_lines)}, section keys: {list(current_section.keys())}{Style.RESET_ALL}"
                 )
 
-            page_num, line = page_lines[i]
+            # page_num is part of the (page, line) tuple but not used inside
+            # the section-state machine — only `line` is consumed below.
+            _page_num, line = page_lines[i]
 
             if not line:
                 if current_section and (accumulating_511 or accumulating_531 or accumulating_540):
