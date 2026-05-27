@@ -1107,10 +1107,16 @@ class PDFProcessor:
                             img_w, img_h = processed_img.size
                             rect_h_pts = rect.y1 - rect.y0
                             # Sub-images thinner than this are rendering
-                            # artifacts (e.g., a label sitting one or two
-                            # px above the rect bottom) — drop them rather
-                            # than emit a useless sliver.
+                            # artifacts when SPLITTING a multi-section image
+                            # (a label sitting one or two px above the rect
+                            # bottom) — drop them rather than emit a useless
+                            # sliver. Single-slice cases (no interior labels,
+                            # rect maps to exactly one section) must NEVER be
+                            # filtered here: that would drop legitimate small
+                            # logos (e.g., gazette mark rasters as small as
+                            # 68x18) and create false NEITHER cases.
                             MIN_SLICE_PX = 20
+                            is_single_slice = len(slices) == 1
 
                             for slice_idx, (identifier_raw, sy0, sy1) in enumerate(slices):
                                 if identifier_raw.startswith("unknown_"):
@@ -1121,7 +1127,7 @@ class PDFProcessor:
 
                                 px_y0 = max(0, int((sy0 - rect.y0) / rect_h_pts * img_h))
                                 px_y1 = min(img_h, int((sy1 - rect.y0) / rect_h_pts * img_h))
-                                if px_y1 - px_y0 < MIN_SLICE_PX:
+                                if not is_single_slice and (px_y1 - px_y0) < MIN_SLICE_PX:
                                     continue
 
                                 key = (identifier_raw, xref, slice_idx)
