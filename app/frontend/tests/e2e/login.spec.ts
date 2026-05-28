@@ -17,7 +17,10 @@ test.describe("Login", () => {
     await page.goto("/today");
 
     await expect(page).toHaveURL(/\/login(\?next=.+)?$/);
-    await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
+    // Post-PR 3 redesign, the visible h1 is "Welcome back." (the previous
+    // one-pane form had h1 "Sign in"). The Sign-in submit button still
+    // exists but as a <button>, not a heading.
+    await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
   });
 
   test("rejects wrong password with an error message", async ({ page }) => {

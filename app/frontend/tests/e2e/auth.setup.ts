@@ -25,7 +25,10 @@ setup("authenticate as admin", async ({ page }) => {
 
   // Confirm the login form is what's rendering — guards against accidentally
   // landing on a server-error page or stale `/login` redirect loop.
-  await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
+  // Post-PR 3 redesign: the visible h1 is "Welcome back." (the previous
+  // one-pane form had h1 "Sign in"). The submit button is still labeled
+  // "Sign in", just no longer the heading.
+  await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
 
   await page.getByLabel(/email/i).fill(ADMIN_EMAIL);
   await page.getByLabel(/password/i).fill(ADMIN_PASSWORD);
