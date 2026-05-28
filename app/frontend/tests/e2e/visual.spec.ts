@@ -119,7 +119,10 @@ test.describe("Visual regression — anonymous", () => {
 
   test("login page", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
+    // Post-PR 3 redesign: the visible h1 is "Welcome back." (the previous
+    // simple form's h1 was "Sign in"). The submit button is still labeled
+    // "Sign in" but it's a <button>, not a heading.
+    await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
     await expect(page).toHaveScreenshot("login.png", {
       fullPage: false,
       maxDiffPixelRatio: 0.01,
