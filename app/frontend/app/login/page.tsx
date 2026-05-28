@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-context";
 
 export default function LoginPageShell() {
@@ -23,10 +23,23 @@ function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   // If we're already authenticated (e.g., came via /login while logged in),
-  // skip the form and bounce to the requested destination.
+  // skip the form and bounce to the requested destination. Done in an effect
+  // because router.replace() is a setState — calling it during render
+  // triggers React 19's "Cannot update a component while rendering a
+  // different component" error. The effect runs after commit, which is
+  // when navigation is safe.
+  useEffect(() => {
+    if (user) {
+      // `/` is the public marketing landing post-PR 1 (Route Group split).
+      // Authed users with no `?next=` should land on the in-app home, not
+      // bounce back to the marketing page.
+      const next = sp.get("next") ?? "/today";
+      router.replace(next);
+    }
+  }, [user, sp, router]);
+
+  // Hide the form during the redirect frame to avoid flashing it.
   if (user) {
-    const next = sp.get("next") ?? "/";
-    router.replace(next);
     return null;
   }
 
@@ -36,7 +49,10 @@ function LoginPage() {
     setError(null);
     try {
       await login(email, password);
-      const next = sp.get("next") ?? "/";
+      // Same fallback as the already-authed redirect above: /today is the
+      // in-app home; marketing's / would dump the user back onto the public
+      // landing they just signed in from.
+      const next = sp.get("next") ?? "/today";
       router.replace(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
