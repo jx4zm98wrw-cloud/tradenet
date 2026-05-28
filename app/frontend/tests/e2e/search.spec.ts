@@ -11,7 +11,10 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Search", () => {
   test("nav-search button opens the Cmd-K palette", async ({ page }) => {
-    await page.goto("/");
+    // `/` is the marketing landing now (post-PR 1) — it renders MarketingNav
+    // with no Cmd-K search box. The in-app TopNav with the search button
+    // lives under (app) routes; use /today as the entrypoint.
+    await page.goto("/today");
     // TopNav's central search button: locate by its visible label text.
     // Using getByText (not getByRole + name) because the button mixes a
     // text label with an icon and a ⌘K Kbd badge, which confuses
