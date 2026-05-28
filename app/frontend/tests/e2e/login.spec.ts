@@ -12,7 +12,9 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test.describe("Login", () => {
   test("redirects unauthenticated users to /login", async ({ page }) => {
     // Hit a protected page — AuthProvider should bounce us to /login.
-    await page.goto("/");
+    // `/` is now the public marketing landing (post-PR 1 restructure); use
+    // `/today` instead, which lives under the (app) group + AuthProvider.
+    await page.goto("/today");
 
     await expect(page).toHaveURL(/\/login(\?next=.+)?$/);
     await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
