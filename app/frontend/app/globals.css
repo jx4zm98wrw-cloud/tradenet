@@ -34,14 +34,25 @@
     --warn:        oklch(0.58 0.13 75);
     --warn-2:      oklch(0.955 0.04 75);
 
-    /* sizing */
-    --container:   1320px;
+    /* sizing — unified with the marketing handoff
+     * (design_handoff_tradenet_marketing/marketing/marketing.css) so both
+     * the in-app surfaces and the upcoming marketing routes use one set.
+     *   --container 1320 → 1240: slimmer column reads better on widescreens;
+     *     in-app pages narrow by 80px but keep their existing
+     *     `max-w-container` Tailwind class (it reads from this variable).
+     *   --radius-lg 12 → 14: card corners slightly softer.
+     *   --radius-xl: new, used by the marketing CTA strip (harmless here).
+     *   --shadow-lg: new, used by the marketing hero scorecard tilt + the
+     *     pricing-page featured tier (harmless here). */
+    --container:   1240px;
     --row-pad-y:   12px;
     --gap-card:    20px;
     --radius:      8px;
-    --radius-lg:   12px;
+    --radius-lg:   14px;
+    --radius-xl:   20px;
     --shadow-sm:   0 1px 0 rgba(20,16,12,0.04);
     --shadow-md:   0 1px 2px rgba(20,16,12,0.04), 0 6px 24px -8px rgba(20,16,12,0.10);
+    --shadow-lg:   0 1px 2px rgba(20,16,12,0.04), 0 24px 60px -20px rgba(20,16,12,0.18);
   }
 
   /* Alternate brand swaps — opt in via <body data-theme="…"> */
