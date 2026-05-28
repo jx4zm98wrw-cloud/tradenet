@@ -33,12 +33,26 @@ test.describe("Visual regression", () => {
   // Standard viewport — keeps screenshots stable across runners.
   test.use({ viewport: { width: 1280, height: 720 } });
 
-  test("home (Today digest)", async ({ page }) => {
+  // `/` now serves the public marketing landing (since the (marketing)
+  // route group landed). The in-app Today digest moved to `/today`.
+  // Two separate visual snapshots: one for each surface.
+
+  test("landing page (/)", async ({ page }) => {
     await page.goto("/");
+    // Hero h1 — "Catch every conflict..." — is the LCP candidate.
+    await expect(page.locator("h1").first()).toBeVisible();
+    await expect(page).toHaveScreenshot("landing.png", {
+      fullPage: false,
+      maxDiffPixelRatio: 0.01,
+    });
+  });
+
+  test("today digest (/today)", async ({ page }) => {
+    await page.goto("/today");
     // Wait for the main heading to be present before snapshotting — guards
     // against capturing a half-loaded SSR frame.
     await expect(page.locator("h1, h2").first()).toBeVisible();
-    await expect(page).toHaveScreenshot("home.png", {
+    await expect(page).toHaveScreenshot("today.png", {
       fullPage: false,
       // Allow tiny anti-aliasing drift between runs without flagging.
       maxDiffPixelRatio: 0.01,

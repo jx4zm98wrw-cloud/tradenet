@@ -1,10 +1,22 @@
+/**
+ * Root layout — slim shell only.
+ *
+ * Carries the things every URL needs (html / body / font CSS variables /
+ * global styles) and nothing else. Per-section chrome lives in the route
+ * group layouts:
+ *
+ *   app/(marketing)/layout.tsx   → MarketingNav + MarketingFooter (public)
+ *   app/(app)/layout.tsx         → AuthProvider + CmdKProvider + TopNav
+ *                                  + TweaksPanel (authenticated)
+ *   app/login/page.tsx           → no group; uses its own minimal shell
+ *
+ * This split lets the marketing pages render without paying the
+ * AuthProvider boot cost (refresh-token round-trip on mount) and
+ * without rendering the in-app TopNav.
+ */
 import "./globals.css";
 import { Be_Vietnam_Pro, JetBrains_Mono, Source_Serif_4 } from "next/font/google";
 import type { Metadata } from "next";
-import { TopNav } from "@/components/top-nav";
-import { CmdKProvider } from "@/components/cmdk";
-import { TweaksPanel } from "@/components/tweaks-panel";
-import { AuthProvider } from "@/components/auth-context";
 
 const sans = Be_Vietnam_Pro({
   subsets: ["latin", "vietnamese"],
@@ -26,8 +38,9 @@ const serif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "Tradenet — Trademark Gazette",
-  description: "Vietnam NOIP trademark gazette workbench",
+  title: "Tradenet — Vietnam Trademark Intelligence",
+  description:
+    "Catch every conflict in the Vietnamese gazette before the opposition window closes.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -42,13 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         data-serifheads="1"
         className="min-h-screen font-sans"
       >
-        <AuthProvider>
-          <CmdKProvider>
-            <TopNav />
-            <main>{children}</main>
-            <TweaksPanel />
-          </CmdKProvider>
-        </AuthProvider>
+        {children}
       </body>
     </html>
   );

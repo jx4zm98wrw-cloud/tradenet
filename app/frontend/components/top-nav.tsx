@@ -10,7 +10,9 @@ import { Kbd } from "./ui/kbd";
 import { useCmdK } from "./cmdk";
 
 const TABS = [
-  { href: "/", label: "Today", match: (p: string) => p === "/" || p === "/today" },
+  // `/` now serves the public marketing landing — the in-app home moved
+  // to `/today` when we split into (marketing) / (app) Route Groups.
+  { href: "/today", label: "Today", match: (p: string) => p === "/today" },
   { href: "/search", label: "Search", match: (p: string) => p.startsWith("/search") || p.startsWith("/marks") || p.startsWith("/compare") || p.startsWith("/trademarks") },
   { href: "/watchlists", label: "Watchlists", match: (p: string) => p.startsWith("/watchlists") },
   { href: "/admin/gazettes", label: "Gazettes", match: (p: string) => p.startsWith("/admin") || p.startsWith("/gazettes") },
@@ -24,7 +26,10 @@ export function TopNav() {
     <header className="sticky top-0 z-40 border-b border-line bg-paper/95 backdrop-blur-md">
       <div className="max-w-container mx-auto px-6 h-14 flex items-center justify-between gap-6">
         <div className="flex items-center gap-7">
-          <Link href="/" className="flex items-center gap-2.5 no-underline text-ink">
+          {/* Logo links to the in-app home (`/today`), not `/` — `/` is the
+              public marketing landing. The marketing site has its own
+              MarketingNav with a logo link to `/`. */}
+          <Link href="/today" className="flex items-center gap-2.5 no-underline text-ink">
             <Logo />
             <div className="flex flex-col leading-[1.1]">
               <span className="text-[14px] font-bold tracking-tight">Tradenet</span>

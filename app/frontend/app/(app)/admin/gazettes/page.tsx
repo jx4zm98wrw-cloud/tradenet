@@ -32,7 +32,8 @@ export default function AdminGazettesPage() {
   React.useEffect(() => {
     api.adminCheck()
       .then((c) => {
-        if (!c.isAdmin) router.replace("/");
+        // `/` is the public marketing landing; in-app home moved to `/today`.
+        if (!c.isAdmin) router.replace("/today");
         else setIsAdmin(true);
       })
       .catch(() => setError("Admin check failed"));
