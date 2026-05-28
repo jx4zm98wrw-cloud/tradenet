@@ -59,6 +59,17 @@ test.describe("Visual regression", () => {
     });
   });
 
+  test("pricing page (/pricing)", async ({ page }) => {
+    await page.goto("/pricing");
+    // Wait for the serif hero heading — the page is largely static, but the
+    // segmented controls are client components that hydrate after first paint.
+    await expect(page.getByRole("heading", { name: /Priced for the work/i })).toBeVisible();
+    await expect(page).toHaveScreenshot("pricing.png", {
+      fullPage: false,
+      maxDiffPixelRatio: 0.01,
+    });
+  });
+
   test("/search empty state", async ({ page }) => {
     await page.goto("/search");
     await expect(page.locator("input").first()).toBeVisible();
