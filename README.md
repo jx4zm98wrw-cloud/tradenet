@@ -10,6 +10,8 @@ into structured CSV/database rows and serves them through a small web UI.
 | [`app/`](app/) | The web stack: FastAPI backend (`app/backend/`) + Next.js 15 frontend (`app/frontend/`) + dev `docker-compose.yml`. Start here for ongoing development. |
 | [`app/backend/tm_extractor/`](app/backend/tm_extractor/) | The CSV parser, vendored as a Python package. Originally `TM_csv_builder.py`. |
 | [`app/backend/image_extractor/`](app/backend/image_extractor/) | The logo / mark-specimen image extractor. Originally `Final_TRADEMARK_image_extractor_refine.py`. |
+| [`design_handoff_trademark_gazette/`](design_handoff_trademark_gazette/) | Static HTML design reference for the in-app surfaces (Today / Search / Detail / Compare / Watchlists / Gazettes). Already implemented in `app/frontend/`. |
+| [`design_handoff_tradenet_marketing/`](design_handoff_tradenet_marketing/) | Static HTML design reference for the public marketing site (Landing / Pricing / Coverage / Docs / Login). **Planned, not yet implemented** — see [`IMPLEMENTATION_PLAN.md`](design_handoff_tradenet_marketing/IMPLEMENTATION_PLAN.md). |
 | [`TM_csv_builder.py`](TM_csv_builder.py) | Thin CLI shim that runs the parser without standing up the web stack — handy for "just give me CSVs." |
 | `input/`, `csv/`, `image/`, `modified/`, `log/` | Runtime inputs and outputs (all gitignored; regenerable). |
 | `cities_by_country.json`, `company_suffixes.json`, `cities_overrides.json`, `config_image_extractor.yaml` | Reference data + extractor config consumed at parse time. |
@@ -21,6 +23,7 @@ into structured CSV/database rows and serves them through a small web UI.
 - **Contributing** — [`app/CONTRIBUTING.md`](app/CONTRIBUTING.md)
 - **Deployment** — [`app/DEPLOYMENT.md`](app/DEPLOYMENT.md)
 - **Security policy** — [`app/SECURITY.md`](app/SECURITY.md)
+- **Marketing site plan** — [`design_handoff_tradenet_marketing/IMPLEMENTATION_PLAN.md`](design_handoff_tradenet_marketing/IMPLEMENTATION_PLAN.md)
 - **Guidance for Claude Code (and a denser walkthrough of the parser internals)** — [`CLAUDE.md`](CLAUDE.md)
 
 ## Quick start (CSV-only, no DB or UI)
