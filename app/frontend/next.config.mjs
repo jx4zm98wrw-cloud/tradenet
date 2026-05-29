@@ -1,4 +1,18 @@
-/** @type {import('next').NextConfig} */
+// ESM Next config — switched from `.js` (CommonJS) in PR 5 so we can
+// `import` `remark-gfm`, which is ESM-only and breaks `require()`.
+// All previous behavior (CSP, headers, /api + /static rewrites) is
+// preserved verbatim; the only new wiring is `withMDX`.
+
+import createMDX from "@next/mdx";
+import remarkGfm from "remark-gfm";
+
+const withMDX = createMDX({
+  extension: /\.mdx?$/,
+  options: {
+    remarkPlugins: [remarkGfm],
+    rehypePlugins: [],
+  },
+});
 
 // Content Security Policy — only the API origin + Google Fonts allowed.
 // The `'unsafe-inline'` on style-src is required for Next's Tailwind injection.
@@ -31,9 +45,11 @@ const SECURITY_HEADERS = [
     : []),
 ];
 
-module.exports = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  pageExtensions: ["ts", "tsx", "mdx"],
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
@@ -51,3 +67,5 @@ module.exports = {
     ];
   },
 };
+
+export default withMDX(nextConfig);

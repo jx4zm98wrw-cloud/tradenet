@@ -1,0 +1,106 @@
+{/*
+  Vienna classification — figurative codes.
+  Source: design_handoff_tradenet_marketing/Tradenet - Marketing.html lines 1267-1373.
+*/}
+
+import { DocsCallout } from "@/components/marketing/docs/DocsCallout";
+import { DocsCode } from "@/components/marketing/docs/DocsCode";
+import { DocsTable } from "@/components/marketing/docs/DocsTable";
+import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
+
+<DocsTOC
+  items={[
+    { href: "#v-what", label: "What Vienna codes are" },
+    { href: "#v-format", label: "Reading the code format" },
+    { href: "#v-search", label: "Searching by Vienna code" },
+    { href: "#v-cats", label: "Category reference (1–29)" },
+  ]}
+/>
+
+<h2 className="docs-h2" id="v-what">
+  <span className="docs-h2-num">01</span> What Vienna codes are
+</h2>
+
+<p className="docs-p">
+  Vienna codes classify the <strong>figurative content</strong> of a mark — what you see in it, not what it spells. A logo containing a stylized “V” and a circle gets coded against two categories simultaneously. The same mark might carry 5–15 codes in a thorough classification.
+</p>
+
+<p className="docs-p">
+  The classification is maintained by WIPO and revised every few years. Tradenet uses <strong>Vienna 5.1</strong> (2023 revision). Older marks classified under 4.x or 3.x are auto-mapped where the categories are equivalent; flagged for review where they aren't.
+</p>
+
+<h2 className="docs-h2" id="v-format">
+  <span className="docs-h2-num">02</span> Reading the code format
+</h2>
+
+<p className="docs-p">
+  Codes are three-level and dotted: <span className="mono">CC.DD.SS</span> — Category, Division, Section. For example, <span className="mono">26.04.04</span> means category 26 (geometric figures), division 04 (quadrilaterals), section 04 (rectangles).
+</p>
+
+<DocsCallout heading="Auxiliary codes">
+  A leading <span className="mono">A</span> on the last digit (e.g. <span className="mono">26.04.04 A.1</span>) is an auxiliary code — finer-grained sub-classification that's optional but improves recall in image search.
+</DocsCallout>
+
+<h2 className="docs-h2" id="v-search">
+  <span className="docs-h2-num">03</span> Searching by Vienna code
+</h2>
+
+<p className="docs-p">
+  On the Search page, switch to the <strong>Vienna code</strong> mode tab. You can search by a single full code, a partial code (e.g. <span className="mono">26.04</span> matches everything under category 26 / division 04), or a combination with boolean operators.
+</p>
+
+<DocsCode lang="DSL">{`# Find all marks combining a stylized V with a circle
+27.05.21 AND 26.01.03
+
+# All animals (category 3) except common breeds
+3.* NOT 3.04.01
+
+# Geometric containers (typeface-agnostic)
+24.17.* OR 26.04.*`}</DocsCode>
+
+<h2 className="docs-h2" id="v-cats">
+  <span className="docs-h2-num">04</span> Category reference
+</h2>
+
+<p className="docs-p">
+  The 29 top-level categories. Each links to the WIPO official definition.
+</p>
+
+<DocsTable
+  headers={["Cat.", "Subject", "Common examples"]}
+  rows={[
+    ["01", "Celestial bodies, natural phenomena", "Stars, moons, lightning, rainbows"],
+    ["02", "Human beings", "Heads, hands, silhouettes, figures"],
+    ["03", "Animals", "Mammals, birds, fish, insects"],
+    ["04", "Supernatural, fabulous beings", "Dragons, angels, mythical creatures"],
+    ["05", "Plants", "Trees, leaves, flowers, grain"],
+    ["06", "Landscapes", "Mountains, water, scenery"],
+    ["07", "Constructions, structures, maps", "Buildings, bridges, towers, maps"],
+    ["08", "Foodstuffs", "Bread, dairy, prepared meals"],
+    ["09", "Textiles, clothing", "Garments, footwear, headwear"],
+    ["10", "Tobacco, smokers' articles, matches", "Cigarettes, pipes, lighters"],
+    ["11", "Household utensils", "Cutlery, glassware, kitchenware"],
+    ["12", "Furniture, sanitary installations", "Chairs, tables, plumbing fixtures"],
+    ["13", "Lighting, heating, cooking", "Lamps, stoves, radiators"],
+    ["14", "Hardware, tools, ladders", "Nails, hammers, fasteners"],
+    ["15", "Machinery, motors, engines", "Gears, turbines, mechanical parts"],
+    ["16", "Telecommunications, recording", "Antennas, microphones, screens"],
+    ["17", "Horological, jewelry, weights", "Clocks, watches, gems, scales"],
+    ["18", "Transport, anchors, signaling", "Cars, ships, planes, road signs"],
+    ["19", "Containers, packaging", "Bottles, boxes, bags, jars"],
+    ["20", "Writing materials, books", "Pens, paper, scrolls, libraries"],
+    ["21", "Games, toys, sporting articles", "Cards, dice, equipment, mascots"],
+    ["22", "Musical instruments & accessories", "Strings, percussion, brass"],
+    ["23", "Arms, ammunition, armor", "Swords, shields, firearms"],
+    ["24", "Heraldry, coins, emblems, symbols", "Crests, crowns, flags, badges"],
+    ["25", "Ornamental motifs, surfaces, frames", "Patterns, borders, decorations"],
+    ["26", "Geometric figures & solids", "Circles, squares, triangles, polygons"],
+    ["27", "Forms of writing, numerals", "Letters, numbers, typographic styling"],
+    ["28", "Inscriptions in non-Latin alphabets", "Chinese, Arabic, Cyrillic, Vietnamese diacritics"],
+    ["29", "Colors", "Color claims, multi-color schemes"],
+  ]}
+/>
+
+<DocsCallout heading="Auto-classification">
+  When you upload a specimen, our classifier emits Vienna codes automatically. Accuracy is 87.6% against gold-standard human classification. Enterprise customers can override and persist corrections back to the trained model.
+</DocsCallout>

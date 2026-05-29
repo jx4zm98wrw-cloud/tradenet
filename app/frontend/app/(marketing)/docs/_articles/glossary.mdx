@@ -1,0 +1,137 @@
+{/*
+  Vietnam IP glossary & INID codes.
+  Source: design_handoff_tradenet_marketing/Tradenet - Marketing.html lines 1494-1625.
+*/}
+
+import Link from "next/link";
+import { DocsCallout } from "@/components/marketing/docs/DocsCallout";
+import { DocsTable } from "@/components/marketing/docs/DocsTable";
+import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
+
+<DocsTOC
+  items={[
+    { href: "#g-vn", label: "Vietnamese terms" },
+    { href: "#g-issues", label: "Gazette issue conventions" },
+    { href: "#g-inid", label: "WIPO INID codes" },
+    { href: "#g-international", label: "International instruments" },
+  ]}
+/>
+
+<h2 className="docs-h2" id="g-vn">
+  <span className="docs-h2-num">01</span> Vietnamese terms
+</h2>
+
+<DocsTable
+  headers={["Term", "English", "Notes"]}
+  rows={[
+    [
+      "Cục Sở hữu trí tuệ",
+      "Intellectual Property Office of Vietnam",
+      <>The IP office, now branded <strong>Vietnam IP</strong> (formerly <strong>NOIP</strong> until the 2024 reorganization). Based in Hà Nội.</>,
+    ],
+    ["Nhãn hiệu", "Trademark", "Generic term for any registered or applied-for mark."],
+    ["Đơn đăng ký", "Application", "A pending mark not yet registered. Section A of the gazette."],
+    ["Văn bằng bảo hộ", "Certificate of protection", "The grant document. Issued after successful examination + no opposition."],
+    ["Phản đối", "Opposition", "Third-party challenge filed within the 5-month window."],
+    ["Huỷ bỏ hiệu lực", "Invalidation", "Post-grant challenge. Slower and more expensive than opposition."],
+    ["Người nộp đơn", "Applicant", "The party seeking registration."],
+    ["Đại diện sở hữu công nghiệp", "IP agent", "Authorized representative. Often a law firm."],
+    ["Phân loại Nice", "Nice classification", "The 45-class goods/services system."],
+    ["Phân loại Vienna", "Vienna classification", "The figurative-element classification system."],
+    ["Gia hạn", "Renewal", "Marks are renewable indefinitely in 10-year increments."],
+    ["Bị từ chối", "Refused", "Status after substantive examination rejects the mark."],
+  ]}
+/>
+
+<h2 className="docs-h2" id="g-issues">
+  <span className="docs-h2-num">02</span> Gazette issue conventions
+</h2>
+
+<p className="docs-p">
+  Vietnam IP publishes a weekly bulletin in two parallel streams. Filenames follow a strict convention: <span className="mono">{`{SECTION}_{ISSUE}_{YEAR}.pdf`}</span>.
+</p>
+
+<DocsTable
+  headers={["Code", "Meaning", "Example"]}
+  rows={[
+    ["A", "Section A · Published applications (opens opposition windows)", "A_T2_2026.pdf"],
+    ["B", "Section B · Granted registrations (post-opposition)", "B_T4_2026.pdf"],
+    ["T1", "First weekly issue of the month", "—"],
+    ["T2", "Second weekly issue of the month", "—"],
+    ["T3", "Third weekly issue of the month", "—"],
+    ["T4", "Fourth weekly issue of the month", "—"],
+  ]}
+/>
+
+<DocsCallout heading="Application numbers">
+  Vietnamese app numbers follow <span className="mono">4-YYYY-NNNNN</span>. The leading “4” is the IP-right type (4 = trademark). Certificate numbers (granted marks) follow <span className="mono">4-NNNNNNN</span> with no year.
+</DocsCallout>
+
+<h2 className="docs-h2" id="g-inid">
+  <span className="docs-h2-num">03</span> WIPO INID codes
+</h2>
+
+<p className="docs-p">
+  INID = <em>Internationally agreed Numbers for the Identification of bibliographic Data</em>. Every field in a gazette entry is tagged with a numerical code so the entry can be parsed without knowing the publication's language. Tradenet extracts these directly.
+</p>
+
+<DocsTable
+  headers={["INID", "Field", "What it contains"]}
+  rows={[
+    ["(111)", "Registration number", "The certificate № once granted"],
+    ["(151)", "Date of registration", "Effective date of protection"],
+    ["(181)", "Expected expiration", "10 years from registration"],
+    ["(210)", "Application number", "Pre-grant identifier"],
+    ["(220)", "Filing date", "Date application was filed"],
+    ["(310)", "Priority application №", "For Paris Convention priority claims"],
+    ["(320)", "Priority date", "Earliest priority date claimed"],
+    ["(330)", "Priority country", "Where priority application was filed"],
+    ["(442)", "Publication date · Section A", "Opposition window starts here"],
+    ["(450)", "Publication date · Section B", "Registration announced"],
+    ["(511)", "Nice classes", "Goods/services classes covered"],
+    ["(526)", "Disclaimers", "Non-exclusive elements within the mark"],
+    ["(531)", "Vienna codes", "Figurative element classification"],
+    ["(540)", "Reproduction of mark", "The specimen image / wordmark"],
+    ["(550)", "Mark type", "Wordmark, figurative, 3D, color, sound, etc."],
+    ["(551)", "Collective mark indication", "True if a collective or certification mark"],
+    ["(554)", "Three-dimensional mark", "Flag for 3D marks"],
+    ["(561)", "Transliteration", "For non-Latin marks"],
+    ["(566)", "Translation", "For non-Latin marks"],
+    ["(571)", "Mark description", "Verbal description of figurative elements"],
+    ["(591)", "Color claim", "Specific colors claimed as part of the mark"],
+    ["(730)", "Applicant / owner", "Name and address of the holder"],
+    ["(740)", "Authorized representative", "The IP agent of record"],
+    ["(750)", "Address for correspondence", "Where Vietnam IP sends notices"],
+    ["(811)", "Designating Contracting Party", "For Madrid Protocol designations"],
+    ["(891)", "Madrid subsequent designation date", "Vietnam-designation date for international registrations"],
+  ]}
+/>
+
+<h2 className="docs-h2" id="g-international">
+  <span className="docs-h2-num">04</span> International instruments
+</h2>
+
+<p className="docs-p">
+  Vietnam is a member of several international IP treaties that affect how marks are filed and protected.
+</p>
+
+<DocsTable
+  headers={["Instrument", "What it does", "Vietnam joined"]}
+  rows={[
+    ["Paris Convention", "6-month priority claim from first foreign filing", "1949"],
+    ["Madrid Agreement", "Centralized international registration via WIPO", "1949"],
+    ["Madrid Protocol", "More flexible companion treaty to the Agreement", "2006"],
+    ["Nice Agreement", "The 45-class goods/services system", "2007"],
+    ["Vienna Agreement", "The figurative classification system", "2007"],
+    ["TRIPS (WTO)", "Minimum IP standards for WTO members", "2007"],
+    ["Hague Agreement", "International registration of industrial designs", "2019"],
+  ]}
+/>
+
+<DocsCallout heading="Article 112">
+  The opposition provision of Vietnam's IP Law (Luật Sở hữu trí tuệ). Sets the 5-month window from publication and the grounds on which opposition may be filed. See the{" "}
+  <Link href="/docs/article-112" style={{ color: "var(--stamp)" }}>
+    Article 112 guide
+  </Link>{" "}
+  for the practitioner's view.
+</DocsCallout>

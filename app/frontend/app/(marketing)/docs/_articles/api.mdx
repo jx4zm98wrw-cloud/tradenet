@@ -1,0 +1,79 @@
+{/*
+  REST API reference.
+  Source: design_handoff_tradenet_marketing/Tradenet - Marketing.html lines 1147-1219.
+*/}
+
+import { DocsCallout } from "@/components/marketing/docs/DocsCallout";
+import { DocsCode } from "@/components/marketing/docs/DocsCode";
+import { DocsTable } from "@/components/marketing/docs/DocsTable";
+
+<DocsCallout heading="Base URL">
+  <span className="mono" style={{ color: "var(--ink)" }}>https://api.tradenet.vn/v1</span>
+  <br />
+  All requests must include <span className="mono">Authorization: Bearer YOUR_TOKEN</span>. Tokens are issued in your Enterprise admin console.
+</DocsCallout>
+
+<h2 className="docs-h2">
+  <span className="docs-h2-num">01</span> Authentication
+</h2>
+
+<DocsCode lang="cURL">{`curl "https://api.tradenet.vn/v1/me" \\
+  -H "Authorization: Bearer $TRADENET_API_KEY"`}</DocsCode>
+
+<h2 className="docs-h2">
+  <span className="docs-h2-num">02</span> Search
+</h2>
+
+<p className="docs-p">
+  <span className="mono"><strong>POST</strong> /v1/search</span> — run a one-off search. Returns up to 200 results per call; paginate via the <span className="mono">cursor</span> field.
+</p>
+
+<DocsCode lang="JSON">{`POST /v1/search
+{
+  "mode": "phonetic",
+  "q": "neur*",
+  "filters": {
+    "classes": [5, 10],
+    "countries": ["VN", "SG"],
+    "period": { "from": "2026-01-01" }
+  },
+  "threshold": 0.75,
+  "sort": "similarity",
+  "limit": 50
+}`}</DocsCode>
+
+<h2 className="docs-h2">
+  <span className="docs-h2-num">03</span> Watchlists
+</h2>
+
+<p className="docs-p">
+  <span className="mono"><strong>POST</strong> /v1/watchlists</span> creates a saved query that re-runs each gazette issue. Findings are delivered via webhook, email, or by polling the watchlist endpoint.
+</p>
+
+<h2 className="docs-h2">
+  <span className="docs-h2-num">04</span> Webhooks
+</h2>
+
+<p className="docs-p">
+  Subscribe to events at <span className="mono">POST /v1/webhooks</span>. All webhook payloads are signed with HMAC-SHA256 — verify the <span className="mono">X-TM-Signature</span> header.
+</p>
+
+<DocsTable
+  headers={["Event", "Triggered when"]}
+  rows={[
+    ["watchlist.hit", "A new mark matches a watchlist"],
+    ["opposition.window_closing", "14 days before an opposition window closes"],
+    ["mark.status_changed", "A tracked mark changes status"],
+    ["gazette.ingested", "A new gazette issue is fully indexed"],
+  ]}
+/>
+
+<h2 className="docs-h2">
+  <span className="docs-h2-num">05</span> Rate limits
+</h2>
+
+<ul className="docs-list">
+  <li><strong>Search:</strong> 100 requests/min · 10,000/day</li>
+  <li><strong>Watchlists:</strong> no rate limit on writes; reads paginated</li>
+  <li><strong>Webhook delivery:</strong> at-least-once, exponential backoff up to 24h</li>
+</ul>

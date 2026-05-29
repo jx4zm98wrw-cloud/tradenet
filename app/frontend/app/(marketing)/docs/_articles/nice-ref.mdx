@@ -1,0 +1,117 @@
+{/*
+  Nice classification — goods & services.
+  Source: design_handoff_tradenet_marketing/Tradenet - Marketing.html lines 1375-1492.
+*/}
+
+import { DocsCallout } from "@/components/marketing/docs/DocsCallout";
+import { DocsTable } from "@/components/marketing/docs/DocsTable";
+import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
+
+<DocsTOC
+  items={[
+    { href: "#n-overview", label: "The 45-class split" },
+    { href: "#n-common", label: "Commonly confused classes" },
+    { href: "#n-search", label: "Searching across classes" },
+    { href: "#n-goods", label: "Goods reference (1–34)" },
+    { href: "#n-services", label: "Services reference (35–45)" },
+  ]}
+/>
+
+<h2 className="docs-h2" id="n-overview">
+  <span className="docs-h2-num">01</span> The 45-class split
+</h2>
+
+<p className="docs-p">
+  Classes 1–34 cover <strong>goods</strong> (tangible products). Classes 35–45 cover <strong>services</strong>. The split matters because conflict analysis usually starts with: are these marks in the same or related classes? A pharmaceutical (Class 5) and a restaurant (Class 43) sharing the same name rarely conflict; two food brands in Class 30 almost always do.
+</p>
+
+<h2 className="docs-h2" id="n-common">
+  <span className="docs-h2-num">02</span> Commonly confused classes
+</h2>
+
+<p className="docs-p">
+  Three pairs that trip up filers and create avoidable opposition windows:
+</p>
+
+<ul className="docs-list">
+  <li><strong>Class 35 (Retail services) vs. the class of the goods sold.</strong> A clothing brand selling its own line files in Class 25 (the clothes). A department store selling many brands' clothes files in Class 35.</li>
+  <li><strong>Class 9 (Software) vs. Class 42 (SaaS / cloud).</strong> Downloaded apps go in Class 9. Hosted, browser-delivered services go in Class 42. Many filings need both.</li>
+  <li><strong>Class 5 (Pharmaceuticals) vs. Class 44 (Medical services).</strong> A drug is a Class 5 good. A clinic that prescribes it is a Class 44 service. Often filed together for healthcare brands.</li>
+</ul>
+
+<DocsCallout heading="Cross-class conflict">
+  Vietnamese examiners sometimes find conflict across “related classes” even without direct overlap — e.g. Class 32 (beverages) and Class 33 (alcoholic beverages). Tradenet surfaces these via the semantic-similarity channel in the conflict scorecard.
+</DocsCallout>
+
+<h2 className="docs-h2" id="n-search">
+  <span className="docs-h2-num">03</span> Searching across classes
+</h2>
+
+<p className="docs-p">
+  In the search rail, the Nice classes group has an <strong>ANY / ALL</strong> toggle. Default is ANY — match marks covering any selected class. Switch to ALL when you need marks that cover the full set (e.g. food brands that cover Classes 29, 30, <em>and</em> 32 together).
+</p>
+
+<h2 className="docs-h2" id="n-goods">
+  <span className="docs-h2-num">04</span> Goods reference (Classes 1–34)
+</h2>
+
+<DocsTable
+  headers={["Class", "Heading", "Typical contents"]}
+  rows={[
+    ["01", "Chemicals", "Industrial chemicals, fertilizers, unprocessed plastics"],
+    ["02", "Paints", "Coatings, dyes, pigments, anti-corrosion"],
+    ["03", "Cosmetics & cleaning", "Soap, perfume, toothpaste, detergents"],
+    ["04", "Lubricants & fuels", "Oils, greases, candles, fuels"],
+    ["05", "Pharmaceuticals", "Medicines, vitamins, supplements, dental preps"],
+    ["06", "Metal goods", "Common metals, hardware, pipes (non-electric)"],
+    ["07", "Machinery", "Industrial machines, motors, robots"],
+    ["08", "Hand tools", "Cutlery, manual tools, razors"],
+    ["09", "Software & electronics", "Phones, software (downloaded), batteries, optics"],
+    ["10", "Medical apparatus", "Surgical instruments, prosthetics, medical devices"],
+    ["11", "Lighting, heating, cooking", "Lamps, HVAC, appliances, water filters"],
+    ["12", "Vehicles", "Cars, motorcycles, bicycles, parts"],
+    ["13", "Firearms", "Weapons, ammunition, explosives"],
+    ["14", "Jewelry & horology", "Precious metals, watches, jewelry"],
+    ["15", "Musical instruments", "Instruments, music stands, cases"],
+    ["16", "Paper & printed matter", "Books, stationery, art supplies, packaging paper"],
+    ["17", "Rubber & plastics", "Insulating materials, semi-processed plastics, hoses"],
+    ["18", "Leather goods", "Bags, luggage, leather, umbrellas"],
+    ["19", "Building materials", "Non-metallic: stone, timber, mortar, glass"],
+    ["20", "Furniture", "Beds, tables, mirrors, picture frames"],
+    ["21", "Household utensils", "Kitchenware, glassware, cleaning tools"],
+    ["22", "Ropes & textiles (raw)", "Tents, sails, raw fibers, padding"],
+    ["23", "Yarns & threads", "Textile yarns, threads, embroidery"],
+    ["24", "Textiles (finished)", "Bed linen, towels, curtains, fabric"],
+    ["25", "Clothing", "Apparel, footwear, headwear"],
+    ["26", "Lace & trimmings", "Buttons, zippers, ribbons, hair accessories"],
+    ["27", "Carpets & floor coverings", "Rugs, mats, wallpaper, linoleum"],
+    ["28", "Games & sporting goods", "Toys, games, sports equipment, fishing gear"],
+    ["29", "Meat, dairy, processed food", "Meat, fish, dairy, oils, preserves"],
+    ["30", "Coffee, tea, foodstuffs", "Coffee, tea, sugar, rice, bread, condiments, instant noodles"],
+    ["31", "Agriculture & live animals", "Raw produce, seeds, live plants & animals"],
+    ["32", "Beverages (non-alcoholic)", "Beer, soft drinks, mineral water, juices"],
+    ["33", "Alcoholic beverages", "Wine, spirits, liqueurs (excluding beer)"],
+    ["34", "Tobacco & smokers' articles", "Cigarettes, vapes, matches, lighters"],
+  ]}
+/>
+
+<h2 className="docs-h2" id="n-services">
+  <span className="docs-h2-num">05</span> Services reference (Classes 35–45)
+</h2>
+
+<DocsTable
+  headers={["Class", "Heading", "Typical contents"]}
+  rows={[
+    ["35", "Advertising & retail", "Marketing, retail services, business consulting, HR"],
+    ["36", "Insurance & finance", "Banking, insurance, real estate, payment processing"],
+    ["37", "Construction & repair", "Building, installation, vehicle repair, cleaning"],
+    ["38", "Telecommunications", "Mobile services, streaming, internet access, messaging"],
+    ["39", "Transport & logistics", "Shipping, travel agencies, warehousing, distribution"],
+    ["40", "Material treatment", "Manufacturing, recycling, printing, food preservation"],
+    ["41", "Education & entertainment", "Training, publishing, sports, music, online content"],
+    ["42", "Scientific & technology", "R&D, SaaS, cloud computing, design, IT consulting"],
+    ["43", "Food, drink, accommodation", "Restaurants, cafés, hotels, catering"],
+    ["44", "Medical & agriculture services", "Clinics, pharmacies, vets, beauty salons, landscaping"],
+    ["45", "Legal & personal services", "Law firms, security, dating, social services"],
+  ]}
+/>
