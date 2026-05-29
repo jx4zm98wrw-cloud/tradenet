@@ -85,6 +85,21 @@ test.describe("Visual regression", () => {
     });
   });
 
+  test("docs page (/docs/getting-started)", async ({ page }) => {
+    await page.goto("/docs/getting-started");
+    // The "Introduction to Tradenet" h1 is rendered by DocsArticleShell;
+    // the docs route lives in the (marketing) group and is statically
+    // generated (one SSG render per slug), so no client-side hydration
+    // delay before the heading appears.
+    await expect(
+      page.getByRole("heading", { name: /Introduction to Tradenet/i }),
+    ).toBeVisible();
+    await expect(page).toHaveScreenshot("docs-getting-started.png", {
+      fullPage: false,
+      maxDiffPixelRatio: 0.01,
+    });
+  });
+
   test("/search empty state", async ({ page }) => {
     await page.goto("/search");
     await expect(page.locator("input").first()).toBeVisible();

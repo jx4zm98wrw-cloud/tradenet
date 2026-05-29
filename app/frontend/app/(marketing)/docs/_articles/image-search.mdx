@@ -1,0 +1,47 @@
+{/*
+  Image similarity search.
+  Source: design_handoff_tradenet_marketing/Tradenet - Marketing.html lines 1093-1145.
+*/}
+
+import { DocsCallout } from "@/components/marketing/docs/DocsCallout";
+import { DocsTable } from "@/components/marketing/docs/DocsTable";
+
+<h2 className="docs-h2">
+  <span className="docs-h2-num">01</span> How it works
+</h2>
+
+<p className="docs-p">
+  When you upload a specimen, three pipelines run in parallel: a <strong>perceptual hash</strong> for visual similarity, <strong>OCR</strong> to extract the wordmark text, and a <strong>Vienna code classifier</strong> for figurative elements. Results combine all three.
+</p>
+
+<DocsTable
+  headers={["Channel", "What it catches", "Weight (default)"]}
+  rows={[
+    ["pHash", "Visually identical / near-identical marks", "40%"],
+    ["OCR", "Marks that read the same word", "35%"],
+    ["Vienna", "Same figurative category (e.g. “stylized V”)", "25%"],
+  ]}
+/>
+
+<h2 className="docs-h2">
+  <span className="docs-h2-num">02</span> What to upload
+</h2>
+
+<ul className="docs-list">
+  <li>The cleanest specimen you have — ideally the one you'd submit to Vietnam IP</li>
+  <li>PNG with transparent background works best for visual matching</li>
+  <li>For figurative-only marks (no text), the Vienna classifier carries more weight</li>
+  <li>For wordmarks, OCR-cleanness matters most — avoid stylized fonts when possible</li>
+</ul>
+
+<DocsCallout heading="Pro tip">
+  You can upload multiple specimens at once and Tradenet will treat them as a single query. Useful for marks with multiple registered variants (color, B&W, with/without tagline).
+</DocsCallout>
+
+<h2 className="docs-h2">
+  <span className="docs-h2-num">03</span> Tuning weights
+</h2>
+
+<p className="docs-p">
+  On the Firm plan and above, you can override the default weights per matter. Pharmaceutical clearance often weights phonetic and visual evenly. Logo conflicts for sports brands weight visual + Vienna heavily, with OCR near zero.
+</p>

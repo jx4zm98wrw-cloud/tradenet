@@ -1,0 +1,111 @@
+{/*
+  Introduction to Tradenet — first article in the docs sequence.
+  Body-only: eyebrow / h1 / lede / prev-next footer come from DocsArticleShell.
+  Source: design_handoff_tradenet_marketing/Tradenet - Marketing.html lines 939-1046.
+*/}
+
+import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
+import { DocsCallout } from "@/components/marketing/docs/DocsCallout";
+import { DocsTable } from "@/components/marketing/docs/DocsTable";
+import { DocsCode } from "@/components/marketing/docs/DocsCode";
+
+<DocsTOC
+  items={[
+    { href: "#what", label: "What Tradenet does" },
+    { href: "#how", label: "How the four surfaces fit together" },
+    { href: "#first-search", label: "Your first search" },
+    { href: "#next", label: "What to do next" },
+  ]}
+/>
+
+<h2 className="docs-h2" id="what">
+  <span className="docs-h2-num">01</span> What Tradenet does
+</h2>
+
+<p className="docs-p">
+  Vietnam IP — formally Cục Sở hữu trí tuệ, and previously branded NOIP — publishes a weekly gazette in two sections: <strong>Section A</strong> for newly-published applications (opening their 5-month opposition window), and <strong>Section B</strong> for newly-granted registrations. Each issue runs 80–4,000 pages of dense PDF.
+</p>
+
+<p className="docs-p">
+  Tradenet ingests every issue the day it publishes, extracts the marks, and gives you four surfaces:
+</p>
+
+<ul className="docs-list">
+  <li><strong>Today</strong> — a digest of what landed since you last checked, anchored on your watchlists</li>
+  <li><strong>Search</strong> — text, phonetic, image, and Vienna-code search across the entire corpus</li>
+  <li><strong>Detail</strong> — every fact about one mark, including its procedural timeline and opposition window</li>
+  <li><strong>Compare</strong> — side-by-side conflict review for 2–3 marks</li>
+</ul>
+
+<DocsCallout heading="Tip">
+  The fastest way to understand the product is to set up a watchlist for one of your client's brands and let it run for a week. The Monday-morning digest is the moment Tradenet earns its keep.
+</DocsCallout>
+
+<h2 className="docs-h2" id="how">
+  <span className="docs-h2-num">02</span> How the four surfaces fit together
+</h2>
+
+<p className="docs-p">
+  The product is built around one loop: <strong>watch → find → analyze → act</strong>. A watchlist saves a search. Each new gazette issue re-runs the search and surfaces matches on <strong>Today</strong>. You click into <strong>Detail</strong> to investigate, optionally pull two or three marks into <strong>Compare</strong> for a scorecard, then act — usually by filing opposition before the 5-month window closes.
+</p>
+
+<DocsTable
+  headers={["Surface", "What it answers", "When you use it"]}
+  rows={[
+    ["Today", "What's new this week?", "Monday morning, daily"],
+    ["Search", "Is this name / image / class clear?", "Pre-filing clearance"],
+    ["Detail", "Everything about this mark", "Conflict investigation"],
+    ["Compare", "How conflicting are these?", "Opposition decision memo"],
+  ]}
+/>
+
+<h2 className="docs-h2" id="first-search">
+  <span className="docs-h2-num">03</span> Your first search
+</h2>
+
+<p className="docs-p">
+  The fastest way to see Tradenet in action: search for a brand you know, then save the search as a watchlist.
+</p>
+
+<ol style={{ paddingLeft: 22, fontSize: 14.5, color: "var(--ink-2)", lineHeight: 1.8 }}>
+  <li>Click <strong>Search</strong> in the top nav (or press <kbd>⌘K</kbd>)</li>
+  <li>Switch to the <strong>Phonetic / fuzzy</strong> mode tab</li>
+  <li>Type <span className="mono">neur*</span> and pick Class 5 in the rail</li>
+  <li>Drag the similarity threshold up to ~75%</li>
+  <li>Click <strong>Save as watchlist</strong> in the active-filters bar</li>
+</ol>
+
+<p className="docs-p">
+  That's it. Every new gazette issue, Tradenet will run that exact query and surface matches on your Today screen.
+</p>
+
+<DocsCallout heading="API equivalent">
+  Every action you take in the UI maps 1:1 to a REST endpoint. The above is two API calls: <span className="mono">POST /v1/search</span> followed by <span className="mono">POST /v1/watchlists</span>. See the API reference for the full schema.
+</DocsCallout>
+
+<DocsCode lang="cURL">{`# Create a watchlist from a phonetic search
+curl "https://api.tradenet.vn/v1/watchlists" \\
+  -H "Authorization: Bearer $TRADENET_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "NEUREX family",
+    "query": {
+      "mode": "phonetic",
+      "q": "neur*",
+      "classes": [5],
+      "threshold": 0.75
+    },
+    "matter": "CR-2024-118",
+    "alerts": ["email-weekly", "slack"]
+  }'`}</DocsCode>
+
+<h2 className="docs-h2" id="next">
+  <span className="docs-h2-num">04</span> What to do next
+</h2>
+
+<ul className="docs-list">
+  <li>Read <strong>Your first watchlist</strong> for the full setup walkthrough</li>
+  <li>Bookmark the <strong>Article 112 guide</strong> for opposition rules</li>
+  <li>Connect Slack so your team sees findings in real time</li>
+  <li>Enterprise admins: set up SSO and configure data residency</li>
+</ul>
