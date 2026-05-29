@@ -291,3 +291,43 @@ class User(Base):
     # a logout/password-change are rejected. Stored as Postgres BIGINT so we
     # never wrap (default 0 = no revocations yet).
     token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class TmNameIndex(Base):
+    """NOIP wordmark reference table — see migration 0011 for the full rationale.
+
+    Out-of-band index from the NOIP applicant-name extract, keyed by
+    application number, used by `scripts/enrich_mark_samples.py` to fill
+    missing `mark_sample` values in `trademarks`. Not linked by FK to
+    `gazettes` — the CSV has no per-PDF provenance and many of its rows
+    are for filings we'll never see in gazettes we ingest. This table is
+    therefore *not* part of the application's hot-path query surface; the
+    ORM mapping exists only so `alembic check` sees a corresponding model
+    for the migration-created table.
+
+    The trigram + date indexes are declared in the migration itself
+    (CREATE INDEX) rather than via SQLAlchemy `Index()` because they use
+    Postgres-specific opclasses (`gin_trgm_ops`) that aren't first-class
+    in SQLAlchemy's index API. `alembic check` is willing to ignore index
+    diffs that look like raw-SQL-only constructs, but for safety we keep
+    the model's Index() declarations matching the migration shape.
+    """
+
+    __tablename__ = "tm_name_index"
+    __table_args__ = (
+        # Trigram GIN to make this table usable for fuzzy search across the
+        # full ~770k mark corpus down the road. The opclass is set in the
+        # migration; SQLAlchemy here just records the column it covers so
+        # autogenerate sees the index exists.
+        Index(
+            "ix_tm_name_index_mark_trgm",
+            "mark_sample",
+            postgresql_using="gin",
+            postgresql_ops={"mark_sample": "gin_trgm_ops"},
+        ),
+        Index("ix_tm_name_index_submission_date", "submission_date"),
+    )
+
+    application_number: Mapped[str] = mapped_column(String(64), primary_key=True)
+    submission_date: Mapped[date | None] = mapped_column(Date)
+    mark_sample: Mapped[str] = mapped_column(Text, nullable=False)
