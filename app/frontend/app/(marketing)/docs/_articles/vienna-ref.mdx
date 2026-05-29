@@ -7,6 +7,7 @@ import { DocsCallout } from "@/components/marketing/docs/DocsCallout";
 import { DocsCode } from "@/components/marketing/docs/DocsCode";
 import { DocsTable } from "@/components/marketing/docs/DocsTable";
 import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
+import { DocsH2 } from "@/components/marketing/docs/DocsH2";
 
 <DocsTOC
   items={[
@@ -17,37 +18,23 @@ import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
   ]}
 />
 
-<h2 className="docs-h2" id="v-what">
-  <span className="docs-h2-num">01</span> What Vienna codes are
-</h2>
+<DocsH2 num="01" id="v-what">What Vienna codes are</DocsH2>
 
-<p className="docs-p">
-  Vienna codes classify the <strong>figurative content</strong> of a mark — what you see in it, not what it spells. A logo containing a stylized “V” and a circle gets coded against two categories simultaneously. The same mark might carry 5–15 codes in a thorough classification.
-</p>
+Vienna codes classify the <strong>figurative content</strong> of a mark — what you see in it, not what it spells. A logo containing a stylized “V” and a circle gets coded against two categories simultaneously. The same mark might carry 5–15 codes in a thorough classification.
 
-<p className="docs-p">
-  The classification is maintained by WIPO and revised every few years. Tradenet uses <strong>Vienna 5.1</strong> (2023 revision). Older marks classified under 4.x or 3.x are auto-mapped where the categories are equivalent; flagged for review where they aren't.
-</p>
+The classification is maintained by WIPO and revised every few years. Tradenet uses <strong>Vienna 5.1</strong> (2023 revision). Older marks classified under 4.x or 3.x are auto-mapped where the categories are equivalent; flagged for review where they aren't.
 
-<h2 className="docs-h2" id="v-format">
-  <span className="docs-h2-num">02</span> Reading the code format
-</h2>
+<DocsH2 num="02" id="v-format">Reading the code format</DocsH2>
 
-<p className="docs-p">
-  Codes are three-level and dotted: <span className="mono">CC.DD.SS</span> — Category, Division, Section. For example, <span className="mono">26.04.04</span> means category 26 (geometric figures), division 04 (quadrilaterals), section 04 (rectangles).
-</p>
+Codes are three-level and dotted: <span className="mono">CC.DD.SS</span> — Category, Division, Section. For example, <span className="mono">26.04.04</span> means category 26 (geometric figures), division 04 (quadrilaterals), section 04 (rectangles).
 
 <DocsCallout heading="Auxiliary codes">
   A leading <span className="mono">A</span> on the last digit (e.g. <span className="mono">26.04.04 A.1</span>) is an auxiliary code — finer-grained sub-classification that's optional but improves recall in image search.
 </DocsCallout>
 
-<h2 className="docs-h2" id="v-search">
-  <span className="docs-h2-num">03</span> Searching by Vienna code
-</h2>
+<DocsH2 num="03" id="v-search">Searching by Vienna code</DocsH2>
 
-<p className="docs-p">
-  On the Search page, switch to the <strong>Vienna code</strong> mode tab. You can search by a single full code, a partial code (e.g. <span className="mono">26.04</span> matches everything under category 26 / division 04), or a combination with boolean operators.
-</p>
+On the Search page, switch to the <strong>Vienna code</strong> mode tab. You can search by a single full code, a partial code (e.g. <span className="mono">26.04</span> matches everything under category 26 / division 04), or a combination with boolean operators.
 
 <DocsCode lang="DSL">{`# Find all marks combining a stylized V with a circle
 27.05.21 AND 26.01.03
@@ -58,13 +45,9 @@ import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
 # Geometric containers (typeface-agnostic)
 24.17.* OR 26.04.*`}</DocsCode>
 
-<h2 className="docs-h2" id="v-cats">
-  <span className="docs-h2-num">04</span> Category reference
-</h2>
+<DocsH2 num="04" id="v-cats">Category reference</DocsH2>
 
-<p className="docs-p">
-  The 29 top-level categories. Each links to the WIPO official definition.
-</p>
+The 29 top-level categories. Each links to the WIPO official definition.
 
 <DocsTable
   headers={["Cat.", "Subject", "Common examples"]}

@@ -8,6 +8,7 @@ import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
 import { DocsCallout } from "@/components/marketing/docs/DocsCallout";
 import { DocsTable } from "@/components/marketing/docs/DocsTable";
 import { DocsCode } from "@/components/marketing/docs/DocsCode";
+import { DocsH2 } from "@/components/marketing/docs/DocsH2";
 
 <DocsTOC
   items={[
@@ -18,17 +19,11 @@ import { DocsCode } from "@/components/marketing/docs/DocsCode";
   ]}
 />
 
-<h2 className="docs-h2" id="what">
-  <span className="docs-h2-num">01</span> What Tradenet does
-</h2>
+<DocsH2 num="01" id="what">What Tradenet does</DocsH2>
 
-<p className="docs-p">
-  Vietnam IP — formally Cục Sở hữu trí tuệ, and previously branded NOIP — publishes a weekly gazette in two sections: <strong>Section A</strong> for newly-published applications (opening their 5-month opposition window), and <strong>Section B</strong> for newly-granted registrations. Each issue runs 80–4,000 pages of dense PDF.
-</p>
+Vietnam IP — formally Cục Sở hữu trí tuệ, and previously branded NOIP — publishes a weekly gazette in two sections: <strong>Section A</strong> for newly-published applications (opening their 5-month opposition window), and <strong>Section B</strong> for newly-granted registrations. Each issue runs 80–4,000 pages of dense PDF.
 
-<p className="docs-p">
-  Tradenet ingests every issue the day it publishes, extracts the marks, and gives you four surfaces:
-</p>
+Tradenet ingests every issue the day it publishes, extracts the marks, and gives you four surfaces:
 
 <ul className="docs-list">
   <li><strong>Today</strong> — a digest of what landed since you last checked, anchored on your watchlists</li>
@@ -41,13 +36,9 @@ import { DocsCode } from "@/components/marketing/docs/DocsCode";
   The fastest way to understand the product is to set up a watchlist for one of your client's brands and let it run for a week. The Monday-morning digest is the moment Tradenet earns its keep.
 </DocsCallout>
 
-<h2 className="docs-h2" id="how">
-  <span className="docs-h2-num">02</span> How the four surfaces fit together
-</h2>
+<DocsH2 num="02" id="how">How the four surfaces fit together</DocsH2>
 
-<p className="docs-p">
-  The product is built around one loop: <strong>watch → find → analyze → act</strong>. A watchlist saves a search. Each new gazette issue re-runs the search and surfaces matches on <strong>Today</strong>. You click into <strong>Detail</strong> to investigate, optionally pull two or three marks into <strong>Compare</strong> for a scorecard, then act — usually by filing opposition before the 5-month window closes.
-</p>
+The product is built around one loop: <strong>watch → find → analyze → act</strong>. A watchlist saves a search. Each new gazette issue re-runs the search and surfaces matches on <strong>Today</strong>. You click into <strong>Detail</strong> to investigate, optionally pull two or three marks into <strong>Compare</strong> for a scorecard, then act — usually by filing opposition before the 5-month window closes.
 
 <DocsTable
   headers={["Surface", "What it answers", "When you use it"]}
@@ -59,13 +50,9 @@ import { DocsCode } from "@/components/marketing/docs/DocsCode";
   ]}
 />
 
-<h2 className="docs-h2" id="first-search">
-  <span className="docs-h2-num">03</span> Your first search
-</h2>
+<DocsH2 num="03" id="first-search">Your first search</DocsH2>
 
-<p className="docs-p">
-  The fastest way to see Tradenet in action: search for a brand you know, then save the search as a watchlist.
-</p>
+The fastest way to see Tradenet in action: search for a brand you know, then save the search as a watchlist.
 
 <ol style={{ paddingLeft: 22, fontSize: 14.5, color: "var(--ink-2)", lineHeight: 1.8 }}>
   <li>Click <strong>Search</strong> in the top nav (or press <kbd>⌘K</kbd>)</li>
@@ -75,9 +62,7 @@ import { DocsCode } from "@/components/marketing/docs/DocsCode";
   <li>Click <strong>Save as watchlist</strong> in the active-filters bar</li>
 </ol>
 
-<p className="docs-p">
-  That's it. Every new gazette issue, Tradenet will run that exact query and surface matches on your Today screen.
-</p>
+That's it. Every new gazette issue, Tradenet will run that exact query and surface matches on your Today screen.
 
 <DocsCallout heading="API equivalent">
   Every action you take in the UI maps 1:1 to a REST endpoint. The above is two API calls: <span className="mono">POST /v1/search</span> followed by <span className="mono">POST /v1/watchlists</span>. See the API reference for the full schema.
@@ -99,9 +84,7 @@ curl "https://api.tradenet.vn/v1/watchlists" \\
     "alerts": ["email-weekly", "slack"]
   }'`}</DocsCode>
 
-<h2 className="docs-h2" id="next">
-  <span className="docs-h2-num">04</span> What to do next
-</h2>
+<DocsH2 num="04" id="next">What to do next</DocsH2>
 
 <ul className="docs-list">
   <li>Read <strong>Your first watchlist</strong> for the full setup walkthrough</li>
