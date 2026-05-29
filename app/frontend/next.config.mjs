@@ -50,6 +50,38 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   pageExtensions: ["ts", "tsx", "mdx"],
+  // Use polling-based file watching in dev so bulk file changes from
+  // `git pull` / `git merge` / `git checkout` don't desync webpack's
+  // chunk graph from the browser's cached chunk URLs.
+  //
+  // Symptom (without this): after a git operation touches 100+ files
+  // atomically, the page reload shows raw HTML with no CSS — the
+  // `<link rel="stylesheet">` references chunks that webpack already
+  // renamed but the browser hasn't reconciled. Only fix used to be
+  // `kill dev + rm -rf .next + restart`, which we hit 4× in one session
+  // (#84 was filed against it).
+  //
+  // Why polling fixes it: native FS events (the default) can drop or
+  // batch events under high-frequency change bursts. Polling reads
+  // file mtimes every `poll` ms — slow file changes are missed by no
+  // more than `poll` ms, and bursts get coalesced into a single
+  // rebuild cycle rather than 100 partial ones. ~1-2% CPU overhead on
+  // idle, negligible on M-series hardware.
+  //
+  // Only applied in dev — prod uses `next build` which doesn't watch.
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.watchOptions = {
+        // Coalesce all change events from a single git op into one rebuild
+        aggregateTimeout: 600,
+        // Poll every 1s — catches atomic replacements within 1s, no events lost
+        poll: 1000,
+        // Don't waste cycles polling node_modules / build outputs / git dir
+        ignored: ["**/node_modules/**", "**/.next/**", "**/.git/**"],
+      };
+    }
+    return config;
+  },
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
