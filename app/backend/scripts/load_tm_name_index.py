@@ -98,8 +98,7 @@ def load_csv(csv_path: Path, *, execute: bool) -> int:
                 reader = csv.DictReader(fh)
                 if reader.fieldnames is None or COL_APPNUM not in reader.fieldnames:
                     print(
-                        f"ERROR: csv missing expected header {COL_APPNUM!r}; "
-                        f"got {reader.fieldnames!r}",
+                        f"ERROR: csv missing expected header {COL_APPNUM!r}; got {reader.fieldnames!r}",
                         file=sys.stderr,
                     )
                     return -1
@@ -196,8 +195,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--execute",
         action="store_true",
-        help="Actually write to the DB. Without this flag we count-only "
-        "and roll back.",
+        help="Actually write to the DB. Without this flag we count-only and roll back.",
     )
     args = parser.parse_args(argv)
     result = load_csv(args.csv, execute=args.execute)

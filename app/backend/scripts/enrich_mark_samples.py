@@ -78,10 +78,7 @@ def enrich(*, execute: bool) -> int:
 
             if not execute:
                 conn.rollback()
-                print(
-                    f"DRY-RUN: would update {matched:,} trademarks rows. "
-                    "Re-run with --execute to apply."
-                )
+                print(f"DRY-RUN: would update {matched:,} trademarks rows. Re-run with --execute to apply.")
                 return matched
 
             # The real update. Single-statement SQL — Postgres runs the
@@ -110,8 +107,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--execute",
         action="store_true",
-        help="Actually run the UPDATE. Without this flag we count-only "
-        "and roll back.",
+        help="Actually run the UPDATE. Without this flag we count-only and roll back.",
     )
     args = parser.parse_args(argv)
     result = enrich(execute=args.execute)
