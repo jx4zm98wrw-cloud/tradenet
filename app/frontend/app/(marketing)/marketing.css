@@ -4,14 +4,15 @@
  * Stripped sections (all tokens, all alt themes, all preflight resets, all
  * body font setup) live in `app/globals.css` already — no duplication. The
  * following prototype sections were also stripped because they belong to
- * later PRs (Pricing, Login, Coverage, Docs) and the stub Buttons/View
- * toggle/Tweaks panel safety blocks don't apply in the Next.js shell:
+ * later PRs (Docs) and the stub Buttons/View toggle/Tweaks panel safety
+ * blocks don't apply in the Next.js shell:
  *   - .view / .view.active (HTML-prototype hash routing; replaced by Next routing)
  *   - .btn family (we use components/ui/button.tsx — but kept here because
  *     the prototype CSS is the simplest path to the design and the in-app
  *     Button hasn't been audited for parity. Re-evaluate when PR 3 ships.)
- *   - Coverage / Docs / Tweaks-panel-safety blocks
- *     (Pricing block was added back in PR 2; Login block in PR 3)
+ *   - Docs / Tweaks-panel-safety blocks
+ *     (Pricing block added back in PR 2; Login block in PR 3; Coverage
+ *     block in PR 4)
  *
  * Kept:
  *   .container helper · eyebrow / serif / mono / tnum text helpers ·
@@ -751,3 +752,99 @@
   font-family: var(--font-mono), "JetBrains Mono", monospace; letter-spacing: 0.06em; text-transform: uppercase;
 }
 .login-trust-item { display: flex; align-items: center; gap: 4px; }
+
+/* ===== Coverage page =====
+ * Lifted verbatim from
+ *   design_handoff_tradenet_marketing/marketing/marketing.css
+ *   (the `/* ===== Coverage view ===== *\/` block, ~lines 738-812)
+ * with the same adjustment we made for Pricing / Login: the hardcoded
+ * "Source Serif 4" / "JetBrains Mono" font literals are swapped for the
+ * `var(--font-serif)` / `var(--font-mono)` CSS variables already in use
+ * across this file.
+ *
+ * Class inventory (consumed by `coverage/page.tsx` + the four new
+ * components):
+ *   .coverage-hero · .coverage-stats · .coverage-stat (+ -label / -value / -meta) ·
+ *   .coverage-sources · .source-card (+ .primary) ·
+ *   .source-card-head · .source-card-name · .source-card-sub ·
+ *   .source-card-body · .source-card-kv (dt / dd) ·
+ *   .timeline-band · .timeline-band-head · .tl-h3 · .tl-sub ·
+ *   .tl-legend · .tl-legend-swatch ·
+ *   .tl-grid · .tl-grid-week · .tl-grid-year · .tl-grid-cell ·
+ *   .tl-row · .tl-grid-label ·
+ *   .dq-grid · .dq-card · .dq-card-h · .dq-card-value · .dq-bar · .dq-bar-fill · .dq-card-meta
+ */
+.coverage-hero { padding: 64px 0 40px; text-align: center; position: relative; }
+.coverage-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1px; background: var(--line);
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  margin: 40px 0 56px; overflow: hidden;
+}
+@media (max-width: 720px) { .coverage-stats { grid-template-columns: repeat(2, 1fr); } }
+.coverage-stat { background: var(--surface); padding: 22px 24px; }
+.coverage-stat-label { font-family: var(--font-mono), "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); }
+.coverage-stat-value { font-family: var(--font-serif), Georgia, serif; font-size: 34px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin-top: 6px; line-height: 1.1; }
+.coverage-stat-meta { font-size: 12px; color: var(--mute); margin-top: 4px; }
+
+.coverage-sources {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px;
+}
+@media (max-width: 820px) { .coverage-sources { grid-template-columns: 1fr; } }
+.source-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  padding: 24px; display: flex; flex-direction: column; gap: 14px;
+}
+.source-card.primary { border-color: var(--stamp); border-width: 2px; background: linear-gradient(180deg, var(--stamp-2) 0%, var(--surface) 30%); }
+.source-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.source-card-name { font-family: var(--font-serif), Georgia, serif; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; margin: 0; line-height: 1.2; }
+.source-card-sub { font-size: 12.5px; color: var(--mute); margin: 3px 0 0; font-family: var(--font-mono), "JetBrains Mono", monospace; }
+.source-card-body { font-size: 14px; color: var(--ink-2); line-height: 1.55; margin: 0; }
+.source-card-kv {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px;
+  margin-top: auto; padding-top: 14px; border-top: 1px dashed var(--line);
+}
+.source-card-kv > div { display: flex; flex-direction: column; gap: 1px; padding: 5px 0; }
+.source-card-kv dt { font-family: var(--font-mono), "JetBrains Mono", monospace; font-size: 10px; color: var(--mute); text-transform: uppercase; letter-spacing: 0.08em; }
+.source-card-kv dd { margin: 0; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* Timeline */
+.timeline-band {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 24px; margin-top: 32px;
+}
+.timeline-band-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px; gap: 16px; flex-wrap: wrap; }
+.tl-h3 { font-family: var(--font-serif), Georgia, serif; font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.tl-sub { font-size: 13px; color: var(--mute); margin-top: 2px; }
+.tl-legend { display: flex; gap: 14px; font-size: 11.5px; color: var(--mute); font-family: var(--font-mono), "JetBrains Mono", monospace; letter-spacing: 0.05em; align-items: center; }
+.tl-legend-swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; margin-right: 4px; vertical-align: middle; }
+
+.tl-grid {
+  display: grid; grid-template-columns: 60px repeat(52, 1fr);
+  gap: 2px; align-items: center;
+  font-size: 10px;
+}
+.tl-grid-week { color: var(--mute); font-family: var(--font-mono), "JetBrains Mono", monospace; font-size: 9px; text-align: center; }
+.tl-grid-year { font-family: var(--font-mono), "JetBrains Mono", monospace; font-weight: 700; font-size: 11px; color: var(--ink-2); padding-right: 4px; }
+.tl-grid-cell { aspect-ratio: 1; border-radius: 2px; background: var(--paper-3); position: relative; cursor: default; }
+.tl-grid-cell[data-load="0"] { background: var(--paper-3); }
+.tl-grid-cell[data-load="1"] { background: oklch(0.86 0.04 28); }
+.tl-grid-cell[data-load="2"] { background: oklch(0.72 0.09 28); }
+.tl-grid-cell[data-load="3"] { background: var(--stamp); }
+.tl-grid-cell[data-load="4"] { background: var(--stamp-deep); }
+.tl-grid-cell[title]:hover { outline: 1.5px solid var(--ink); outline-offset: 1px; z-index: 2; }
+.tl-row { display: contents; }
+.tl-grid-label { font-family: var(--font-mono), "JetBrains Mono", monospace; font-size: 9.5px; color: var(--mute); padding-right: 4px; text-align: right; }
+
+/* Data quality grid */
+.dq-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 18px; }
+@media (max-width: 760px) { .dq-grid { grid-template-columns: 1fr; } }
+.dq-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 20px;
+}
+.dq-card-h { font-family: var(--font-mono), "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase; color: var(--mute); }
+.dq-card-value { font-family: var(--font-serif), Georgia, serif; font-size: 30px; font-weight: 600; margin: 6px 0 0; letter-spacing: -0.02em; }
+.dq-bar { height: 4px; background: var(--paper-3); border-radius: 2px; overflow: hidden; margin-top: 12px; }
+.dq-bar-fill { height: 100%; background: var(--stamp); border-radius: 2px; }
+.dq-card-meta { font-size: 12px; color: var(--mute); margin-top: 8px; }
