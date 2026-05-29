@@ -70,6 +70,21 @@ test.describe("Visual regression", () => {
     });
   });
 
+  test("coverage page (/coverage)", async ({ page }) => {
+    await page.goto("/coverage");
+    // Hero h1 is the marketing /coverage signal — there is no in-app
+    // /coverage route, so this URL unambiguously hits the (marketing)
+    // route group. The ingest timeline below is a client component but
+    // its data is deterministic, so the rendered grid is pixel-stable.
+    await expect(
+      page.getByRole("heading", { name: /Every Vietnam IP issue/i }),
+    ).toBeVisible();
+    await expect(page).toHaveScreenshot("coverage.png", {
+      fullPage: false,
+      maxDiffPixelRatio: 0.01,
+    });
+  });
+
   test("/search empty state", async ({ page }) => {
     await page.goto("/search");
     await expect(page.locator("input").first()).toBeVisible();
