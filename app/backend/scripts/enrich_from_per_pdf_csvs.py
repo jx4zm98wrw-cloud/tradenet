@@ -49,9 +49,9 @@ import argparse
 import csv
 import re
 import sys
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 import psycopg2
 from psycopg2.extras import execute_values
@@ -72,9 +72,17 @@ COL_116 = "116 International registration number under Madrid Agreement"
 # editing pass. These look like real strings to CSV but encode "no value
 # found" semantically. Saving them as mark_sample would poison search +
 # display. Skip them as if the (540) field was empty.
-_EXCEL_ERRORS = frozenset({
-    "#N/A", "#REF!", "#VALUE!", "#NAME?", "#NULL!", "#DIV/0!", "#NUM!",
-})
+_EXCEL_ERRORS = frozenset(
+    {
+        "#N/A",
+        "#REF!",
+        "#VALUE!",
+        "#NAME?",
+        "#NULL!",
+        "#DIV/0!",
+        "#NUM!",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -86,22 +94,20 @@ class CsvKind:
       - B_domestic (key = certificate_number, source col = COL_111)
       - B_madrid  (key = madrid_number,     source col = COL_116, zero-padded)
     """
-    record_type: str           # matches the `record_type` enum value in DB
-    csv_id_col: str            # column to read from the CSV
-    db_id_col: str             # column to join against in `trademarks`
-    pad_to_7: bool             # zero-pad CSV IDs to 7 chars (Madrid only)
+
+    record_type: str  # matches the `record_type` enum value in DB
+    csv_id_col: str  # column to read from the CSV
+    db_id_col: str  # column to join against in `trademarks`
+    pad_to_7: bool  # zero-pad CSV IDs to 7 chars (Madrid only)
 
 
 # Filename patterns route each CSV to the right kind. Order matters: the
 # `_madrid` match has to be tried first since `B_T1_2026_madrid.csv` also
 # matches the looser B pattern.
 _KIND_BY_FILENAME = (
-    (re.compile(r"^B_T\d_\d{4}_madrid\.csv$"),
-     CsvKind("B_madrid", COL_116, "madrid_number", pad_to_7=True)),
-    (re.compile(r"^A_T\d_\d{4}\.csv$"),
-     CsvKind("A", COL_210, "application_number", pad_to_7=False)),
-    (re.compile(r"^B_T\d_\d{4}\.csv$"),
-     CsvKind("B_domestic", COL_111, "certificate_number", pad_to_7=False)),
+    (re.compile(r"^B_T\d_\d{4}_madrid\.csv$"), CsvKind("B_madrid", COL_116, "madrid_number", pad_to_7=True)),
+    (re.compile(r"^A_T\d_\d{4}\.csv$"), CsvKind("A", COL_210, "application_number", pad_to_7=False)),
+    (re.compile(r"^B_T\d_\d{4}\.csv$"), CsvKind("B_domestic", COL_111, "certificate_number", pad_to_7=False)),
 )
 
 
@@ -176,10 +182,7 @@ def _enrich_one_file(cur, csv_path: Path, kind: CsvKind) -> int:
     # Using a temp table + UPDATE-FROM-JOIN is significantly faster than
     # per-row UPDATE in a loop — one round-trip per file regardless of
     # row count, and Postgres can pick a hash join for the merge.
-    cur.execute(
-        "CREATE TEMP TABLE _enrich_batch (id TEXT PRIMARY KEY, mark TEXT NOT NULL) "
-        "ON COMMIT DROP"
-    )
+    cur.execute("CREATE TEMP TABLE _enrich_batch (id TEXT PRIMARY KEY, mark TEXT NOT NULL) ON COMMIT DROP")
     execute_values(
         cur,
         "INSERT INTO _enrich_batch (id, mark) VALUES %s "
@@ -265,8 +268,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"\nOK: committed {total:,} mark_sample updates")
         else:
             conn.rollback()
-            print(f"\nDRY-RUN: {total:,} rows would be updated. "
-                  "Re-run with --execute to apply.")
+            print(f"\nDRY-RUN: {total:,} rows would be updated. Re-run with --execute to apply.")
         return 0
     finally:
         conn.close()
