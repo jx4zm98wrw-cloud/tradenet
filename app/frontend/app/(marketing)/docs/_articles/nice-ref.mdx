@@ -6,6 +6,7 @@
 import { DocsCallout } from "@/components/marketing/docs/DocsCallout";
 import { DocsTable } from "@/components/marketing/docs/DocsTable";
 import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
+import { DocsH2 } from "@/components/marketing/docs/DocsH2";
 
 <DocsTOC
   items={[
@@ -17,21 +18,13 @@ import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
   ]}
 />
 
-<h2 className="docs-h2" id="n-overview">
-  <span className="docs-h2-num">01</span> The 45-class split
-</h2>
+<DocsH2 num="01" id="n-overview">The 45-class split</DocsH2>
 
-<p className="docs-p">
-  Classes 1–34 cover <strong>goods</strong> (tangible products). Classes 35–45 cover <strong>services</strong>. The split matters because conflict analysis usually starts with: are these marks in the same or related classes? A pharmaceutical (Class 5) and a restaurant (Class 43) sharing the same name rarely conflict; two food brands in Class 30 almost always do.
-</p>
+Classes 1–34 cover <strong>goods</strong> (tangible products). Classes 35–45 cover <strong>services</strong>. The split matters because conflict analysis usually starts with: are these marks in the same or related classes? A pharmaceutical (Class 5) and a restaurant (Class 43) sharing the same name rarely conflict; two food brands in Class 30 almost always do.
 
-<h2 className="docs-h2" id="n-common">
-  <span className="docs-h2-num">02</span> Commonly confused classes
-</h2>
+<DocsH2 num="02" id="n-common">Commonly confused classes</DocsH2>
 
-<p className="docs-p">
-  Three pairs that trip up filers and create avoidable opposition windows:
-</p>
+Three pairs that trip up filers and create avoidable opposition windows:
 
 <ul className="docs-list">
   <li><strong>Class 35 (Retail services) vs. the class of the goods sold.</strong> A clothing brand selling its own line files in Class 25 (the clothes). A department store selling many brands' clothes files in Class 35.</li>
@@ -43,17 +36,11 @@ import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
   Vietnamese examiners sometimes find conflict across “related classes” even without direct overlap — e.g. Class 32 (beverages) and Class 33 (alcoholic beverages). Tradenet surfaces these via the semantic-similarity channel in the conflict scorecard.
 </DocsCallout>
 
-<h2 className="docs-h2" id="n-search">
-  <span className="docs-h2-num">03</span> Searching across classes
-</h2>
+<DocsH2 num="03" id="n-search">Searching across classes</DocsH2>
 
-<p className="docs-p">
-  In the search rail, the Nice classes group has an <strong>ANY / ALL</strong> toggle. Default is ANY — match marks covering any selected class. Switch to ALL when you need marks that cover the full set (e.g. food brands that cover Classes 29, 30, <em>and</em> 32 together).
-</p>
+In the search rail, the Nice classes group has an <strong>ANY / ALL</strong> toggle. Default is ANY — match marks covering any selected class. Switch to ALL when you need marks that cover the full set (e.g. food brands that cover Classes 29, 30, <em>and</em> 32 together).
 
-<h2 className="docs-h2" id="n-goods">
-  <span className="docs-h2-num">04</span> Goods reference (Classes 1–34)
-</h2>
+<DocsH2 num="04" id="n-goods">Goods reference (Classes 1–34)</DocsH2>
 
 <DocsTable
   headers={["Class", "Heading", "Typical contents"]}
@@ -95,9 +82,7 @@ import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
   ]}
 />
 
-<h2 className="docs-h2" id="n-services">
-  <span className="docs-h2-num">05</span> Services reference (Classes 35–45)
-</h2>
+<DocsH2 num="05" id="n-services">Services reference (Classes 35–45)</DocsH2>
 
 <DocsTable
   headers={["Class", "Heading", "Typical contents"]}

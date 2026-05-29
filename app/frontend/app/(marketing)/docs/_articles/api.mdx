@@ -6,6 +6,7 @@
 import { DocsCallout } from "@/components/marketing/docs/DocsCallout";
 import { DocsCode } from "@/components/marketing/docs/DocsCode";
 import { DocsTable } from "@/components/marketing/docs/DocsTable";
+import { DocsH2 } from "@/components/marketing/docs/DocsH2";
 
 <DocsCallout heading="Base URL">
   <span className="mono" style={{ color: "var(--ink)" }}>https://api.tradenet.vn/v1</span>
@@ -13,20 +14,14 @@ import { DocsTable } from "@/components/marketing/docs/DocsTable";
   All requests must include <span className="mono">Authorization: Bearer YOUR_TOKEN</span>. Tokens are issued in your Enterprise admin console.
 </DocsCallout>
 
-<h2 className="docs-h2">
-  <span className="docs-h2-num">01</span> Authentication
-</h2>
+<DocsH2 num="01" id="None">Authentication</DocsH2>
 
 <DocsCode lang="cURL">{`curl "https://api.tradenet.vn/v1/me" \\
   -H "Authorization: Bearer $TRADENET_API_KEY"`}</DocsCode>
 
-<h2 className="docs-h2">
-  <span className="docs-h2-num">02</span> Search
-</h2>
+<DocsH2 num="02" id="None">Search</DocsH2>
 
-<p className="docs-p">
-  <span className="mono"><strong>POST</strong> /v1/search</span> — run a one-off search. Returns up to 200 results per call; paginate via the <span className="mono">cursor</span> field.
-</p>
+<span className="mono"><strong>POST</strong> /v1/search</span> — run a one-off search. Returns up to 200 results per call; paginate via the <span className="mono">cursor</span> field.
 
 <DocsCode lang="JSON">{`POST /v1/search
 {
@@ -42,21 +37,13 @@ import { DocsTable } from "@/components/marketing/docs/DocsTable";
   "limit": 50
 }`}</DocsCode>
 
-<h2 className="docs-h2">
-  <span className="docs-h2-num">03</span> Watchlists
-</h2>
+<DocsH2 num="03" id="None">Watchlists</DocsH2>
 
-<p className="docs-p">
-  <span className="mono"><strong>POST</strong> /v1/watchlists</span> creates a saved query that re-runs each gazette issue. Findings are delivered via webhook, email, or by polling the watchlist endpoint.
-</p>
+<span className="mono"><strong>POST</strong> /v1/watchlists</span> creates a saved query that re-runs each gazette issue. Findings are delivered via webhook, email, or by polling the watchlist endpoint.
 
-<h2 className="docs-h2">
-  <span className="docs-h2-num">04</span> Webhooks
-</h2>
+<DocsH2 num="04" id="None">Webhooks</DocsH2>
 
-<p className="docs-p">
-  Subscribe to events at <span className="mono">POST /v1/webhooks</span>. All webhook payloads are signed with HMAC-SHA256 — verify the <span className="mono">X-TM-Signature</span> header.
-</p>
+Subscribe to events at <span className="mono">POST /v1/webhooks</span>. All webhook payloads are signed with HMAC-SHA256 — verify the <span className="mono">X-TM-Signature</span> header.
 
 <DocsTable
   headers={["Event", "Triggered when"]}
@@ -68,9 +55,7 @@ import { DocsTable } from "@/components/marketing/docs/DocsTable";
   ]}
 />
 
-<h2 className="docs-h2">
-  <span className="docs-h2-num">05</span> Rate limits
-</h2>
+<DocsH2 num="05" id="None">Rate limits</DocsH2>
 
 <ul className="docs-list">
   <li><strong>Search:</strong> 100 requests/min · 10,000/day</li>

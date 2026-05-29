@@ -7,6 +7,7 @@ import Link from "next/link";
 import { DocsCallout } from "@/components/marketing/docs/DocsCallout";
 import { DocsTable } from "@/components/marketing/docs/DocsTable";
 import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
+import { DocsH2 } from "@/components/marketing/docs/DocsH2";
 
 <DocsTOC
   items={[
@@ -17,9 +18,7 @@ import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
   ]}
 />
 
-<h2 className="docs-h2" id="g-vn">
-  <span className="docs-h2-num">01</span> Vietnamese terms
-</h2>
+<DocsH2 num="01" id="g-vn">Vietnamese terms</DocsH2>
 
 <DocsTable
   headers={["Term", "English", "Notes"]}
@@ -43,13 +42,9 @@ import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
   ]}
 />
 
-<h2 className="docs-h2" id="g-issues">
-  <span className="docs-h2-num">02</span> Gazette issue conventions
-</h2>
+<DocsH2 num="02" id="g-issues">Gazette issue conventions</DocsH2>
 
-<p className="docs-p">
-  Vietnam IP publishes a weekly bulletin in two parallel streams. Filenames follow a strict convention: <span className="mono">{`{SECTION}_{ISSUE}_{YEAR}.pdf`}</span>.
-</p>
+Vietnam IP publishes a weekly bulletin in two parallel streams. Filenames follow a strict convention: <span className="mono">{`{SECTION}_{ISSUE}_{YEAR}.pdf`}</span>.
 
 <DocsTable
   headers={["Code", "Meaning", "Example"]}
@@ -67,13 +62,9 @@ import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
   Vietnamese app numbers follow <span className="mono">4-YYYY-NNNNN</span>. The leading “4” is the IP-right type (4 = trademark). Certificate numbers (granted marks) follow <span className="mono">4-NNNNNNN</span> with no year.
 </DocsCallout>
 
-<h2 className="docs-h2" id="g-inid">
-  <span className="docs-h2-num">03</span> WIPO INID codes
-</h2>
+<DocsH2 num="03" id="g-inid">WIPO INID codes</DocsH2>
 
-<p className="docs-p">
-  INID = <em>Internationally agreed Numbers for the Identification of bibliographic Data</em>. Every field in a gazette entry is tagged with a numerical code so the entry can be parsed without knowing the publication's language. Tradenet extracts these directly.
-</p>
+INID = <em>Internationally agreed Numbers for the Identification of bibliographic Data</em>. Every field in a gazette entry is tagged with a numerical code so the entry can be parsed without knowing the publication's language. Tradenet extracts these directly.
 
 <DocsTable
   headers={["INID", "Field", "What it contains"]}
@@ -107,13 +98,9 @@ import { DocsTOC } from "@/components/marketing/docs/DocsTOC";
   ]}
 />
 
-<h2 className="docs-h2" id="g-international">
-  <span className="docs-h2-num">04</span> International instruments
-</h2>
+<DocsH2 num="04" id="g-international">International instruments</DocsH2>
 
-<p className="docs-p">
-  Vietnam is a member of several international IP treaties that affect how marks are filed and protected.
-</p>
+Vietnam is a member of several international IP treaties that affect how marks are filed and protected.
 
 <DocsTable
   headers={["Instrument", "What it does", "Vietnam joined"]}
