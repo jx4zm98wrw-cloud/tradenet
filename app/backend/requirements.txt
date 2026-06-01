@@ -25,7 +25,7 @@ sqlalchemy[asyncio]==2.0.50
 alembic==1.18.4
 asyncpg==0.31.0
 psycopg2-binary==2.9.12
-python-multipart==0.0.29      # was 0.0.17; latest available. Future CVE-2026-* require >=0.0.22
+python-multipart==0.0.30      # was 0.0.17; latest available. Future CVE-2026-* require >=0.0.22
                               # which isn't on PyPI yet — ignored in pip-audit per ci.yml
 pydantic==2.13.4
 pydantic-settings==2.14.1
@@ -41,7 +41,7 @@ rq==2.9.0
 
 # === Observability ===
 structlog==24.4.0
-sentry-sdk[fastapi]==2.60.0
+sentry-sdk[fastapi]==2.61.0
 prometheus-fastapi-instrumentator==7.1.0
 
 # === File handling ===
