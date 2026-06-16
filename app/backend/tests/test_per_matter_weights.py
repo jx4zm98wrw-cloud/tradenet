@@ -13,7 +13,6 @@ import pytest
 
 from api.similarity import DEFAULT_WEIGHTS, resolve_weights
 
-
 # ----- resolve_weights (pure) -------------------------------------------------
 
 

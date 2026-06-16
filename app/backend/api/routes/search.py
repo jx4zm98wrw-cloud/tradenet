@@ -245,15 +245,13 @@ async def search_trademarks(
         # Widen the `%` threshold for this statement only. SET LOCAL is scoped
         # to the surrounding transaction and resets automatically; the value is
         # a trusted module constant, not user input, so inlining it is safe.
-        await session.execute(
-            text(f"SET LOCAL pg_trgm.similarity_threshold = {_PHONETIC_TRGM_THRESHOLD}")
-        )
+        await session.execute(text(f"SET LOCAL pg_trgm.similarity_threshold = {_PHONETIC_TRGM_THRESHOLD}"))
         candidates = list((await session.execute(recall_stmt)).scalars().all())
 
         scored = [(m, _score(m, q, mode)) for m in candidates]
         scored = [(m, s) for (m, s) in scored if s >= threshold]
         if sort == "publication-desc":
-            scored.sort(key=lambda x: (x[0].publication_date_441 or date.min), reverse=True)
+            scored.sort(key=lambda x: x[0].publication_date_441 or date.min, reverse=True)
         elif sort == "applicant-asc":
             scored.sort(key=lambda x: (x[0].applicant_name is None, (x[0].applicant_name or "")))
         elif sort == "class-count":

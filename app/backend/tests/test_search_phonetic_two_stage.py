@@ -16,7 +16,7 @@ import pytest
 
 
 def _name(mark: dict) -> str:
-    return ((mark.get("mark_sample") or mark.get("applicant_name") or "")).lower()
+    return (mark.get("mark_sample") or mark.get("applicant_name") or "").lower()
 
 
 @pytest.mark.asyncio
