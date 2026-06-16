@@ -139,14 +139,14 @@ function ComparePage() {
           </CmpRow>
           <CmpRow label="Applicant" n={N}>
             {data.marks.map((m) => (
-              <span key={m.id} className="text-[12.5px] truncate" title={m.applicant_name ?? ""}>
+              <span key={m.id} className="block text-[12.5px] truncate" title={m.applicant_name ?? ""}>
                 {m.applicant_name ?? "—"}
               </span>
             ))}
           </CmpRow>
           <CmpRow label="IP agent" n={N}>
             {data.marks.map((m) => (
-              <span key={m.id} className="text-mute text-[12.5px] truncate" title={m.ip_agency ?? ""}>
+              <span key={m.id} className="block text-mute text-[12.5px] truncate" title={m.ip_agency ?? ""}>
                 {m.ip_agency ?? "—"}
               </span>
             ))}
