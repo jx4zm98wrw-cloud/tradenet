@@ -21,7 +21,7 @@ from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import similarity as sim
-from ..db import RecordType, Trademark, get_session
+from ..db import RecordType, Trademark, Watchlist, get_session
 from ..schemas import TrademarkOut
 from ..settings import get_settings
 from .today import DEMO_TODAY, _opp_close_date
@@ -290,7 +290,10 @@ _SIMILAR_CANDIDATE_POOL = 40
 
 @router.get("/{id}/similar", response_model=list[SimilarMark])
 async def similar_marks(
-    id: uuid.UUID, limit: int = 4, session: AsyncSession = Depends(get_session)
+    id: uuid.UUID,
+    limit: int = 4,
+    watchlist_id: uuid.UUID | None = None,
+    session: AsyncSession = Depends(get_session),
 ) -> list[SimilarMark]:
     """Return marks similar to the given one, ranked by composite score.
 
@@ -329,6 +332,14 @@ async def similar_marks(
     image_root = get_settings().data_dir / "image"
     m_text = m.mark_sample or m.applicant_name
 
+    # Per-matter weights: when a watchlist context is supplied, rank with that
+    # matter's weight profile (e.g. pharma up-weights phonetic); else defaults.
+    weights = None
+    if watchlist_id is not None:
+        wl = await session.get(Watchlist, watchlist_id)
+        if wl is not None:
+            weights = sim.resolve_weights(wl.weights)
+
     scored: list[tuple[Trademark, float, str]] = []
     for r in candidates:
         r_text = r.mark_sample or r.applicant_name
@@ -342,7 +353,9 @@ async def similar_marks(
         )
         class_o = sim.class_overlap(m.nice_classes, r.nice_classes)
         vienna_o = sim.vienna_overlap(m.vienna_codes, r.vienna_codes)
-        cs = sim.composite_score(phon, vis.score, class_o, vienna_o, visual_confidence=vis.confidence)
+        cs = sim.composite_score(
+            phon, vis.score, class_o, vienna_o, weights=weights, visual_confidence=vis.confidence
+        )
         if cs.composite >= _SIMILAR_MIN_COMPOSITE:
             scored.append((r, cs.composite, vis.confidence))
 

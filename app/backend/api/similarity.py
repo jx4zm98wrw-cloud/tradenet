@@ -348,6 +348,33 @@ phonetics dominate) should tune these per matter — exactly the design's
 'tunable per matter' requirement."""
 
 
+def resolve_weights(overrides: dict[str, float] | None) -> dict[str, float]:
+    """Merge per-matter weight overrides over DEFAULT_WEIGHTS and renormalise to 1.
+
+    The single source of truth for turning a stored/requested weights dict into
+    the normalised weights `composite_score` expects. Shared by the per-matter
+    surfaces (watchlist-scoped similar marks) and the /compare endpoint so they
+    validate identically.
+
+    - None / empty → DEFAULT_WEIGHTS (a fresh copy).
+    - Only the four known keys (phonetic/visual/class/vienna) are honoured;
+      unknown keys are ignored and missing keys inherit their default.
+    - Non-numeric / negative values are dropped (fall back to the default for
+      that key); a non-positive total falls back entirely to DEFAULT_WEIGHTS.
+    """
+    if not overrides:
+        return dict(DEFAULT_WEIGHTS)
+    merged = dict(DEFAULT_WEIGHTS)
+    for k in DEFAULT_WEIGHTS:
+        v = overrides.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0:
+            merged[k] = float(v)
+    total = sum(merged.values())
+    if total <= 0:
+        return dict(DEFAULT_WEIGHTS)
+    return {k: v / total for k, v in merged.items()}
+
+
 @dataclass(frozen=True)
 class CompositeScore:
     composite: float
