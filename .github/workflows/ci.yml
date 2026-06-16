@@ -128,24 +128,18 @@ jobs:
       - uses: actions/setup-python@v6
         with: { python-version: "3.11" }
       - name: pip-audit
-        # Fail the job on any reported vuln. Previously appended `|| true`
-        # which silently swallowed warnings.
+        # Fail the job on any reported vuln (no `|| true`, no ignore list).
         #
-        # --ignore-vuln is the documented escape hatch for known-unfixable
-        # advisories where no patched release is yet on PyPI. Each entry
-        # MUST carry an "until …" rationale and be reviewed periodically.
-        # Right now: python-multipart 0.0.20 is the latest published, but
-        # advisory drafts require >= 0.0.22 / 0.0.26 / 0.0.27 (future
-        # CVE-2026-* entries). Drop these once the patched releases ship.
-        # Each --ignore-vuln entry carries a "patched in" version that
-        # isn't yet on PyPI. Review and remove once published.
+        # The previous --ignore-vuln entries (python-multipart + starlette
+        # advisories) are gone: the patched releases now ship and are pinned
+        # in requirements.txt — starlette 1.3.1, python-multipart 0.0.32,
+        # unblocked by prometheus-fastapi-instrumentator 8.0.0 (which lifted
+        # the starlette<1.0 cap). Audit is clean with no exceptions. Re-add
+        # --ignore-vuln (with a "patched in <version>" rationale) only for a
+        # genuinely unfixable advisory.
         run: |
           pip install pip-audit
-          pip-audit -r app/backend/requirements.txt --strict \
-            --ignore-vuln CVE-2026-24486   `# python-multipart, needs unreleased 0.0.22` \
-            --ignore-vuln CVE-2026-40347   `# python-multipart, needs unreleased 0.0.26` \
-            --ignore-vuln CVE-2026-42561   `# python-multipart, needs unreleased 0.0.27` \
-            --ignore-vuln PYSEC-2026-161   `# starlette, needs 1.0.1; fastapi caps at <1.0`
+          pip-audit -r app/backend/requirements.txt --strict
 
   image-scan:
     name: Backend image scan (Trivy)
