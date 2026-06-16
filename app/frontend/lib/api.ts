@@ -145,6 +145,26 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
   return r.json();
 }
 
+/** Authed mutation with no JSON body to parse (e.g. 204 DELETE). Same
+ *  Authorization + credentials + one-shot 401-refresh as json(); kept separate
+ *  because json() always parses a body. Without this, write calls that used
+ *  raw fetch() never sent the bearer token and 401'd while "logged in". */
+async function mutateVoid(url: string, init: RequestInit): Promise<void> {
+  const { getAccessToken, refresh } = await import("./auth");
+  const withAuth = (): RequestInit => {
+    const headers = new Headers(init.headers);
+    const token = getAccessToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return { ...init, headers, credentials: "include" };
+  };
+  let r = await fetch(url, withAuth());
+  if (r.status === 401) {
+    const user = await refresh();
+    if (user) r = await fetch(url, withAuth());
+  }
+  if (!r.ok && r.status !== 204) throw new Error(`${url} -> ${r.status}`);
+}
+
 export type TodayDigest = {
   today: string;
   totalNew: number;
@@ -196,6 +216,9 @@ export type Watchlist = {
   matter: string | null;
   query: WatchQuery;
   queryDesc: string | null;
+  /** Per-matter similarity weight overrides (keys: phonetic/visual/class/vienna).
+   *  null → default weight profile. Stored raw; normalised server-side at use. */
+  weights: Record<string, number> | null;
   totalCount: number;
   newCount: number;
   createdAt: string;
@@ -332,15 +355,12 @@ export const api = {
   statsTopApplicants: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-applicants?limit=${limit}`),
   statsTopAgents: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-agents?limit=${limit}`),
   getMark: (id: string) => json<MarkDetail>(`/api/v1/marks/${id}`),
-  compare: async (markIds: string[], anchorId?: string): Promise<CompareResponse> => {
-    const r = await fetch(`/api/v1/compare`, {
+  compare: (markIds: string[], anchorId?: string): Promise<CompareResponse> =>
+    json<CompareResponse>(`/api/v1/compare`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ markIds, anchorId }),
-    });
-    if (!r.ok) throw new Error(`Compare failed: ${r.status}`);
-    return r.json();
-  },
+    }),
   markTimeline: (id: string) => json<TimelineEvent[]>(`/api/v1/marks/${id}/timeline`),
   markCoMarks: (id: string, limit = 6) => json<CoMark[]>(`/api/v1/marks/${id}/co-marks?limit=${limit}`),
   markSimilar: (id: string, limit = 4) => json<SimilarMark[]>(`/api/v1/marks/${id}/similar?limit=${limit}`),
@@ -352,30 +372,28 @@ export const api = {
     json<OppositionWindow[]>(`/api/v1/opposition-windows?status=${status}&limit=${limit}`),
   watchlists: () => json<Watchlist[]>(`/api/v1/watchlists`),
   watchlistFindings: (id: string, limit = 12) => json<Trademark[]>(`/api/v1/watchlists/${id}/findings?limit=${limit}`),
-  createWatchlist: async (body: { name: string; client?: string; matter?: string; query: WatchQuery; queryDesc?: string }) => {
-    const r = await fetch(`/api/v1/watchlists`, {
+  createWatchlist: (body: { name: string; client?: string; matter?: string; query: WatchQuery; queryDesc?: string; weights?: Record<string, number> | null }) =>
+    json<Watchlist>(`/api/v1/watchlists`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-    });
-    if (!r.ok) throw new Error(`Create failed: ${r.status}`);
-    return r.json() as Promise<Watchlist>;
-  },
-  deleteWatchlist: async (id: string) => {
-    const r = await fetch(`/api/v1/watchlists/${id}`, { method: "DELETE" });
-    if (!r.ok && r.status !== 204) throw new Error(`Delete failed: ${r.status}`);
-  },
+    }),
+  updateWatchlist: (id: string, body: { name?: string; client?: string; matter?: string; query?: WatchQuery; queryDesc?: string; weights?: Record<string, number> | null }) =>
+    json<Watchlist>(`/api/v1/watchlists/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  deleteWatchlist: (id: string) => mutateVoid(`/api/v1/watchlists/${id}`, { method: "DELETE" }),
   pipelineStats: () => json<PipelineStats>(`/api/v1/stats/pipeline`),
   adminCheck: () => json<AdminCheck>(`/api/v1/admin/check`),
-  uploadGazette: async (file: File): Promise<Gazette> => {
+  uploadGazette: (file: File): Promise<Gazette> => {
     const fd = new FormData();
     fd.append("file", file);
-    const r = await fetch(`/api/v1/gazettes`, { method: "POST", body: fd });
-    if (!r.ok) {
-      const d = await r.json().catch(() => ({ detail: r.statusText }));
-      throw new Error(d.detail || `Upload failed: ${r.status}`);
-    }
-    return r.json();
+    // No Content-Type header — the browser sets the multipart boundary itself.
+    // json() attaches the bearer token + credentials + 401-refresh, which the
+    // prior raw fetch() skipped (uploads 401'd while authenticated).
+    return json<Gazette>(`/api/v1/gazettes`, { method: "POST", body: fd });
   },
 };
 
