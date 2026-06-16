@@ -19,8 +19,7 @@ type Props = {
 export function ResultsGrid({ results, selected, onToggle, highlightClasses = new Set() }: Props) {
   return (
     <div
-      className="grid gap-4"
-      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}
+      className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
     >
       {results.map(({ mark: m, score }) => {
         const isSel = selected.has(m.id);

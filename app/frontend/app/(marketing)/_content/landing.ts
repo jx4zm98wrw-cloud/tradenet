@@ -20,11 +20,11 @@ export type FeatureCard = {
 };
 
 export type CoverageCell = {
-  /** `B / T4 · 2026` shape from the prototype */
+  /** `Grant / Apr · 2026` shape — type (Filing=A, Grant=B) / month / year */
   label: string;
   /** Raw mark count for the gazette issue */
   count: string;
-  /** `Registrations · 2m ago` shape */
+  /** Relative-time stamp, e.g. `2m ago` */
   meta: string;
 };
 
@@ -206,7 +206,6 @@ export const landing = {
       { label: "Phonetic", pct: 88, color: "var(--stamp)" },
       { label: "Visual", pct: 71, color: "var(--warn)" },
       { label: "Class overlap", pct: 100, color: "var(--stamp)" },
-      { label: "Semantic", pct: 81, color: "var(--stamp)" },
     ],
   },
 
@@ -219,14 +218,14 @@ export const landing = {
   },
 
   coverage: [
-    { label: "B / T4 · 2026", count: "9,499", meta: "Registrations · 2m ago" },
-    { label: "B / T3 · 2026", count: "5,326", meta: "Registrations · 8m ago" },
-    { label: "B / T2 · 2026", count: "5,913", meta: "Registrations · 11m ago" },
-    { label: "B / T1 · 2026", count: "6,608", meta: "Registrations · 17m ago" },
-    { label: "A / T4 · 2026", count: "8,331", meta: "Applications · 21m ago" },
-    { label: "A / T3 · 2026", count: "3,273", meta: "Applications · 28m ago" },
-    { label: "A / T2 · 2026", count: "3,159", meta: "Applications · 1h ago" },
-    { label: "A / T1 · 2026", count: "4,649", meta: "Applications · 1h ago" },
+    { label: "Grant / Apr · 2026", count: "9,499", meta: "2m ago" },
+    { label: "Grant / Mar · 2026", count: "5,326", meta: "8m ago" },
+    { label: "Grant / Feb · 2026", count: "5,913", meta: "11m ago" },
+    { label: "Grant / Jan · 2026", count: "6,608", meta: "17m ago" },
+    { label: "Filing / Apr · 2026", count: "8,331", meta: "21m ago" },
+    { label: "Filing / Mar · 2026", count: "3,273", meta: "28m ago" },
+    { label: "Filing / Feb · 2026", count: "3,159", meta: "1h ago" },
+    { label: "Filing / Jan · 2026", count: "4,649", meta: "1h ago" },
   ] as ReadonlyArray<CoverageCell>,
 
   cta: {
