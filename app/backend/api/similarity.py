@@ -212,9 +212,7 @@ def phonetic_similarity(a: str | None, b: str | None) -> float:
     # examiners weigh syllable count / rhythm. Within the tolerance the factor is
     # 1.0 (no change).
     la, lb = len(na.replace(" ", "")), len(nb.replace(" ", ""))
-    length_factor = (
-        min(1.0, (min(la, lb) / max(la, lb)) / _PHONETIC_LENGTH_TOLERANCE) if la and lb else 1.0
-    )
+    length_factor = min(1.0, (min(la, lb) / max(la, lb)) / _PHONETIC_LENGTH_TOLERANCE) if la and lb else 1.0
 
     # Metaphone per token, then best-pair JW on the resulting codes.
     # Encoding the whole multi-word string in one call produces a single
