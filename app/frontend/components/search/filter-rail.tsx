@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   api, type CountBucket, type SearchParams as Params, type NiceMode,
-  countryDisplay, NICE_LABELS,
+  countryDisplay, NICE_LABELS, MARK_CATEGORY_LABELS,
 } from "@/lib/api";
 import { Flag } from "@/components/ui";
 import { Icon } from "@/components/icons";
@@ -18,11 +18,22 @@ type Props = {
   classes: CountBucket[];
   applicants: CountBucket[];
   ipAgencies: CountBucket[];
+  markCategories: CountBucket[];
 };
+
+// Logical display order for the derived classification facet (lifecycle stage,
+// not count). Empty buckets (e.g. unknown=0) are hidden at render time.
+const MARK_CATEGORY_ORDER = [
+  "domestic_application",
+  "domestic_registration",
+  "madrid_registration",
+  "madrid_renewal",
+  "unknown",
+] as const;
 
 export function FilterRail({
   filters, setFilter, niceMode, onNiceModeChange,
-  countries, classes, applicants, ipAgencies,
+  countries, classes, applicants, ipAgencies, markCategories,
 }: Props) {
   const [countryModal, setCountryModal] = React.useState(false);
   const [classesModal, setClassesModal] = React.useState(false);
@@ -31,19 +42,24 @@ export function FilterRail({
 
   return (
     <aside className="space-y-5">
-      <RailGroup title="Record type">
-        {[
-          { v: "A",          label: "A · Application" },
-          { v: "B_domestic", label: "B · Domestic" },
-          { v: "B_madrid",   label: "B · Madrid" },
-        ].map((r) => (
-          <Row
-            key={r.v}
-            checked={filters.record_type === r.v}
-            onToggle={() => setFilter({ record_type: filters.record_type === r.v ? undefined : r.v })}
-            label={r.label}
-          />
-        ))}
+      <RailGroup title="Mark category">
+        {MARK_CATEGORY_ORDER.map((cat) => {
+          const count = markCategories.find((b) => b.key === cat)?.count ?? 0;
+          const active = filters.mark_category === cat;
+          // Hide buckets with no rows (unless selected) — keeps "Unclassified"
+          // out of the rail when the corpus is clean.
+          if (count === 0 && !active) return null;
+          return (
+            <Row
+              key={cat}
+              checked={active}
+              onToggle={() => setFilter({ mark_category: active ? undefined : cat })}
+              label={MARK_CATEGORY_LABELS[cat] ?? cat}
+              count={count}
+              empty={count === 0 && !active}
+            />
+          );
+        })}
       </RailGroup>
 
       <RailGroup

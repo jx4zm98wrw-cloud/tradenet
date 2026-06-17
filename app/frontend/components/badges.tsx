@@ -1,7 +1,59 @@
 "use client";
 
+import type { PillTone } from "@/components/ui";
+
 /** Visual tokens for record_type, status, Nice classes. Centralized so colors
  * stay consistent across the dashboard, search results, and detail page. */
+
+export type MarkCategory =
+  | "domestic_application"
+  | "domestic_registration"
+  | "madrid_registration"
+  | "madrid_renewal"
+  | "unknown";
+
+type MarkCategoryMeta = {
+  /** Full label for detail/compare pills, e.g. "Madrid registration". */
+  label: string;
+  /** Compact code for dense grids/tables: A | B | M. */
+  short: string;
+  /** Pill tone — A=blue, B=violet, M=rose. */
+  tone: PillTone;
+  /** Side-row "Section" phrasing on the detail page. */
+  section: string;
+};
+
+const CATEGORY_META: Record<MarkCategory, MarkCategoryMeta> = {
+  domestic_application:  { label: "Application",          short: "A", tone: "A", section: "Applications published" },
+  domestic_registration: { label: "Registration",         short: "B", tone: "B", section: "Domestic registrations" },
+  madrid_registration:   { label: "Madrid registration",  short: "M", tone: "M", section: "Madrid registrations (accepted in VN)" },
+  madrid_renewal:        { label: "Madrid renewal",       short: "M", tone: "M", section: "Madrid renewals" },
+  unknown:               { label: "Registration",          short: "B", tone: "B", section: "Registered marks" },
+};
+
+// Defensive fallback: if a payload predates the mark_category generated column,
+// derive a best-effort category from the legacy record_type. B_domestic is
+// ambiguous (it conflated domestic + Madrid registrations — the exact bug
+// mark_category fixes), so it maps to the generic "Registration".
+const LEGACY_TO_CATEGORY: Record<string, MarkCategory> = {
+  A: "domestic_application",
+  B_domestic: "domestic_registration",
+  B_madrid: "madrid_renewal",
+};
+
+/** Single source of truth for how a mark's derived category renders. Prefer the
+ * correct-by-construction `mark_category`; fall back to `record_type` only when
+ * it is absent, so the UI never shows a blank pill. */
+export function markCategoryMeta(
+  category?: string | null,
+  recordType?: string | null,
+): MarkCategoryMeta {
+  const key: MarkCategory =
+    category && category in CATEGORY_META
+      ? (category as MarkCategory)
+      : (LEGACY_TO_CATEGORY[recordType ?? ""] ?? "unknown");
+  return CATEGORY_META[key];
+}
 
 export function RecordTypeBadge({ type }: { type: string }) {
   const styles: Record<string, string> = {

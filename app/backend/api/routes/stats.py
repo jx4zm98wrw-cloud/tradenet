@@ -15,6 +15,10 @@ router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
 class StatsOverview(BaseModel):
     total: int
     by_record_type: dict[str, int]
+    # Derived classification counts (correct-by-construction). by_record_type is
+    # kept for back-compat; prefer by_mark_category — it separates the Madrid
+    # registrations that by_record_type folds into B_domestic.
+    by_mark_category: dict[str, int]
     gazettes_total: int
     gazettes_completed: int
     gazettes_in_flight: int
@@ -27,6 +31,10 @@ async def overview(session: AsyncSession = Depends(get_session)) -> StatsOvervie
         await session.execute(select(Trademark.record_type, func.count()).group_by(Trademark.record_type))
     ).all()
     by_type = {rt.value: n for rt, n in by_type_rows}
+    by_cat_rows = (
+        await session.execute(select(Trademark.mark_category, func.count()).group_by(Trademark.mark_category))
+    ).all()
+    by_cat = {cat: n for cat, n in by_cat_rows}
     g_total = (await session.execute(select(func.count()).select_from(Gazette))).scalar_one()
     g_done = (
         await session.execute(
@@ -43,6 +51,7 @@ async def overview(session: AsyncSession = Depends(get_session)) -> StatsOvervie
     return StatsOverview(
         total=total,
         by_record_type=by_type,
+        by_mark_category=by_cat,
         gazettes_total=g_total,
         gazettes_completed=g_done,
         gazettes_in_flight=g_inflight,

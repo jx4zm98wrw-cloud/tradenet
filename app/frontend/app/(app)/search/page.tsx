@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button, SegmentedControl, type SegOption } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import {
-  api, NICE_LABELS, countryDisplay,
+  api, NICE_LABELS, MARK_CATEGORY_LABELS, countryDisplay,
   type CountBucket, type NiceMode, type SearchMode, type SearchParams as Params,
   type SearchResults, type SortKey,
 } from "@/lib/api";
@@ -42,6 +42,7 @@ function SearchPage() {
       country: sp.get("country") ?? undefined,
       nice_class: ncs.length ? ncs : undefined,
       record_type: sp.get("record_type") ?? undefined,
+      mark_category: sp.get("mark_category") ?? undefined,
       applicant_type: sp.get("applicant_type") ?? undefined,
       applicant: sp.get("applicant") ?? undefined,
       year: sp.get("year") ? parseInt(sp.get("year")!, 10) : undefined,
@@ -71,6 +72,7 @@ function SearchPage() {
   const [classes, setClasses] = React.useState<CountBucket[]>([]);
   const [applicants, setApplicants] = React.useState<CountBucket[]>([]);
   const [ipAgencies, setIpAgencies] = React.useState<CountBucket[]>([]);
+  const [markCategories, setMarkCategories] = React.useState<CountBucket[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
@@ -92,6 +94,7 @@ function SearchPage() {
     api.facetsNiceClasses(filters, 45, init).then(setClasses).catch(silent);
     api.facetsApplicants(filters, 8, init).then(setApplicants).catch(silent);
     api.facetsIpAgencies(filters, 8, init).then(setIpAgencies).catch(silent);
+    api.facetsMarkCategories(filters, init).then(setMarkCategories).catch(silent);
     return () => controller.abort();
   }, [filters]);
 
@@ -201,6 +204,7 @@ function SearchPage() {
           classes={classes}
           applicants={applicants}
           ipAgencies={ipAgencies}
+          markCategories={markCategories}
         />
 
         <main className="min-w-0 space-y-4">
@@ -402,6 +406,15 @@ function buildChips(filters: Params, setFilter: (p: Partial<Params>) => void, ni
       onRemove: () => setFilter({ country: undefined }),
     });
   }
+  if (filters.mark_category) {
+    chips.push({
+      key: "mc",
+      label: <>Category: {MARK_CATEGORY_LABELS[filters.mark_category] ?? filters.mark_category}</>,
+      onRemove: () => setFilter({ mark_category: undefined }),
+    });
+  }
+  // Back-compat: shared/bookmarked links may still carry ?record_type=. It still
+  // filters server-side; surface a removable chip so the user can see + clear it.
   if (filters.record_type) {
     const m: Record<string, string> = { A: "A (Application)", B_domestic: "B Domestic", B_madrid: "B Madrid" };
     chips.push({ key: "rt", label: <>Type: {m[filters.record_type] ?? filters.record_type}</>, onRemove: () => setFilter({ record_type: undefined }) });
@@ -458,6 +471,7 @@ function buildScopeLabel(filters: Params): string {
     parts.push(d.name);
   }
   if (filters.year) parts.push(`Year ${filters.year}`);
+  if (filters.mark_category) parts.push(MARK_CATEGORY_LABELS[filters.mark_category] ?? filters.mark_category);
   if (filters.record_type) parts.push(filters.record_type);
   return parts.join(" · ");
 }

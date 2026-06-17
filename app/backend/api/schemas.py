@@ -41,6 +41,12 @@ class TrademarkOut(BaseModel):
     id: UUID
     gazette_id: UUID
     record_type: str
+    # Derived (generated) classification + lifecycle identity. mark_category is
+    # one of: domestic_application | domestic_registration | madrid_registration
+    # | madrid_renewal | unknown. lineage_key links a mark's rows across gazette
+    # years (domestic by 210, Madrid by WIPO IRN).
+    mark_category: str | None = None
+    lineage_key: str | None = None
     application_number: str | None
     certificate_number: str | None
     madrid_number: str | None

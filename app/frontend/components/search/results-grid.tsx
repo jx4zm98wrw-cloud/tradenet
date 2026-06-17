@@ -6,6 +6,7 @@ import { Icon } from "@/components/icons";
 import { Pill, Flag, ClassChip, SimilarityRing } from "@/components/ui";
 import { MarkSpecimen } from "@/components/specimen";
 import { markDisplay } from "@/lib/mark-display";
+import { markCategoryMeta } from "@/components/badges";
 import { countryDisplay, type ScoredMark } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 
@@ -60,8 +61,8 @@ export function ResultsGrid({ results, selected, onToggle, highlightClasses = ne
               <Link href={`/marks/${m.id}`} className="block">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-semibold text-[13.5px] truncate">{md.text}</span>
-                  <Pill tone={m.record_type === "A" ? "A" : "B"} size="sm">
-                    {m.record_type === "A" ? "A" : "B"}
+                  <Pill tone={markCategoryMeta(m.mark_category, m.record_type).tone} size="sm">
+                    {markCategoryMeta(m.mark_category, m.record_type).short}
                   </Pill>
                 </div>
                 <div className="text-xs text-ink-2 truncate mt-0.5">{m.applicant_name}</div>

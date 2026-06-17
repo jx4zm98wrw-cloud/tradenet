@@ -20,6 +20,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import (
+    Computed,
     Date,
     DateTime,
     ForeignKey,
@@ -184,6 +185,33 @@ class Trademark(Base):
     application_number: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # (210)
     certificate_number: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # (111)
     madrid_number: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # (116)
+    # Derived classification + lifecycle identity — STORED generated columns
+    # (migration 20260617_0015). Pure functions of the (210/111/116) signs above,
+    # so they can never drift. Computed(persisted=True) marks them generated, so
+    # the ORM reads them and excludes them from INSERT/UPDATE. Indexed in the
+    # migration and excluded from alembic drift-check in env.py (Postgres
+    # normalises the stored expression vs this string).
+    mark_category: Mapped[str] = mapped_column(
+        Text,
+        Computed(
+            "CASE WHEN nullif(application_number,'') IS NOT NULL AND nullif(certificate_number,'') IS NULL "
+            "AND nullif(madrid_number,'') IS NULL THEN 'domestic_application' "
+            "WHEN nullif(application_number,'') IS NOT NULL AND nullif(certificate_number,'') IS NOT NULL "
+            "THEN 'domestic_registration' "
+            "WHEN nullif(certificate_number,'') IS NOT NULL AND nullif(application_number,'') IS NULL "
+            "AND nullif(madrid_number,'') IS NULL THEN 'madrid_registration' "
+            "WHEN nullif(madrid_number,'') IS NOT NULL AND nullif(certificate_number,'') IS NULL "
+            "AND nullif(application_number,'') IS NULL THEN 'madrid_renewal' ELSE 'unknown' END",
+            persisted=True,
+        ),
+    )
+    lineage_key: Mapped[str | None] = mapped_column(
+        Text,
+        Computed(
+            "COALESCE(nullif(application_number,''), nullif(certificate_number,''), nullif(madrid_number,''))",
+            persisted=True,
+        ),
+    )
 
     # Dates (publication / registration / validity)
     submission_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # (220)

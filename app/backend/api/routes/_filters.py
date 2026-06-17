@@ -75,6 +75,7 @@ def build_trademark_where(
     nice_class: list[str] | None = None,
     vienna_codes: list[str] | None = None,
     record_type: RecordType | None = None,
+    mark_category: str | None = None,
     applicant_type: str | None = None,
     applicant: str | None = None,
     year: int | None = None,
@@ -118,6 +119,12 @@ def build_trademark_where(
             where.append(vienna_code_match(vc))
     if record_type is not None and exclude != "record_type":
         where.append(Trademark.record_type == record_type)
+    # Derived classification (domestic_application | domestic_registration |
+    # madrid_registration | madrid_renewal | unknown). Correct-by-construction,
+    # so it cleanly separates the 2,605 Madrid registrations that record_type
+    # lumps under B_domestic. An unrecognised value simply matches no rows.
+    if mark_category and exclude != "mark_category":
+        where.append(Trademark.mark_category == mark_category)
     if applicant_type and exclude != "applicant_type":
         where.append(Trademark.applicant_type == applicant_type)
     if applicant and exclude != "applicant":
