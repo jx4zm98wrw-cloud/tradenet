@@ -30,17 +30,23 @@ def derive_vn(rec: MadridRecord) -> VnStatus:
     if "VN" not in (rec.designated_countries or []):
         return VnStatus(designated=False, status=None)
 
-    grant_date: date | None = None
-    refusal_date: date | None = None
+    grant_dates: list[date] = []
+    refusal_dates: list[date] = []
     for ev in rec.transaction_history or []:
         if "VN" not in (ev.get("parties") or []):
             continue
         t = ev.get("type", "").lower()
         d = _iso_to_date(ev.get("date"))
-        if "grant of protection" in t and grant_date is None:
-            grant_date = d
-        elif "refusal" in t and refusal_date is None:
-            refusal_date = d
+        if d is None:
+            continue
+        if "grant of protection" in t:
+            grant_dates.append(d)
+        elif "refusal" in t:
+            refusal_dates.append(d)
+
+    # Multiple VN grant/refusal events can exist; the earliest is authoritative.
+    grant_date = min(grant_dates) if grant_dates else None
+    refusal_date = min(refusal_dates) if refusal_dates else None
 
     if grant_date:
         status = "granted"

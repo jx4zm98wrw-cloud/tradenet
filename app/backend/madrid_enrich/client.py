@@ -1,9 +1,9 @@
 """Polite WIPO Madrid Monitor fetch with on-disk raw-HTML cache.
 
 Politeness rails (spec §6): realistic UA + reused session, honors
-X-RateLimit-Remaining, jittered inter-request delay, exponential backoff on
-429/5xx (the backfill in Plan 2 adds the daily cap + circuit breaker). The
-cache makes re-parse free (no network) and the backfill resumable.
+X-RateLimit-Remaining, jittered inter-request delay (Plan 2 adds 429/Retry-After
+backoff, the daily cap, and the circuit breaker). The cache makes re-parse free
+(no network) and the backfill resumable.
 """
 
 from __future__ import annotations

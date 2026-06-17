@@ -29,6 +29,8 @@ async def test_upsert_inserts_then_skips_unchanged(db_session):
     assert row.holder_name == "Interojo Inc."
     assert row.vn_status == "granted"
     assert "VN" in row.designated_countries
+    assert row.designation_status is not None
+    assert row.designation_status["VN"]["status"] == "granted"
     assert row.content_hash == hashlib.sha256(html.encode()).hexdigest()
 
     wrote_again = await upsert(db_session, rec, vn, html, url)

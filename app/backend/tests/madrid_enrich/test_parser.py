@@ -45,3 +45,13 @@ def test_transaction_history_has_vn_grant_and_renewal():
         if "grant of protection" in e["type"].lower() and "VN" in (e.get("parties") or [])
     ]
     assert vn_grants and vn_grants[0]["date"] == "2019-05-02"
+
+
+def test_designation_status_per_country():
+    r = _rec()
+    assert r.designation_status["VN"]["status"] == "granted"
+    assert r.designation_status["VN"]["date"] == "2019-05-02"
+    # IR is in designated_countries (subsequent designation) but has no
+    # grant/refusal event of its own, so it is pending. (MA *does* have a grant
+    # in this fixture, so the spec's example country was swapped for IR.)
+    assert r.designation_status["IR"]["status"] == "pending"

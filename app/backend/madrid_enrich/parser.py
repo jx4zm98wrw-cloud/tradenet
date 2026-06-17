@@ -41,6 +41,7 @@ class MadridRecord(BaseModel):
     basic_registration: str | None = None
     language: str | None = None
     transaction_history: list[dict] = []
+    designation_status: dict = {}
     raw: dict = {}
 
 
@@ -151,8 +152,43 @@ def parse(html_src: str) -> MadridRecord:
         for cc in ev.get("designations") or []:
             if cc not in rec.designated_countries:
                 rec.designated_countries.append(cc)
+    rec.designation_status = _designation_status(rec.designated_countries, rec.transaction_history)
     rec.raw = {"line_count": len(lines)}
     return rec
+
+
+def _designation_status(countries: list[str], history: list[dict]) -> dict:
+    """Per-country protection status backing the status-by-jurisdiction UI.
+
+    For each designated country, scan the transaction history for grant/refusal
+    events naming it. Prefer the EARLIEST-dated grant/refusal (events sorted by
+    ISO date), not document order. A designated country with neither event is
+    pending.
+    """
+    events = sorted(history or [], key=lambda e: e.get("date") or "")
+    out: dict = {}
+    for cc in countries or []:
+        status: dict = {"status": "pending", "date": None, "gazette": None}
+        for ev in events:
+            if cc not in (ev.get("parties") or []):
+                continue
+            t = (ev.get("type") or "").lower()
+            if "grant of protection" in t:
+                status = {
+                    "status": "granted",
+                    "date": ev.get("date"),
+                    "gazette": ev.get("gazette"),
+                }
+                break
+            if "refusal" in t:
+                status = {
+                    "status": "refused",
+                    "date": ev.get("date"),
+                    "gazette": ev.get("gazette"),
+                }
+                break
+        out[cc] = status
+    return out
 
 
 def _parse_history(lines: list[str]) -> list[dict]:
@@ -197,7 +233,15 @@ def _next_event(lines: list[str], start: int) -> int:
 def _field(block: list[str], code: str) -> list[str]:
     for k, ln in enumerate(block):
         if ln == code and k + 2 < len(block):
-            return re.findall(r"\b([A-Z]{2})\b", block[k + 2])
+            # Collect every continuation line from k+2 up to (but excluding) the
+            # next 3-digit INID code, then findall across the joined text — multi-
+            # country 832/833 values wrap onto several lines ("EG", "- IN", ...).
+            vals = []
+            j = k + 2
+            while j < len(block) and not _INID.match(block[j]):
+                vals.append(block[j])
+                j += 1
+            return re.findall(r"\b([A-Z]{2})\b", " ".join(vals))
     return []
 
 

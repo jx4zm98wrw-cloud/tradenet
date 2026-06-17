@@ -50,6 +50,7 @@ async def upsert(
         vn_grant_date=vn.grant_date,
         vn_refusal_date=vn.refusal_date,
         transaction_history=rec.transaction_history or None,
+        designation_status=rec.designation_status or None,
         raw=rec.raw or None,
         source_url=source_url,
         content_hash=digest,

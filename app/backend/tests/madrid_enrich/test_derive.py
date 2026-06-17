@@ -47,3 +47,16 @@ def test_pending_when_designated_no_event():
 def test_not_designated():
     v = derive_vn(_rec(designated_countries=["SG"]))
     assert v.designated is False and v.status is None
+
+
+def test_earliest_vn_grant_wins_regardless_of_document_order():
+    # Two VN grants, the later one listed first in document order; the earlier
+    # date must be chosen.
+    r = _rec(
+        transaction_history=[
+            {"type": "Statement of grant of protection, VN", "date": "2021-08-01", "parties": ["VN"]},
+            {"type": "Statement of grant of protection, VN", "date": "2019-05-02", "parties": ["VN"]},
+        ]
+    )
+    v = derive_vn(r)
+    assert v.status == "granted" and v.grant_date == date(2019, 5, 2)
