@@ -19,6 +19,7 @@ app/
 │   │   └── routes/         Resource routers (one file per concept)
 │   ├── alembic/            DB migrations
 │   ├── tm_extractor/       PDF parser library (refactored from TM_csv_builder)
+│   ├── madrid_enrich/      WIPO Madrid Monitor enrichment (client/parser/derive/store)
 │   ├── worker/             RQ ingest job + section→row mapper
 │   ├── tests/              pytest suite (httpx AsyncClient against live ASGI)
 │   ├── pyproject.toml      Ruff + Mypy + pytest config

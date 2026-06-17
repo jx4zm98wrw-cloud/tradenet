@@ -29,6 +29,11 @@ claude_csvbuilder/
 │   │   │                           routes/gazettes.py and worker/ingest.py)
 │   │   ├── worker/                 RQ jobs (ingest pipeline lives here)
 │   │   ├── tm_extractor/           Vendored CSV parser (was TM_csv_builder.py)
+│   │   ├── madrid_enrich/          WIPO Madrid Monitor enrichment package
+│   │   │                           (client/parser/derive/store + enrich_one).
+│   │   │                           Populates `madrid_records` (keyed by IRN,
+│   │   │                           soft-joined to `trademarks.lineage_key`)
+│   │   │                           with WIPO-fetched Madrid bibliographic data.
 │   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
 │   │   ├── alembic/                Migrations
 │   │   ├── scripts/                One-off scripts (smoke_ingest.py)
