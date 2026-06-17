@@ -1,4 +1,27 @@
-"""Derive Vietnam protection status from a parsed MadridRecord."""
+"""Derive Vietnam protection status from a parsed MadridRecord.
+
+Gazette-authoritative rule
+--------------------------
+Every IRN this pipeline enriches is harvested from Vietnam's gazette
+"Madrid accepted in VN" section, which means VN protection is *already
+established* at the source. The status derivation therefore treats the
+gazette as authoritative: when ``gazette_accepted=True`` the record is
+"granted", full stop. WIPO's transaction history is consulted only to
+supply the grant *date*; it can never downgrade an accepted record to
+"refused" or "pending".
+
+Provisional != final
+---------------------
+A WIPO "provisional refusal of protection" is an *interim* office action
+during examination -- it is routinely lifted by a later grant. It is NOT
+a terminal refusal. Only a *final* refusal event (a confirmation of total
+provisional refusal, a final decision, an invalidation, or a refusal that
+is explicitly total/final/confirmed) is treated as terminal, and even
+then only in the non-gazette WIPO-refined fallback path used by callers
+that do not have a gazette acceptance signal. The previous implementation
+conflated provisional with final and wrongly marked accepted records
+"refused".
+"""
 
 from __future__ import annotations
 
@@ -26,32 +49,71 @@ def _iso_to_date(s: str | None) -> date | None:
         return None
 
 
-def derive_vn(rec: MadridRecord) -> VnStatus:
-    if "VN" not in (rec.designated_countries or []):
-        return VnStatus(designated=False, status=None)
-
-    grant_dates: list[date] = []
-    refusal_dates: list[date] = []
+def _vn_events(rec: MadridRecord) -> list[tuple[str, date | None]]:
+    """VN-party events as (lowercased type, parsed-or-None date) tuples."""
+    out: list[tuple[str, date | None]] = []
     for ev in rec.transaction_history or []:
         if "VN" not in (ev.get("parties") or []):
             continue
-        t = ev.get("type", "").lower()
-        d = _iso_to_date(ev.get("date"))
-        if d is None:
-            continue
-        if "grant of protection" in t:
-            grant_dates.append(d)
-        elif "refusal" in t:
-            refusal_dates.append(d)
+        out.append((ev.get("type", "").lower(), _iso_to_date(ev.get("date"))))
+    return out
 
-    # Multiple VN grant/refusal events can exist; the earliest is authoritative.
+
+def _is_grant(t: str) -> bool:
+    return "grant of protection" in t or "statement of grant" in t or "the mark is protected" in t
+
+
+def _is_final_refusal(t: str) -> bool:
+    """A FINAL (terminal) refusal -- NOT a bare provisional refusal."""
+    if "confirmation of total provisional refusal" in t:
+        return True
+    if "final decision" in t:
+        return True
+    if "invalidation" in t:
+        return True
+    return "refusal" in t and ("total" in t or "final" in t or "confirm" in t)
+
+
+def derive_vn(rec: MadridRecord, *, gazette_accepted: bool = False) -> VnStatus:
+    designated = gazette_accepted or ("VN" in (rec.designated_countries or []))
+    if not designated:
+        return VnStatus(designated=False, status=None)
+
+    events = _vn_events(rec)
+
+    grant_dates = [d for (t, d) in events if _is_grant(t) and d is not None]
     grant_date = min(grant_dates) if grant_dates else None
-    refusal_date = min(refusal_dates) if refusal_dates else None
+
+    if gazette_accepted:
+        # The gazette is authoritative: VN protection is established. WIPO only
+        # supplies the grant date (which may be missing -> granted per gazette).
+        return VnStatus(
+            designated=True,
+            status="granted",
+            grant_date=grant_date,
+            refusal_date=None,
+        )
+
+    # WIPO-refined fallback for callers without a gazette acceptance signal.
+    final_refusal_dates = [d for (t, d) in events if _is_final_refusal(t) and d is not None]
+    final_refusal_date = min(final_refusal_dates) if final_refusal_dates else None
+
+    # Guard: an active registration (reg + exp both present) is never refused.
+    has_active_registration = rec.registration_date is not None and rec.expiration_date is not None
 
     if grant_date:
         status = "granted"
-    elif refusal_date:
+        refusal_date = None
+    elif final_refusal_date and not has_active_registration:
         status = "refused"
+        refusal_date = final_refusal_date
     else:
         status = "pending"
-    return VnStatus(designated=True, status=status, grant_date=grant_date, refusal_date=refusal_date)
+        refusal_date = None
+
+    return VnStatus(
+        designated=True,
+        status=status,
+        grant_date=grant_date,
+        refusal_date=refusal_date,
+    )
