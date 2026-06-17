@@ -1,6 +1,6 @@
 import * as React from "react";
 
-export type PillTone = "ink" | "stamp" | "ok" | "warn" | "mute" | "A" | "B";
+export type PillTone = "ink" | "stamp" | "ok" | "warn" | "mute" | "A" | "B" | "M";
 
 const TONES: Record<PillTone, string> = {
   ink:   "bg-paper-2 text-ink-2 border-line",
@@ -8,9 +8,12 @@ const TONES: Record<PillTone, string> = {
   ok:    "bg-ok-2 text-ok border-[oklch(0.85_0.05_165)]",
   warn:  "bg-warn-2 text-[oklch(0.45_0.13_75)] border-[oklch(0.85_0.07_75)]",
   mute:  "bg-transparent text-mute border-line",
-  // Record types use distinct hues to read at-a-glance: A=blue, B=violet
+  // Mark categories use distinct hues to read at-a-glance: domestic
+  // application=blue, domestic registration=violet, Madrid (registration or
+  // renewal)=rose — so a Madrid mark never visually masquerades as domestic.
   A:     "bg-[oklch(0.96_0.025_220)] text-[oklch(0.42_0.10_220)] border-[oklch(0.88_0.04_220)]",
   B:     "bg-[oklch(0.96_0.03_300)] text-[oklch(0.42_0.13_300)] border-[oklch(0.88_0.05_300)]",
+  M:     "bg-[oklch(0.96_0.035_15)] text-[oklch(0.45_0.14_15)] border-[oklch(0.88_0.06_15)]",
 };
 
 type PillProps = {

@@ -24,6 +24,20 @@ export type Trademark = {
   id: string;
   gazette_id: string;
   record_type: "A" | "B_domestic" | "B_madrid";
+  /** Derived, correct-by-construction classification (STORED generated column).
+   * Prefer this over `record_type` for any display/label decision — record_type
+   * mislabels the 2,605 Madrid registrations (111-only, no 210) as B_domestic,
+   * whereas mark_category distinguishes them. See markCategoryMeta(). */
+  mark_category:
+    | "domestic_application"
+    | "domestic_registration"
+    | "madrid_registration"
+    | "madrid_renewal"
+    | "unknown"
+    | null;
+  /** Identity that links a mark's rows across gazette years: COALESCE(210, 111,
+   * 116) — domestic by application number, Madrid by WIPO IRN. */
+  lineage_key: string | null;
   application_number: string | null;
   certificate_number: string | null;
   madrid_number: string | null;

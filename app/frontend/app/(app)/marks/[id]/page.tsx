@@ -17,6 +17,7 @@ import { markDisplay } from "@/lib/mark-display";
 import { Icon } from "@/components/icons";
 import { Timeline } from "@/components/detail/timeline";
 import { OppositionBox } from "@/components/detail/opposition-box";
+import { markCategoryMeta } from "@/components/badges";
 import {
   api, countryDisplay, NICE_LABELS,
   type ApplicantStats, type CoMark, type InidMarker, type MarkDetail,
@@ -90,6 +91,7 @@ export default function MarkDetailPage() {
 
   const m = detail.mark;
   const md = markDisplay(m);
+  const mc = markCategoryMeta(m.mark_category, m.record_type);
   const idLabel = m.application_number || m.certificate_number || m.madrid_number || "—";
   const idKind = m.application_number ? "Application №" : m.certificate_number ? "Certificate №" : "Madrid №";
   const d = countryDisplay(m.applicant_country_code);
@@ -131,9 +133,7 @@ export default function MarkDetailPage() {
                   </h1>
                 </div>
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <Pill tone={m.record_type === "A" ? "A" : "B"}>
-                    {m.record_type === "A" ? "Application" : m.record_type === "B_madrid" ? "Registration (Madrid)" : "Registration"}
-                  </Pill>
+                  <Pill tone={mc.tone}>{mc.label}</Pill>
                   <Pill tone={detail.statusTone as PillTone} soft>
                     <PulseDot tone={detail.statusTone === "warn" ? "warn" : detail.statusTone === "ok" ? "ok" : "stamp"} />
                     {detail.statusLabel}
@@ -307,7 +307,7 @@ export default function MarkDetailPage() {
             <CardHead title="Source" />
             <dl className="px-5 py-4 space-y-2 text-sm">
               <SideRow label="Gazette ID"><span className="font-mono text-[12px] break-all">{m.gazette_id}</span></SideRow>
-              <SideRow label="Section">{m.record_type === "A" ? "Applications published" : "Registered marks"}</SideRow>
+              <SideRow label="Section">{mc.section}</SideRow>
               <Link
                 href={`/admin/gazettes`}
                 className="block text-center w-full mt-3 px-3 py-1.5 border border-line bg-surface rounded text-[12.5px] font-medium text-ink-2 hover:bg-paper-2"

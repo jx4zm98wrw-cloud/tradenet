@@ -14,6 +14,7 @@ import {
 } from "@/components/ui";
 import { MarkSpecimen } from "@/components/specimen";
 import { markDisplay } from "@/lib/mark-display";
+import { markCategoryMeta } from "@/components/badges";
 import { Icon } from "@/components/icons";
 import {
   api, type Finding, type OppositionWindow, type Watchlist,
@@ -274,8 +275,8 @@ function FindingRow({ f, onClick }: { f: Finding; onClick: () => void }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm">{md.text}</span>
-            <Pill tone={m.record_type === "A" ? "A" : "B"} size="sm">
-              {m.record_type === "A" ? "A" : "B"}
+            <Pill tone={markCategoryMeta(m.mark_category, m.record_type).tone} size="sm">
+              {markCategoryMeta(m.mark_category, m.record_type).short}
             </Pill>
             {(m.nice_classes ?? []).slice(0, 4).map((c) => (
               <ClassChip key={c} n={c} matched={matchedClasses.has(c)} />

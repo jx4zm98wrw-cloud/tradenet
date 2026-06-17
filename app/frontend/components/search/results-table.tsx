@@ -6,6 +6,7 @@ import { Icon } from "@/components/icons";
 import { Pill, Flag, ClassChip, SimilarityRing } from "@/components/ui";
 import { MarkSpecimen } from "@/components/specimen";
 import { markDisplay } from "@/lib/mark-display";
+import { markCategoryMeta } from "@/components/badges";
 import { type ScoredMark } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 
@@ -69,8 +70,8 @@ export function ResultsTable({ results, selected, onToggle, highlightClasses = n
                   </Link>
                 </td>
                 <td className="px-3 py-2">
-                  <Pill tone={m.record_type === "A" ? "A" : "B"} size="sm">
-                    {m.record_type === "A" ? "A" : "B"}
+                  <Pill tone={markCategoryMeta(m.mark_category, m.record_type).tone} size="sm">
+                    {markCategoryMeta(m.mark_category, m.record_type).short}
                   </Pill>
                 </td>
                 <td className="px-3 py-2">

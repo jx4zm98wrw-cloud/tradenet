@@ -19,6 +19,7 @@ import {
   type CompareResponse, type PairScore, type Trademark,
 } from "@/lib/api";
 import type { PillTone } from "@/components/ui";
+import { markCategoryMeta } from "@/components/badges";
 
 // Compact date for the compare grid (no year — implied by surrounding context).
 // Imported from lib/format to keep a single source of truth across the app.
@@ -104,7 +105,7 @@ function ComparePage() {
           <CmpRow label="Type" n={N}>
             {data.marks.map((m) => (
               <span key={m.id}>
-                {m.record_type === "A" ? "Application" : m.record_type === "B_madrid" ? "Registration (Madrid)" : "Registration"}
+                {markCategoryMeta(m.mark_category, m.record_type).label}
               </span>
             ))}
           </CmpRow>
@@ -381,7 +382,10 @@ function PlateCell({ mark, anchor }: { mark: Trademark; anchor: boolean }) {
       />
       <div className="mt-2 flex items-center gap-2">
         <strong className="text-[13.5px] truncate">{md.text}</strong>
-        <Pill tone={mark.record_type === "A" ? "A" : "B"} size="sm">{mark.record_type === "A" ? "A" : "B"}</Pill>
+        {(() => {
+          const cmc = markCategoryMeta(mark.mark_category, mark.record_type);
+          return <Pill tone={cmc.tone} size="sm">{cmc.short}</Pill>;
+        })()}
       </div>
       <div className="text-[11.5px] text-mute truncate" title={mark.applicant_name ?? ""}>
         {mark.applicant_name}
