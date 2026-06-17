@@ -29,11 +29,23 @@ _MANUAL_INDEXES = {
     "ix_trademarks_applicant_name_trgm",
     "ix_trademarks_mark_sample_dmeta",
     "ix_trademarks_applicant_name_dmeta",
+    "ix_trademarks_mark_category",
+    "ix_trademarks_lineage_key",
 }
+
+# STORED generated columns added via raw SQL (mark_category, lineage_key). Their
+# stored CASE/COALESCE expression is normalised by Postgres and would be flagged
+# as drift against the model's Computed() string, so they're excluded from
+# autogenerate comparison.
+_MANUAL_COLUMNS = {"mark_category", "lineage_key"}
 
 
 def _include_object(object_, name, type_, reflected, compare_to) -> bool:
-    return not (type_ == "index" and name in _MANUAL_INDEXES)
+    if type_ == "index":
+        return name not in _MANUAL_INDEXES
+    if type_ == "column":
+        return name not in _MANUAL_COLUMNS
+    return True
 
 
 def run_migrations_offline() -> None:
