@@ -280,6 +280,59 @@ class Trademark(Base):
     gazette: Mapped[Gazette] = relationship("Gazette", back_populates="trademarks")
 
 
+class MadridRecord(Base):
+    """WIPO Madrid Monitor record, one row per International Registration Number.
+
+    Hybrid storage: promoted scalar/array columns for the fields we filter or
+    display, plus JSONB for the nested designation-status / transaction-history
+    and the full parsed `raw` payload (never lose data; re-derive without
+    re-fetching). Soft-linked to trademarks via `irn = trademarks.lineage_key`.
+    """
+
+    __tablename__ = "madrid_records"
+
+    irn: Mapped[str] = mapped_column(Text, primary_key=True)
+
+    holder_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    holder_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    holder_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+    holder_legal_status: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mark_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    representative: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    registration_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    expiration_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+
+    nice_classes: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    designated_countries: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    basic_registration: Mapped[str | None] = mapped_column(Text, nullable=True)
+    language: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    vn_designated: Mapped[bool] = mapped_column(nullable=False, server_default=text("false"))
+    vn_status: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    vn_grant_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    vn_refusal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    designation_status: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    transaction_history: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    raw: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    content_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parse_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+    __table_args__ = (
+        Index(
+            "ix_madrid_records_designated_countries",
+            "designated_countries",
+            postgresql_using="gin",
+        ),
+    )
+
+
 class UserRole(enum.StrEnum):
     """RBAC roles. Sorted from most privileged to least.
 

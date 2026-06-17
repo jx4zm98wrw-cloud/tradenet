@@ -31,6 +31,7 @@ _MANUAL_INDEXES = {
     "ix_trademarks_applicant_name_dmeta",
     "ix_trademarks_mark_category",
     "ix_trademarks_lineage_key",
+    "ix_madrid_records_designated_countries",
 }
 
 # STORED generated columns added via raw SQL (mark_category, lineage_key). Their
