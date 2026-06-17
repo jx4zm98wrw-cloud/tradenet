@@ -128,13 +128,18 @@ New package `app/backend/madrid_enrich/` (sibling to `tm_extractor/`,
   always `granted`; WIPO is consulted only to supply the grant *date* and can
   never downgrade to `refused`/`pending`. Grant-date resolution (first hit wins):
   - explicit R.18ter grant event, party=VN → `vn_grant_date` = earliest such date
-  - else **designation-date fallback**: earliest VN *designation* event
-    (`Subsequent designation, VN`, or the original `International Registration`
-    event listing VN) → that date is the accurate commencement of protection.
-    `Renewal` events are an upper bound only (protection predates them) and are
-    **never** used; "Replacement … by an international registration" is excluded.
+  - else **designation-date fallback** (only when VN has **no refusal event**,
+    provisional or final): earliest VN *designation* event (`Subsequent
+    designation, VN`, or the original `International Registration` event listing
+    VN) → that date is the accurate commencement of protection. `Renewal` events
+    are an upper bound only (protection predates them) and are **never** used;
+    "Replacement … by an international registration" is excluded. If VN ever
+    refused after designation, the designation date predates the real (later)
+    grant, so it is **not** used — grant_date stays null.
   - else → `granted` with `vn_grant_date = null` (date unrecoverable from WIPO;
-    typically Agreement-era marks whose only VN signal is a renewal)
+    typically Agreement-era marks whose only VN signal is a renewal, or marks
+    whose VN designation drew a provisional refusal that the gazette later
+    overrode on an unrecorded date)
   - not designated → `vn_designated=false`, `vn_status=null`
   - **WIPO-refined fallback** (callers without a gazette signal,
     `gazette_accepted=False`): grant wins; only a *final* refusal (not a bare

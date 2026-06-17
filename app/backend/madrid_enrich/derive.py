@@ -78,6 +78,16 @@ def _is_designation(t: str) -> bool:
     return t.startswith("subsequent designation") or t.startswith("international registration")
 
 
+def _is_refusal(t: str) -> bool:
+    """Any VN refusal event -- provisional OR final.
+
+    Used to disqualify the designation-date fallback: if VN ever refused
+    (even provisionally) after designation, the designation date predates the
+    actual grant, so it must not be used as ``vn_grant_date``.
+    """
+    return "refusal" in t
+
+
 def _is_final_refusal(t: str) -> bool:
     """A FINAL (terminal) refusal -- NOT a bare provisional refusal."""
     if "confirmation of total provisional refusal" in t:
@@ -105,7 +115,10 @@ def derive_vn(rec: MadridRecord, *, gazette_accepted: bool = False) -> VnStatus:
         # event date (the accurate commencement of protection). Records whose
         # only VN signal is a Renewal keep grant_date=None (date unrecoverable;
         # granted per gazette).
-        if grant_date is None:
+        if grant_date is None and not any(_is_refusal(t) for (t, _d) in events):
+            # Designation date is a valid grant date only when VN never refused
+            # (even provisionally). A refusal means the real grant came later, on
+            # a date WIPO did not record -> leave grant_date null.
             designation_dates = [d for (t, d) in events if _is_designation(t) and d is not None]
             grant_date = min(designation_dates) if designation_dates else None
         return VnStatus(

@@ -148,6 +148,25 @@ def test_gazette_accepted_original_ir_designation_fallback():
     assert v.status == "granted" and v.grant_date == date(2005, 4, 14)
 
 
+def test_designation_with_later_vn_refusal_stays_null():
+    # Designation, then a (provisional) VN refusal: the designation date is NOT
+    # the grant date -- the real grant came later (gazette overrode the refusal),
+    # a date WIPO never recorded. Gazette-authoritative keeps status "granted",
+    # but grant_date must be null rather than the pre-refusal designation date.
+    r = _rec(
+        transaction_history=[
+            {"type": "International Registration, AU, VN", "date": "2015-05-28", "parties": ["AU", "VN"]},
+            {
+                "type": "Total provisional refusal of protection, VN",
+                "date": "2016-06-30",
+                "parties": ["VN"],
+            },
+        ]
+    )
+    v = derive_vn(r, gazette_accepted=True)
+    assert v.status == "granted" and v.grant_date is None
+
+
 def test_gazette_accepted_renewal_only_stays_null():
     # VN appears only in a Renewal -> protection predates it, exact date is not
     # recoverable from WIPO. Grant date must stay None (accurate-only policy).
