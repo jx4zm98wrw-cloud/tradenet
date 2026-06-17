@@ -55,3 +55,17 @@ def test_designation_status_per_country():
     # grant/refusal event of its own, so it is pending. (MA *does* have a grant
     # in this fixture, so the spec's example country was swapped for IR.)
     assert r.designation_status["IR"]["status"] == "pending"
+
+
+def test_old_record_with_9sexies_designations_includes_vn():
+    from madrid_enrich.parser import parse
+    from pathlib import Path
+
+    html = (Path(__file__).parent.parent / "fixtures" / "madrid" / "0183259.html").read_text(
+        encoding="utf-8"
+    )
+    r = parse(html)
+    assert "VN" in r.designated_countries
+    from madrid_enrich.derive import derive_vn
+
+    assert derive_vn(r).designated is True

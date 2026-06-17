@@ -148,8 +148,16 @@ def parse(html_src: str) -> MadridRecord:
                     break
 
     rec.transaction_history = _parse_history(lines[th_idx:])
+    # designated_countries is the UNION of all summary 832 blocks (above) plus
+    # every transaction-history event's parties AND designations. Old Madrid
+    # Agreement / Article 9sexies records carry the designated set (incl. VN) in
+    # the International Registration event header / 9sexies designation lists,
+    # not in a plain 832 designations sub-field — accruing parties too is what
+    # catches them. A country appearing as an event party (grant/refusal/IR/
+    # subsequent/renewal) or designation is, by definition, designated. Preserve
+    # insertion order, de-dupe.
     for ev in rec.transaction_history:
-        for cc in ev.get("designations") or []:
+        for cc in (ev.get("parties") or []) + (ev.get("designations") or []):
             if cc not in rec.designated_countries:
                 rec.designated_countries.append(cc)
     rec.designation_status = _designation_status(rec.designated_countries, rec.transaction_history)
