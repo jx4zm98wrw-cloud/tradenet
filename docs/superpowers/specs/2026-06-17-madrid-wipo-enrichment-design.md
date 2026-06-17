@@ -190,13 +190,32 @@ actually moved — comfortably within limits, circuit breaker as backstop.
 
 ## 8. UI / search surfacing
 
-- **Mark detail** (Madrid marks only): a "WIPO Madrid record" card — holder,
-  **expiration**, **designated countries (VN highlighted)**, and the prosecution
-  **timeline** (registration 151 → grants/refusals → renewals → expiration 180).
-  Read via the extended mark-detail API.
+Validated against an interactive HTML mockup (real IRN 1266721 data) before
+implementation. Decisions locked from that review:
+
+- **Provenance tags** — every WIPO-derived value wears a small `WIPO` badge to
+  keep the two data lineages legible on one page (gazette-extracted vs
+  WIPO-fetched). A Madrid mark with no record shows gazette fields only +
+  `Source → ○ not enriched` — never fabricated data.
+- **Mark detail** (Madrid marks only), top → bottom:
+  - **Status pill** "Active · protected in VN" + a **🇻🇳 VN banner** (granted
+    date · refusal · renewed · runs-through) as the headline.
+  - **Claims row** gains WIPO fields: `Expiration (180)` and `Granted in VN`.
+  - **"WIPO Madrid record" card** — holder/address/legal-nature/representative,
+    registered, expiration (+ `renewed` badge), basic registration, language,
+    and **designated jurisdictions** as flag chips (VN highlighted + GRANTED).
+  - **Two-pane card**: **Prosecution timeline** (registration 151 →
+    grants/refusals → subsequent designations → renewal → expiration 180, VN
+    event emphasized) ‖ **Status by jurisdiction** (per-country snapshot, VN
+    pinned top, then GRANTED by date, then PENDING).
+  - **Goods & services** (511, full text).
+- **Sidebar**: `Source` gains a `● enriched` indicator; a new **Renewal watch**
+  widget (next renewal due = expiration 180, “≈ N years · last renewed YYYY”).
 - **Search**: a **"Designated jurisdiction"** filter (covers VN / covers country X)
   implemented as a join `trademarks → madrid_records` on `lineage_key`
   (`designated_countries` GIN-indexed). Optional `vn_status` filter.
+
+Mockup reference: `/tmp/madrid_demo/full.html` (throwaway; not committed).
 
 ## 9. Testing
 
