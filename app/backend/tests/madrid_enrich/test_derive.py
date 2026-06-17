@@ -113,3 +113,82 @@ def test_earliest_vn_grant_wins_regardless_of_document_order():
     )
     v = derive_vn(r, gazette_accepted=True)
     assert v.status == "granted" and v.grant_date == date(2019, 5, 2)
+
+
+# --- Designation-date fallback (legacy records with no explicit VN grant) ----
+# For gazette-accepted records that carry no "Grant of protection, VN" event,
+# the date VN protection commenced is the VN *designation* event date: either
+# a "Subsequent designation, VN" or the original "International Registration"
+# event that lists VN among its parties. This is an accurate commencement date.
+# A "Renewal" naming VN is only an upper bound (protection predates it) and must
+# NOT be used as a grant date.
+
+
+def test_gazette_accepted_subsequent_designation_fallback():
+    r = _rec(
+        transaction_history=[
+            {"type": "Subsequent designation, VN", "date": "2017-05-04", "parties": ["VN"]},
+        ]
+    )
+    v = derive_vn(r, gazette_accepted=True)
+    assert v == VnStatus(designated=True, status="granted", grant_date=date(2017, 5, 4), refusal_date=None)
+
+
+def test_gazette_accepted_original_ir_designation_fallback():
+    r = _rec(
+        transaction_history=[
+            {
+                "type": "International Registration, AU, CN, JP, VN",
+                "date": "2005-04-14",
+                "parties": ["AU", "CN", "JP", "VN"],
+            },
+        ]
+    )
+    v = derive_vn(r, gazette_accepted=True)
+    assert v.status == "granted" and v.grant_date == date(2005, 4, 14)
+
+
+def test_gazette_accepted_renewal_only_stays_null():
+    # VN appears only in a Renewal -> protection predates it, exact date is not
+    # recoverable from WIPO. Grant date must stay None (accurate-only policy).
+    r = _rec(
+        transaction_history=[
+            {
+                "type": "Renewal, AG, AL, CN, VN, ZM",
+                "date": "2015-03-26",
+                "parties": ["AG", "AL", "CN", "VN", "ZM"],
+            },
+        ]
+    )
+    v = derive_vn(r, gazette_accepted=True)
+    assert v.status == "granted" and v.grant_date is None
+
+
+def test_explicit_grant_beats_designation_fallback():
+    # When both a designation event and an explicit grant exist, the explicit
+    # grant date wins (it is the truest signal).
+    r = _rec(
+        transaction_history=[
+            {"type": "Subsequent designation, VN", "date": "2017-05-04", "parties": ["VN"]},
+            {"type": "Statement of grant of protection, VN", "date": "2018-09-01", "parties": ["VN"]},
+        ]
+    )
+    v = derive_vn(r, gazette_accepted=True)
+    assert v.grant_date == date(2018, 9, 1)
+
+
+def test_replacement_event_is_not_a_designation():
+    # "Replacement of national registration by an international registration"
+    # contains the substring "international registration" but is NOT a VN
+    # designation event -> must not be mistaken for a commencement date.
+    r = _rec(
+        transaction_history=[
+            {
+                "type": "Replacement of national registration by an international registration, VN",
+                "date": "2003-01-09",
+                "parties": ["VN"],
+            },
+        ]
+    )
+    v = derive_vn(r, gazette_accepted=True)
+    assert v.status == "granted" and v.grant_date is None

@@ -121,12 +121,24 @@ New package `app/backend/madrid_enrich/` (sibling to `tm_extractor/`,
   `transaction_history`, `designation_status`, the effective
   `designated_countries` set (original 832 ∪ subsequent-designation events), and
   multilingual goods/services into `raw`.
-- **`derive.py`** — `derive_vn(record) -> VnStatus`. From `designated_countries`
-  (is VN present?) + `transaction_history` filtered to VN:
-  - R.18ter grant event, party=VN → `granted` + `vn_grant_date`
-  - refusal event, party=VN → `refused` + `vn_refusal_date`
-  - designated, neither → `pending`
-  - not in set → `vn_designated=false`, `vn_status=null`
+- **`derive.py`** — `derive_vn(record, *, gazette_accepted=False) -> VnStatus`.
+  **Gazette-authoritative**: every IRN this pipeline enriches comes from VN's
+  "Madrid accepted in VN" gazette section, so VN protection is already
+  established. With `gazette_accepted=True` (the pipeline default) the record is
+  always `granted`; WIPO is consulted only to supply the grant *date* and can
+  never downgrade to `refused`/`pending`. Grant-date resolution (first hit wins):
+  - explicit R.18ter grant event, party=VN → `vn_grant_date` = earliest such date
+  - else **designation-date fallback**: earliest VN *designation* event
+    (`Subsequent designation, VN`, or the original `International Registration`
+    event listing VN) → that date is the accurate commencement of protection.
+    `Renewal` events are an upper bound only (protection predates them) and are
+    **never** used; "Replacement … by an international registration" is excluded.
+  - else → `granted` with `vn_grant_date = null` (date unrecoverable from WIPO;
+    typically Agreement-era marks whose only VN signal is a renewal)
+  - not designated → `vn_designated=false`, `vn_status=null`
+  - **WIPO-refined fallback** (callers without a gazette signal,
+    `gazette_accepted=False`): grant wins; only a *final* refusal (not a bare
+    provisional one) with no active registration → `refused`; otherwise `pending`.
 - **`store.py`** — `upsert(record)` idempotent by IRN; if `content_hash`
   unchanged and `parse_version` current, skip write. Sets `fetched_at`.
 

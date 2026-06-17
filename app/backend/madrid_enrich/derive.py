@@ -63,6 +63,21 @@ def _is_grant(t: str) -> bool:
     return "grant of protection" in t or "statement of grant" in t or "the mark is protected" in t
 
 
+def _is_designation(t: str) -> bool:
+    """A VN *designation* event -- the moment VN protection commences.
+
+    Either a later "Subsequent designation, VN" or the original
+    "International Registration" event that lists VN among its parties. Used as
+    the grant-date fallback for legacy (Agreement-era) records that carry no
+    explicit "Grant of protection, VN" transaction. ``startswith`` deliberately
+    excludes "Replacement of national registration by an international
+    registration", which mentions VN but is not a designation, and "Renewal",
+    which only proves protection predates it (an upper bound, never a grant).
+    """
+    t = t.strip()
+    return t.startswith("subsequent designation") or t.startswith("international registration")
+
+
 def _is_final_refusal(t: str) -> bool:
     """A FINAL (terminal) refusal -- NOT a bare provisional refusal."""
     if "confirmation of total provisional refusal" in t:
@@ -85,8 +100,14 @@ def derive_vn(rec: MadridRecord, *, gazette_accepted: bool = False) -> VnStatus:
     grant_date = min(grant_dates) if grant_dates else None
 
     if gazette_accepted:
-        # The gazette is authoritative: VN protection is established. WIPO only
-        # supplies the grant date (which may be missing -> granted per gazette).
+        # The gazette is authoritative: VN protection is established. Prefer an
+        # explicit WIPO grant date; otherwise fall back to the VN *designation*
+        # event date (the accurate commencement of protection). Records whose
+        # only VN signal is a Renewal keep grant_date=None (date unrecoverable;
+        # granted per gazette).
+        if grant_date is None:
+            designation_dates = [d for (t, d) in events if _is_designation(t) and d is not None]
+            grant_date = min(designation_dates) if designation_dates else None
         return VnStatus(
             designated=True,
             status="granted",
