@@ -25,6 +25,7 @@ def _filter_params(
     country: str | None = Query(None, min_length=2, max_length=2),
     nice_class: list[str] | None = Query(None),
     record_type: RecordType | None = None,
+    mark_category: str | None = Query(None),
     applicant_type: str | None = Query(None),
     applicant: str | None = Query(None),
     year: int | None = None,
@@ -39,6 +40,7 @@ def _filter_params(
         country=country,
         nice_class=nice_class,
         record_type=record_type,
+        mark_category=mark_category,
         applicant_type=applicant_type,
         applicant=applicant,
         year=year,
@@ -120,6 +122,39 @@ async def facet_applicants(
         stmt = stmt.where(and_(*where))
     rows = (await session.execute(stmt)).all()
     return [CountBucket(key=name, count=n) for name, n in rows]
+
+
+# Human-readable labels for the derived mark_category buckets. Mirrors the
+# frontend MARK_CATEGORY_LABELS (lib/api.ts) — keep the two in sync.
+MARK_CATEGORY_LABELS: dict[str, str] = {
+    "domestic_application": "Domestic application",
+    "domestic_registration": "Domestic registration",
+    "madrid_registration": "Madrid registration",
+    "madrid_renewal": "Madrid renewal",
+    "unknown": "Unclassified",
+}
+
+
+@router.get("/mark-categories", response_model=list[CountBucket])
+async def facet_mark_categories(
+    filters: dict = Depends(_filter_params),
+    session: AsyncSession = Depends(get_session),
+) -> list[CountBucket]:
+    """Count rows per derived mark_category under the current filter set
+    (excluding the mark_category filter itself), so the rail can show "if I
+    picked Madrid registration, how many?" — the bucket record_type can't
+    express because it folds Madrid registrations into B_domestic.
+    """
+    where = build_trademark_where(**filters, exclude="mark_category")
+    stmt = (
+        select(Trademark.mark_category, func.count())
+        .group_by(Trademark.mark_category)
+        .order_by(desc(func.count()))
+    )
+    if where:
+        stmt = stmt.where(and_(*where))
+    rows = (await session.execute(stmt)).all()
+    return [CountBucket(key=cat, label=MARK_CATEGORY_LABELS.get(cat, cat), count=n) for cat, n in rows]
 
 
 @router.get("/ip-agencies", response_model=list[CountBucket])

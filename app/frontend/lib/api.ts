@@ -87,6 +87,10 @@ export type SearchParams = {
    * `01.01` and `1.1` match the same rows. */
   vienna_codes?: string[];
   record_type?: string;
+  /** Derived classification filter — preferred over record_type. One of
+   * domestic_application | domestic_registration | madrid_registration |
+   * madrid_renewal | unknown. */
+  mark_category?: string;
   applicant_type?: string;
   /** Free-text or facet-picked applicant name (substring, case-insensitive). */
   applicant?: string;
@@ -106,6 +110,7 @@ export type SearchParams = {
 export type StatsOverview = {
   total: number;
   by_record_type: Record<string, number>;
+  by_mark_category: Record<string, number>;
   gazettes_total: number;
   gazettes_completed: number;
   gazettes_in_flight: number;
@@ -368,6 +373,8 @@ export const api = {
     json<CountBucket[]>(`/api/v1/facets/applicants?${qs({ ...filters, limit, offset: undefined })}`, init),
   facetsIpAgencies: (filters: SearchParams, limit = 20, init?: RequestInit) =>
     json<CountBucket[]>(`/api/v1/facets/ip-agencies?${qs({ ...filters, limit, offset: undefined })}`, init),
+  facetsMarkCategories: (filters: SearchParams, init?: RequestInit) =>
+    json<CountBucket[]>(`/api/v1/facets/mark-categories?${qs({ ...filters, offset: undefined })}`, init),
   statsTopApplicants: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-applicants?limit=${limit}`),
   statsTopAgents: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-agents?limit=${limit}`),
   getMark: (id: string) => json<MarkDetail>(`/api/v1/marks/${id}`),
@@ -448,6 +455,16 @@ export function countryDisplay(cc: string | null | undefined): { name: string; f
   const c = COUNTRIES[cc];
   return c ? { ...c, cc } : { name: cc, flag: "🏳️", cc };
 }
+
+// Derived mark_category labels for the filter rail / chips (mirrors backend
+// facets.py MARK_CATEGORY_LABELS). Keys are the generated-column values.
+export const MARK_CATEGORY_LABELS: Record<string, string> = {
+  domestic_application: "Domestic application",
+  domestic_registration: "Domestic registration",
+  madrid_registration: "Madrid registration",
+  madrid_renewal: "Madrid renewal",
+  unknown: "Unclassified",
+};
 
 // Short Nice class labels (mirrors backend/api/v1/routes/stats.py NICE_LABELS).
 export const NICE_LABELS: Record<string, string> = {

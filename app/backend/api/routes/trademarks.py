@@ -30,6 +30,10 @@ async def search(
         "leading zeros are stripped to match storage format",
     ),
     record_type: RecordType | None = None,
+    mark_category: str | None = Query(
+        None,
+        description="domestic_application | domestic_registration | madrid_registration | madrid_renewal",
+    ),
     applicant_type: str | None = Query(None, description="Personal | Company"),
     year: int | None = None,
     month: int | None = Query(None, ge=1, le=12),
@@ -48,6 +52,7 @@ async def search(
         nice_class=nice_class,
         vienna_codes=norm_vienna,
         record_type=record_type,
+        mark_category=mark_category,
         applicant_type=applicant_type,
         year=year,
         month=month,

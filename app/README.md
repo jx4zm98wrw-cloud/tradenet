@@ -107,7 +107,7 @@ wired):
 | `GET /api/v1/findings` | Watchlist matches in latest gazette |
 | `GET /api/v1/opposition-windows` | Open opposition windows |
 | `GET /api/v1/search/trademarks` | Scored search |
-| `GET /api/v1/facets/{country,nice-classes}` | Cross-reactive facet counts |
+| `GET /api/v1/facets/{country,nice-classes,applicants,ip-agencies,mark-categories}` | Cross-reactive facet counts (`mark-categories` buckets the derived classification: domestic application/registration, Madrid registration/renewal) |
 | `GET /api/v1/marks/{id}` | Mark detail with derived opposition + status |
 | `GET /api/v1/marks/{id}/{timeline,co-marks,similar,inid-fields,applicant-stats}` | Detail subresources |
 | `POST /api/v1/compare` | Side-by-side conflict scorecard |
