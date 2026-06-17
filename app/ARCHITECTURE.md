@@ -115,8 +115,11 @@ Two sources fill the specimen frame, picked in order:
    writes the relative path to `trademarks.logo_path`. `_save_page_images`
    is label-aware: when clustering merges image rects across sector
    boundaries, it splits the merged image at interior marker y-positions.
-2. **(540) wordmark text** — only B-files (registrations) carry it; A-files
-   (applications) don't.
+2. **(540) wordmark text** — both A-files (applications) and B-files
+   (registrations) can carry it. Extraction scans the registration form first,
+   then the application form; `mark_sample` is empty only when neither
+   transcribed a 540 (~97% of A-files have one in source; the PDF parser misses
+   some, so `mark_sample` is backfilled from the edited per-gazette CSVs).
 
 When both are missing (~0.015% of rows — gazette pages with no figurative
 metadata AND no transcribed wordmark), `markDisplay(mark)` falls back to a

@@ -1,15 +1,19 @@
 /** Picks the best visual label for a mark.
  *
- * Real data status (2026-05): A-file applications have NO mark_sample (we
- * only extract WIPO field 540 from B-file registrations), and no raster
- * specimen images exist anywhere yet. This helper returns the best available
- * stand-in plus an `isPlaceholder` flag so the UI can render placeholders
- * with a subdued treatment + visible "no specimen" hint, instead of pretending
- * a squeezed applicant-name is a real wordmark.
+ * Real data status: both A-files (applications) and B-files (registrations)
+ * can carry a WIPO field-540 wordmark — extraction scans the B/registration
+ * form first, falls back to the A/application form, and `mark_sample` is null
+ * only when NEITHER transcribed a 540. (~97% of A-files have one in the source
+ * data; the PDF parser misses some, so they're backfilled from the edited CSVs.)
+ * Raster logo
+ * specimens are also populated (`logo_path`). This helper returns the best
+ * available label plus an `isPlaceholder` flag so the UI can render
+ * placeholders with a subdued treatment + visible "no specimen" hint, instead
+ * of pretending a squeezed applicant-name is a real wordmark.
  *
  * Precedence:
  *   1. imageUrl (real raster — not yet populated; future-proof)
- *   2. mark_sample, 2–24 chars (real wordmark, B-files)
+ *   2. mark_sample, 2–24 chars (real WIPO 540 wordmark — A or B files)
  *   3. derived label from applicant_name with Vietnamese / Latin company
  *      prefixes stripped
  *   4. application / certificate / Madrid number tail

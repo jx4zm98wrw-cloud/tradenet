@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..auth import User, optional_user, require_user
 from ..db import RecordType, Trademark, Watchlist, get_session
 from ..schemas import TrademarkOut
+from ..similarity import DEFAULT_WEIGHTS
 from ._filters import build_trademark_where
 from .today import DEMO_TODAY
 
@@ -51,6 +52,7 @@ class WatchlistOut(BaseModel):
     matter: str | None
     query: WatchQuery
     queryDesc: str | None
+    weights: dict[str, float] | None
     totalCount: int
     newCount: int
     createdAt: datetime
@@ -64,6 +66,9 @@ class WatchlistCreate(BaseModel):
     matter: str | None = None
     query: WatchQuery
     queryDesc: str | None = None
+    # Per-matter similarity weight overrides (keys: phonetic/visual/class/vienna).
+    # Omit/None → default weight profile. Stored as given; normalised at use time.
+    weights: dict[str, float] | None = None
 
 
 class WatchlistUpdate(BaseModel):
@@ -72,6 +77,7 @@ class WatchlistUpdate(BaseModel):
     matter: str | None = None
     query: WatchQuery | None = None
     queryDesc: str | None = None
+    weights: dict[str, float] | None = None
 
 
 # ===== Endpoints =====
@@ -103,6 +109,7 @@ async def create_watchlist(
         matter=body.matter,
         query=body.query.model_dump(),
         query_desc=body.queryDesc or _summarize_query(body.query),
+        weights=_clean_weights(body.weights),
         owner_id=user.id,
     )
     session.add(w)
@@ -141,6 +148,9 @@ async def update_watchlist(
         w.last_run_at = datetime.now(UTC)
     if body.queryDesc is not None:
         w.query_desc = body.queryDesc
+    if body.weights is not None:
+        # An explicit {} resets to the default profile (stored as NULL).
+        w.weights = _clean_weights(body.weights)
     await session.commit()
     await session.refresh(w)
     return _to_out(w)
@@ -188,6 +198,30 @@ async def watchlist_findings(
 # ===== Internals =====
 
 
+def _clean_weights(weights: dict[str, float] | None) -> dict[str, float] | None:
+    """Validate a per-matter weights override for storage.
+
+    Returns the cleaned dict (only the four known keys, all non-negative
+    numbers, at least one > 0), or None when there's nothing usable (→ default
+    profile). Raises 400 on clearly-invalid input (unknown keys or
+    negative/non-numeric values) so the caller gets a real error rather than
+    silent correction. Values are stored as given; normalisation to sum 1
+    happens at scoring time via api.similarity.resolve_weights.
+    """
+    if not weights:
+        return None
+    cleaned: dict[str, float] = {}
+    for k, v in weights.items():
+        if k not in DEFAULT_WEIGHTS:
+            raise HTTPException(400, f"Unknown weight key {k!r} (allowed: {', '.join(DEFAULT_WEIGHTS)})")
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0:
+            raise HTTPException(400, f"Weight {k!r} must be a non-negative number")
+        cleaned[k] = float(v)
+    if sum(cleaned.values()) <= 0:
+        raise HTTPException(400, "At least one weight must be > 0")
+    return cleaned
+
+
 def _query_where(q: WatchQuery):
     where = build_trademark_where(
         q=q.q,
@@ -223,6 +257,7 @@ def _to_out(w: Watchlist) -> WatchlistOut:
         matter=w.matter,
         query=WatchQuery(**w.query),
         queryDesc=w.query_desc,
+        weights=w.weights,
         totalCount=w.total_count,
         newCount=w.new_count,
         createdAt=w.created_at,

@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ Active punch list — read first
+
+**Enterprise audit completed 2026-05-29.** 28 confirmed P0/P1 findings, untouched.
+
+- **Plan + remediation steps**: [`AUDIT_2026_05_29_PLAN.md`](AUDIT_2026_05_29_PLAN.md) (60KB)
+- **Raw evidence per finding (incl. P2/P3)**: [`audit_2026_05_29.json`](audit_2026_05_29.json) (142KB)
+
+Recommended next-session entry point: open the plan, pick PR A (authz lockdown — blocks production launch). PRs A/B/C are independent; D-I sequenced after.
+
 ## Overview
 
 Project began as a single Python tool (`TM_csv_builder.py`) extracting Vietnamese trademark gazette data from NOIP (IP Vietnam) PDF publications into per-PDF CSVs. It has since grown into a workbench: **FastAPI + Postgres + RQ worker + Next.js 15 frontend**, with the original CSV parser vendored into `app/backend/tm_extractor/` and a separate logo extractor wired in via the worker.

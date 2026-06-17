@@ -6,13 +6,12 @@
 #
 # Format: one CVE id per line, `#` for comments.
 
-# python-multipart — runtime dep of fastapi for multipart/form-data uploads.
-# All three advisories require versions that aren't published on PyPI yet
-# (0.0.20 is currently the latest). The pip-audit step in CI ignores these
-# with identical rationale; this file keeps the Trivy image scan consistent.
-CVE-2026-24486   # python-multipart, needs unreleased 0.0.22
-CVE-2026-40347   # python-multipart, needs unreleased 0.0.26
-CVE-2026-42561   # python-multipart, needs unreleased 0.0.27
+# NOTE: the python-multipart and starlette runtime advisories that used to be
+# listed here are gone — patched releases now ship and are pinned in
+# requirements.txt (python-multipart 0.0.32, starlette 1.3.1 via
+# prometheus-fastapi-instrumentator 8.0.0). The rebuilt image clears them, so no
+# allow-list entry is needed. Only genuinely-unfixable transitive build-stage
+# deps remain below.
 
 # jaraco.context — transitive dep pulled in by setuptools / build-system
 # chain. The advisory is path-traversal via malicious tar archives; the

@@ -81,6 +81,18 @@ def test_phonetic_sound_alike_with_different_spelling() -> None:
     assert s >= 0.75, f"expected >=0.75 (sound-alike), got {s}"
 
 
+def test_phonetic_length_disparity_dampened() -> None:
+    """A much shorter mark must not score near-identical via Metaphone's
+    vowel-dropping. "KAITO"/"KAT" both encode to "KT" but differ in syllable
+    count — the aural length dampener pulls it to "moderate", below a same-length
+    variant. Plurals / minor variants within tolerance stay high."""
+    short = phonetic_similarity("KAITO", "KAT")
+    same_len = phonetic_similarity("KAITO", "KAITA")
+    assert short < 0.75, f"expected <0.75 after length dampener, got {short}"
+    assert short < same_len, f"disparate ({short}) should score below same-length ({same_len})"
+    assert phonetic_similarity("APPLE", "APPLES") >= 0.90
+
+
 def test_phonetic_vietnamese_diacritic_normalisation() -> None:
     """A Vietnamese examiner reading 'Bạc' and 'BAC' would treat them as
     the same mark for phonetic purposes — diacritics affect tone (Vietnamese

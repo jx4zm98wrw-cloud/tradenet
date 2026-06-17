@@ -1,0 +1,913 @@
+{
+  "summary": {
+    "rawFindings": 99,
+    "p0p1Submitted": 31,
+    "p0p1Confirmed": 28,
+    "p0p1Refuted": 3,
+    "p2p3PassThrough": 68
+  },
+  "confirmed_p0": [
+    {
+      "severity": "P0",
+      "category": "query-perf",
+      "location": "app/backend/api/routes/_filters.py:100-108",
+      "claim": "The free-text `q` filter wraps `applicant_name` and `mark_sample` in `lower()` before LIKE, which makes the trigram GIN indexes unusable. Postgres falls back to a sequential scan on trademarks for every search.",
+      "evidence": "EXPLAIN ANALYZE on the actual DB: `WHERE lower(applicant_name) LIKE '%chanel%'` → Seq Scan on trademarks, 46751 rows scanned, 116ms. Replacing with plain `applicant_name ILIKE '%CHANEL%' OR mark_sample ILIKE '%CHANEL%'` → Bitmap Index Scan on ix_trademarks_applicant_name_trgm + ix_trademarks_mark_sample_trgm, 0.49ms. 269x speedup. The pg_trgm index supports `~~*` (ILIKE) natively and is already case-insensitive; wrapping the column in `lower()` defeats it. Code at _filters.py L99-109: `like = f'%{q.lower()}%'` then `func.lower(Trademark.applicant_name).like(like), func.lower(Trademark.mark_sample).like(like)`. The whole point of migration 0009 (trigram indexes) is nullified — index usage on ix_trademarks_mark_sample_trgm shows `idx_scan=0` in pg_stat_user_indexes.",
+      "suggested_fix": "Drop the lower() wrap and use `Trademark.applicant_name.ilike(f'%{q}%')` / `Trademark.mark_sample.ilike(f'%{q}%')`. Postgres' `~~*` operator and trigram GIN are already case-insensitive. No new indexes needed.",
+      "auditor": "db",
+      "verdict": {
+        "confirmed": true,
+        "reason": "Confirmed and reproduced. The code at app/backend/api/routes/_filters.py:100-108 exactly matches the claim: `like = f\"%{q.lower()}%\"` followed by `func.lower(Trademark.applicant_name).like(like)` and `func.lower(Trademark.mark_sample).like(like)`. I reproduced both EXPLAIN ANALYZE plans against the live database (docker exec app-postgres-1): with the lower() wrap, the planner does a Seq Scan on trademarks (46,751 rows filtered, 9,614 buffers, 124ms); without the wrap (plain ILIKE), the planner uses both ix_trademarks_applicant_name_trgm and ix_trademarks_mark_sample_trgm via BitmapOr (28 buffers, 0.48ms) — a ~258x speedup, matching the cited 269x. Migration 0009 explicitly creates the trigram GIN indexes on the raw columns (`USING gin (applicant_name gin_trgm_ops)`), not on `lower(...)`, so the lower() wrap absolutely defeats them. The pg_trgm `~~*` (ILIKE) operator is already case-insensitive by design — the lower() wrap is both wrong (kills indexes) and redundant (ILIKE doesn't need it). pg_stat_user_indexes shows the trigram indexes had near-zero scans before this verification. The suggested fix (drop lower() and use `.ilike(f\"%{q}%\")`) is correct and minimal. P0 is appropriate: this is the user-facing free-text search hot path against a 46k-row table; every search query currently does a full sequential scan, and the fix is one-line per side."
+      }
+    },
+    {
+      "severity": "P0",
+      "category": "container-image-correctness",
+      "location": "app/backend/Dockerfile:45 + app/backend/tm_extractor/data_loaders.py:14-21",
+      "claim": "The production container ships WITHOUT cities_by_country.json or company_suffixes.json. The two reference files live at the repo root, but the Dockerfile build context is `app/backend` and they are not under that directory. data_loaders silently swallows FileNotFoundError and returns empty {} / set(), so the running container will quietly extract trademarks with NO city matching and NO Company-vs-Personal classification.",
+      "evidence": "Dockerfile uses `COPY --chown=app:app . /srv/backend` against the `app/backend` build context (DEPLOYMENT.md:46: `docker build … app/backend`). The data files are at `/Users/francisluong/Project/ASL/ImageExtractor/claude_csvbuilder/cities_by_country.json` and `company_suffixes.json` — repo root, not under app/backend. `find app/backend -name cities_by_country.json` returns nothing. data_loaders.py:19-21: `except Exception as e: logging.error(…); return {}` — silent degradation. tm_extractor/config.py:34-39 hardcodes the file names under `data_dir`.",
+      "suggested_fix": "Either (a) move the JSON files into `app/backend/` and update `from_root()`, or (b) change build context to repo root and add a COPY for the JSONs (and CLAUDE.md / `data_dir` resolution), or (c) bake them into the `tm_extractor` package as package data. Also raise (not log) when files are missing in non-dev TM_ENV — silent empty-data degradation has no legitimate use case in production.",
+      "auditor": "infra",
+      "verdict": {
+        "confirmed": true,
+        "reason": "Confirmed end-to-end. (1) Dockerfile uses build context `app/backend` (`docker build … app/backend` per DEPLOYMENT.md:46) and `COPY --chown=app:app . /srv/backend` copies only files under that directory. (2) `cities_by_country.json` (10 MB) and `company_suffixes.json` are at the repo root, NOT under `app/backend/` — `find app/backend -name cities_by_country.json` returns nothing and `ls app/backend/` shows no JSON. (3) `data_loaders.py:19-21,44-46` catches every exception and returns `{}` / `set()` with only a logging.error — silent degradation, not a hard failure. (4) `tm_extractor/config.py:34-39` resolves `cities_file = data_dir / \"cities_by_country.json\"` and the production `Settings.data_dir` (`api/settings.py:46`) defaults to `Path(__file__).resolve().parents[3]` which in the container is `/` — file would be looked up at `/cities_by_country.json`. DEPLOYMENT.md:33 instead instructs operators to set `TM_DATA_DIR=/srv/backend` \"where cities_by_country.json lives\" — but the build never puts it there, no .dockerignore exclusion is involved, no mount instruction is given to compensate, and no init step copies the files in. (5) `worker/ingest.py:371` builds `ExtractorConfig(data_dir=settings.data_dir, …)` so every production ingest will trigger the silent-empty path. Impact: `Applicant City` matching is completely dead (no fallback for non-VN rows); `Applicant Type` partially degrades — the baked `STRONG_COMPANY_SUFFIXES` + `TYPO_TOLERANT_COMPANY_PATTERNS` Python constants still catch LTD/INC/GMBH/CORP, so the regression is on the long-tail JSON suffixes (step 3 of 4 in the classifier chain). City matching is the bigger hit — entire 10 MB reference is silently gone. P0 is justified given (a) every production ingest is affected, (b) there is no operator-visible signal beyond a single ERROR log line at process start, and (c) DEPLOYMENT.md actively misleads operators about where the files are. The suggested fix list is reasonable; making the missing file fatal in non-dev TM_ENV is the most surgical safety net.",
+        "severity_adjusted": "P0"
+      }
+    },
+    {
+      "severity": "P0",
+      "category": "authz",
+      "location": "app/backend/api/routes/watchlists.py:171-185",
+      "claim": "GET /api/v1/watchlists/{id}/findings has zero authentication or ownership check — any caller with a watchlist UUID can read its results (the saved query rerun against trademarks).",
+      "evidence": "Handler signature: `async def watchlist_findings(id: uuid.UUID, limit: int = 12, session: AsyncSession = Depends(get_session)) -> list[TrademarkOut]` — no `Depends(require_user)`, no `_assert_owned(w, user)` call. Only check is `if w is None: raise 404`. The endpoint then runs the persisted JSONB query and returns the matching trademark rows.",
+      "suggested_fix": "Add `user: User = Depends(require_user)` to the signature and call `_assert_owned(w, user)` immediately after the 404 check (mirrors PUT/DELETE). Watchlist UUIDs may not be guessable today, but admin URLs, browser history, and Sentry breadcrumbs can leak them — authz must not depend on URL secrecy.",
+      "auditor": "data",
+      "verdict": {
+        "confirmed": true,
+        "reason": "Verified by reading app/backend/api/routes/watchlists.py lines 171-185. The handler signature is exactly as cited: `async def watchlist_findings(id: uuid.UUID, limit: int = 12, session: AsyncSession = Depends(get_session)) -> list[TrademarkOut]` — no `Depends(require_user)`, no `_assert_owned(w, user)` call. Only a 404 check on missing watchlist. The two adjacent mutating endpoints (PUT `/{id}` lines 119-129, DELETE `/{id}` lines 149-158) both explicitly take `user: User = Depends(require_user)` and call `_assert_owned(w, user)` after the 404 — confirming author intent that watchlists are owner-scoped. No global auth middleware exists (verified in main.py: only RequestIDMiddleware, SlowAPIMiddleware, CORSMiddleware). The `Watchlist` model has `owner_id` (models.py:123). Real auth is wired (JWT bearer in auth.py), so this isn't a stubbed-out auth situation. Impact is real: any holder of a watchlist UUID (browser history, Sentry breadcrumbs, server logs, referer headers, shared admin URLs) can read the trademark results for a client/matter-scoped saved query — horizontal IDOR exposing per-client legal monitoring intent. The suggested fix mirrors the existing PUT/DELETE pattern exactly. P0 is defensible because both layers (authn and authz) are absent, not just one; the only mitigation is UUID unguessability, which is precisely the URL-secrecy assumption authz must not rely on."
+      }
+    },
+    {
+      "severity": "P0",
+      "category": "authz-confidentiality",
+      "location": "app/backend/api/routes/watchlists.py:80-91",
+      "claim": "GET /api/v1/watchlists with no Authorization header returns every watchlist across every user — name, client, matter, saved query JSON, and counts — because the `optional_user` branch skips the owner filter when `user is None`.",
+      "evidence": "```\nstmt = select(Watchlist).order_by(desc(Watchlist.new_count), desc(Watchlist.updated_at))\nif user is not None:\n    stmt = stmt.where((Watchlist.owner_id == user.id) | (Watchlist.owner_id.is_(None)))\nrows = (await session.execute(stmt)).scalars().all()\n```\nThe `if user is not None:` gate is inverted — anonymous callers fall through with no WHERE clause and read every row. `client` and `matter` columns are explicitly billing/legal-matter PII (the design treats them as confidential per the schema docstring).",
+      "suggested_fix": "Replace `optional_user` with `require_user` and unconditionally apply the owner filter (drop the legacy `is None` branch). The comment 'Pre-auth callers see all (legacy behaviour); once auth is real, drop the if branch.' is the unfixed TODO — auth is now real.",
+      "auditor": "data",
+      "verdict": {
+        "confirmed": true,
+        "reason": "Verified directly in app/backend/api/routes/watchlists.py lines 80-91. The endpoint depends on `optional_user`, which (per auth.py lines 209-212) returns `None` when no Bearer header is present without raising. The `if user is not None:` guard then skips the owner filter, so anonymous callers receive every Watchlist row via `_to_out`, including the `client` and `matter` columns (declared in db/models.py:115-116 as dedicated billing/legal-matter fields) plus the saved-query JSONB and counts. No global auth middleware exists in main.py — auth is per-route — so nothing mitigates the leak. The sibling POST/PUT/DELETE handlers in the same file all use `require_user`, and the inline comment (\"Pre-auth callers see all (legacy behaviour); once auth is real, drop the `if` branch\") explicitly flags this as an unfixed TODO that is now stale because auth.py implements a full JWT bearer flow. P0 is the right severity: unauthenticated cross-tenant disclosure of client/matter PII for a legal-services product, exploitable with a single curl, no chained vuln required.",
+        "severity_adjusted": "P0"
+      }
+    }
+  ],
+  "confirmed_p1": [
+    {
+      "severity": "P1",
+      "category": "idor",
+      "location": "app/backend/api/routes/watchlists.py:80-91",
+      "claim": "GET /api/v1/watchlists has no auth gate when caller is anonymous: it falls through optional_user and returns every watchlist from every user.",
+      "evidence": "`user: User | None = Depends(optional_user)` followed by `if user is not None: stmt = stmt.where(...)`. When user is None the where clause is skipped and `select(Watchlist).order_by(...)` returns the global cross-tenant list, exposing each watchlist's `name`, `client`, `matter` (legal-matter labels), and saved query (with potentially sensitive search terms). The inline comment even calls the branch 'legacy behaviour'.",
+      "suggested_fix": "Replace `optional_user` with `require_user`. If a public listing is genuinely needed, hard-filter to `Watchlist.owner_id.is_(None)` and add the user check anyway so anonymous callers cannot see per-owner rows.",
+      "auditor": "security",
+      "verdict": {
+        "confirmed": true,
+        "reason": "Verified directly against app/backend/api/routes/watchlists.py:80-91. The endpoint uses Depends(optional_user) and only applies the owner-scope WHERE clause when user is not None — anonymous callers receive `select(Watchlist).order_by(...)` with no filtering. The inline comment (\"Pre-auth callers see all (legacy behaviour); once auth is real, drop the `if` branch\") explicitly acknowledges the gap, and auth is already real (api/auth.py implements full HS256 JWT bearer flow with require_user/optional_user). No global auth middleware in main.py (only CORS, SlowAPI, RequestID). Sibling POST/PUT/DELETE handlers correctly use require_user — only the GET list endpoint falls through. The Watchlist model exposes name, client, matter (legal-matter labels), and a JSONB `query` with saved search terms; _to_out returns all of these. Impact is concrete and reproducible by any unauthenticated HTTP caller. P1 severity is appropriate: cross-tenant data leak of sensitive legal-matter metadata, but not full PII exposure or RCE. Suggested fix is correct — swap optional_user → require_user (the legacy branch is obsolete now that auth is wired)."
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "idor",
+      "location": "app/backend/api/routes/watchlists.py:171-185",
+      "claim": "GET /api/v1/watchlists/{id}/findings has no authentication and no ownership check.",
+      "evidence": "The signature is `async def watchlist_findings(id: uuid.UUID, limit: int = 12, session: AsyncSession = Depends(get_session))` — no `require_user`, no `_assert_owned`. Any caller (logged in or not) who knows or guesses a watchlist UUID gets the rendered findings for that watchlist (mark details for whatever query the owner saved — i.e. exactly the curated competitive-monitoring set the owner pays to see).",
+      "suggested_fix": "Add `user: User = Depends(require_user)`, look up `Watchlist`, and call the existing `_assert_owned(w, user)` helper before running the query.",
+      "auditor": "security",
+      "verdict": {
+        "confirmed": true,
+        "reason": "The finding is accurate and exploitable. Reading app/backend/api/routes/watchlists.py lines 171-185, the GET /{id}/findings handler's signature is exactly `async def watchlist_findings(id: uuid.UUID, limit: int = 12, session: AsyncSession = Depends(get_session))` — no `require_user`, no `optional_user`, and no `_assert_owned(w, user)` call after loading the watchlist. Sibling routes (PUT at line 124, DELETE at line 153) both require `user: User = Depends(require_user)` and call `_assert_owned(w, user)` after `session.get(Watchlist, id)`, confirming the expected pattern. There is no global auth middleware in app/backend/api/main.py — auth is per-route via FastAPI Depends — so this endpoint is genuinely open. Worse, the sibling list_watchlists endpoint at line 80-91 uses `optional_user` with a legacy fallback that returns all watchlists to anonymous callers, so an attacker doesn't even need to guess UUIDs — they can list them anonymously and then read findings. The exposed TrademarkOut payload is the curated competitive-monitoring result set the watchlist owner pays for. P1 is appropriate: it's a clean IDOR / broken access control on commercial data, mitigation is trivial (add the same two-line guard used in PUT/DELETE), but the data is business-confidential rather than PII/credentials, so not P0."
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "auth-z",
+      "location": "app/backend/api/routes/watchlists.py:171-185",
+      "claim": "GET /api/v1/watchlists/{id}/findings has no auth dependency — unauthenticated callers can read any watchlist's results if they know (or guess) the UUID.",
+      "evidence": "The handler signature is `async def watchlist_findings(id: uuid.UUID, limit: int = 12, session: AsyncSession = Depends(get_session))`. There is no `Depends(require_user)` / `Depends(optional_user)` / ownership check. By contrast, create/update/delete on the same router all use `Depends(require_user)` + `_assert_owned`. Anyone hitting `/api/v1/watchlists/<uuid>/findings` over the network gets back the saved query's matching trademarks with no token.",
+      "suggested_fix": "Add `user: User = Depends(require_user)` and call `_assert_owned(w, user)` after the `session.get(Watchlist, id)` lookup, mirroring the pattern in `update_watchlist` / `delete_watchlist`.",
+      "auditor": "backend",
+      "verdict": {
+        "confirmed": true,
+        "severity_adjusted": "P1",
+        "reason": "The finding survives adversarial review. I read app/backend/api/routes/watchlists.py and confirmed the watchlist_findings handler at lines 171-185 has signature `async def watchlist_findings(id: uuid.UUID, limit: int = 12, session: AsyncSession = Depends(get_session))` — no Depends(require_user), no Depends(optional_user), and no _assert_owned call. The sibling endpoints on the same router (create at L98, update at L124, delete at L153) all use `user: User = Depends(require_user)`, and update/delete additionally call `_assert_owned(w, user)` (L129, L158), establishing both the pattern and the security expectation. I verified in app/backend/api/auth.py that auth is real (JWT HS256 Bearer tokens, bcrypt, RBAC) — not a stub — and in app/backend/api/main.py that there is no middleware-level auth catching unauthenticated routes; auth is strictly opt-in per route via Depends. Watchlists are owner-scoped (`Watchlist.owner_id` exists in models.py L123, and list_watchlists at L88-89 filters by it when authenticated). The exposed data is the saved-query result set — i.e. which trademarks match a private business query like \"competitor X\" — which leaks the matter/client/query intent even if the underlying trademark rows are gazette-public. The UUID is v4 (unguessable), so this is leak-dependent rather than enumeration-open, which is why P1 (not P0) is the right severity. The suggested fix mirrors the update/delete pattern exactly. Severity stays P1 as originally assigned."
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "async-blocking",
+      "location": "app/backend/api/routes/auth.py:159,161 + app/backend/api/auth.py:71-85",
+      "claim": "Bcrypt verify (~250 ms per call at cost factor 12) runs synchronously inside the async event loop on every login attempt, freezing the API for every other in-flight request for the duration.",
+      "evidence": "auth.py: `def verify_password(plain, hashed) -> bool: ... return bcrypt.checkpw(...)` — sync. routes/auth.py `login` calls `verify_password(body.password, _DUMMY_HASH)` then `verify_password(body.password, user.password_hash)` directly inside an `async def` handler with no `run_in_threadpool` / `asyncio.to_thread` wrapper. A single uvicorn worker handling 4 concurrent login requests gates them ~1s end-to-end on bcrypt alone, blocking all other endpoints on that worker (search, health, etc.).",
+      "suggested_fix": "Wrap the two `verify_password` calls in `await anyio.to_thread.run_sync(verify_password, body.password, hashed)` (or `asyncio.to_thread`). Same for `hash_password` in `scripts/create_user.py` if/when called from API code.",
+      "auditor": "backend",
+      "verdict": {
+        "confirmed": true,
+        "reason": "Verified directly against the source. `verify_password` (app/backend/api/auth.py:78-85) is a plain synchronous function that calls `bcrypt.checkpw`, and the `login` handler (app/backend/api/routes/auth.py:134, an `async def`) invokes it at lines 159 and 161 with no `await`, no `run_in_threadpool`, and no `asyncio.to_thread` wrapper. A repo-wide grep for `run_in_threadpool|to_thread|run_sync` returns zero matches in the backend — no mitigation exists anywhere. The ~250 ms figure is not the reviewer's estimate; it is stated in the source comments themselves (auth.py lines 26-27 and 59-61). FastAPI's documented behavior is that sync work inside `async def` handlers runs on the event loop, so each in-flight bcrypt verify blocks every other coroutine on that uvicorn worker — including search, gazettes, and health endpoints — for the full ~250 ms. The login endpoint is unauthenticated and rate-limit-less in this code, so any external client can trigger it. Severity P1 is appropriate (real availability issue, trivial 2-line fix, security-adjacent endpoint exposed to unauthenticated traffic). One minor caveat that does not change the verdict: the cited `_DUMMY_HASH = _hash(...)` at module load is a one-time startup cost, not a per-request blocker — the per-request blockers are the two `verify_password` calls, exactly as the finding states. The suggested fix (`await anyio.to_thread.run_sync(verify_password, ...)`) is correct and minimal."
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "async-blocking",
+      "location": "app/backend/api/routes/marks.py:333-345, app/backend/api/routes/compare.py:135-141, app/backend/api/similarity.py:255-266",
+      "claim": "`visual_similarity` opens PNGs with PIL and computes pHashes synchronously inside async route handlers, looping over up to `_SIMILAR_CANDIDATE_POOL = 40` candidates per /similar request.",
+      "evidence": "marks.py similar_marks: `for r in candidates: ... vis = sim.visual_similarity(a_logo=m.logo_path, b_logo=r.logo_path, ..., image_root=image_root)` inside `async def similar_marks`. `_phash_for` does `with Image.open(abs_path) as img: h = imagehash.phash(img)` — synchronous file I/O + CPU. First call on a cold mark loads + decodes a PNG from disk on the loop thread; with 40 candidates a uncached request blocks the loop for hundreds of ms.",
+      "suggested_fix": "Wrap the scored loop in `await asyncio.to_thread(_score_loop, ...)`, or precompute pHashes in the worker at ingest time (write them to a new column) so the API doesn't decode images at all. The latter is what the comment in `_phash_cache` hints at.",
+      "auditor": "backend",
+      "verdict": {
+        "confirmed": true,
+        "reason": "All three citations match the code exactly. marks.py line 292 confirms `async def similar_marks`; line 288 confirms `_SIMILAR_CANDIDATE_POOL = 40`; lines 333-345 loop over candidates and call `sim.visual_similarity(...)` synchronously without `asyncio.to_thread` / `run_in_executor` / `run_in_threadpool` (grep across `app/backend/api/` returns zero matches for these — no mitigation exists). compare.py line 76 confirms `async def compare`, which calls `_score_pair` in a loop, and `_score_pair` (lines 135-141) likewise invokes `sim.visual_similarity` synchronously. similarity.py lines 255-266 confirms `_phash_for` does `with Image.open(abs_path) as img: h = imagehash.phash(img)` — synchronous Pillow decode + CPU-heavy pHash computation on the event loop thread. The `_phash_cache` (line 242) does soften the impact: once an anchor's pHash is cached, the work disappears. But the FIRST request for any (anchor, candidate-set) pair on a cold cache decodes up to 41 PNGs on the loop thread — easily hundreds of ms — which blocks ALL concurrent requests (not just /similar), including the simple /marks list browsing the same UI does. The suggested fix (precompute pHashes at ingest time into a new column, eliminating PIL from the request path entirely) is sound and the `_phash_cache` comment (\"logo files don't change\") does hint at the same direction. P1 is appropriate: real event-loop blocking, real cross-request impact, real bound on candidates (40) that grows with `_SIMILAR_CANDIDATE_POOL`."
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "pagination",
+      "location": "app/backend/api/routes/search.py:189-216",
+      "claim": "`/api/v1/search/trademarks` returns inconsistent `total` and broken pagination: `total` counts SQL-filtered rows (no threshold applied), then a bounded `fetch_limit` is sliced post-threshold, so `offset > 0` requests can return empty pages while `total` still reports a large number.",
+      "evidence": "`cnt_stmt` has the same WHERE clauses as `stmt` but no Python-side threshold filtering — `total` reflects pre-threshold matches. Then `fetch_limit = max(limit + offset, limit) * 2` caps the actually-fetched rows; `scored` filters by threshold; `page = scored[offset : offset + limit]`. If threshold drops 80% of rows, page 2 (`offset=50, limit=50`) only sees post-threshold rows from the first `(50+50)*2 = 200` SQL rows, not from the full match set. Past page ~2 the response is empty even though `total` says thousands.",
+      "suggested_fix": "Either (a) make `total` reflect post-threshold counts by running the same scoring path on the count query (expensive but correct), or (b) keep SQL as the source of truth for `total` and document that threshold + pagination interact only on page 1. Option (c): when `mode` ∉ {'phonetic','vienna','image'} and there's no real similarity to compute, skip threshold entirely and just paginate against SQL — matches the current behaviour comment but isn't actually enforced.",
+      "auditor": "backend",
+      "verdict": {
+        "confirmed": true,
+        "reason": "The finding is accurately characterized. In app/backend/api/routes/search.py:189-216 the code constructs cnt_stmt with the same WHERE clauses as stmt but no Python-side scoring/threshold step, so total reflects pre-threshold SQL matches. The over-fetch (fetch_limit = max(limit+offset, limit)*2) only doubles the SQL window; rows passing the threshold then get sliced by [offset:offset+limit]. Walking the math: with threshold-induced pass rate p, after fetching 2*(limit+offset) rows we have ~2p*(limit+offset) survivors, so the slice [offset:offset+limit] requires 2p*(limit+offset) >= offset+limit, i.e., p >= 0.5. Any threshold tight enough to drop more than half the SQL matches produces empty pages for offset >= limit. Concrete repro: mode=text with q=\"GB\" and threshold=0.95 (only wordmark==ql scores 0.98) — SQL returns many rows but post-threshold pass rate is well under 50%, so page 2 is empty while total still reports thousands. The frontend in app/(app)/search/page.tsx confirms the impact: pagination buttons are gated by offset+pageSize >= total, and the header renders \"Showing N–M of total\", so users see the inflated total, click Next, and land on empty pages. The existing test_search_filter_only.py acknowledges total > items can happen with limit=200 and offset=0 (line 156: assert items <= total) but never tests offset > 0, so no current test catches this. Tests test_filter_only_text_search_returns_all_matches relies on the mode in (\"text\",\"phonetic\") and not q short-circuit in _score, which returns 1.0 and bypasses the threshold — that mitigation only covers filter-only searches, not the scored ones described here. No mitigation exists elsewhere. P1 is appropriate: user-visible broken pagination on the primary search endpoint, but not a data-loss or security issue.",
+        "severity_adjusted": "P1"
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "race-condition",
+      "location": "app/frontend/app/(app)/search/page.tsx:99-125 + lib/api.ts:317",
+      "claim": "The main search results fetch has no AbortController. Rapid query/filter changes can let a slow stale response overwrite a faster newer one.",
+      "evidence": "lib/api.ts line 317 defines `scoredSearch: (p: ScoredSearchParams) => json<SearchResults>(...)` with NO `init?: RequestInit` parameter (unlike facetsCountries/etc. on lines 324-330 which do accept it). The search page effect (page.tsx:99-125) calls `api.scoredSearch(params).then((r) => { setResults(r); ... }).finally(() => setLoading(false));` with no signal, no request-id guard, and no cleanup. Compounding it, the facets effect immediately above DOES use AbortController (lines 84-95), highlighting that the developer recognised the race for facets but skipped it for the main results — exactly the race the CmdK abort comment (cmdk.tsx:96) was added to prevent. setLoading(false) in `.finally()` also flips off prematurely when the stale fetch lands first.",
+      "suggested_fix": "Add `init?: RequestInit` to `scoredSearch` in lib/api.ts (mirroring `searchTrademarks`), then in search/page.tsx create an `AbortController` per effect run and pass `{ signal: controller.signal }`. Track a request-id ref so only the latest response's `setLoading(false)` wins.",
+      "auditor": "frontend",
+      "verdict": {
+        "confirmed": true,
+        "reason": "All cited evidence matches the actual code verbatim. lib/api.ts:317 defines scoredSearch with no init parameter, while the surrounding API methods (searchTrademarks line 315, facetsCountries/NiceClasses/Applicants/IpAgencies lines 324-331) all accept init?: RequestInit. The search results effect at page.tsx:99-125 calls api.scoredSearch(params).then(...).finally(() => setLoading(false)) with no AbortController, no signal, no request-id guard, and no cleanup return — confirmed by direct read. The facets effect immediately above (lines 83-96) uses AbortController with an explicit comment citing 'same race the CmdK abort solved,' and cmdk.tsx:96 confirms the team recognized this exact race elsewhere. The inconsistency within a single file demonstrates the omission is an oversight, not a deliberate design. The race is concrete: a slow scoredSearch response from an earlier filter can land after a faster newer one, clobbering state and flipping setLoading off prematurely. P1 is appropriate — this is the app's primary search surface (not a best-effort autocomplete), so wrong results displayed for the wrong query is a real correctness defect, but it's not data-corrupting or security-impacting, so not P0."
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "seo",
+      "location": "app/frontend/app/ (entire marketing tree)",
+      "claim": "Marketing site has zero per-page SEO. /pricing, /coverage, /docs/* all inherit the root layout's single Metadata; no sitemap.xml, no robots.txt, all docs articles share the same <title> and OG tags.",
+      "evidence": "`grep -rn \"export const metadata|generateMetadata\" app/frontend/app/` returns ONE hit — app/layout.tsx line 40. Neither pricing/page.tsx, coverage/page.tsx, docs/[slug]/page.tsx, nor docs/layout.tsx export metadata. `find app/frontend/app -name 'sitemap*' -o -name 'robots*'` returns nothing. `app/frontend/public/` is empty. Result: Google sees 8 docs pages with title='Tradenet — Vietnam Trademark Intelligence' and the landing description.",
+      "suggested_fix": "Add `export const metadata` (or `generateMetadata` for /docs/[slug]) per route. Create `app/sitemap.ts` enumerating /, /pricing, /coverage, /docs/<every slug>. Create `app/robots.ts`. Per-page metadata should include canonical URLs and OG image.",
+      "auditor": "frontend",
+      "verdict": {
+        "confirmed": true,
+        "reason": "Independently verified all evidence. (1) `grep -rn \"export const metadata|generateMetadata\" app/frontend/app/` returns exactly one hit: app/layout.tsx:40 with the static \"Tradenet — Vietnam Trademark Intelligence\" title. (2) `find` for sitemap/robots returns nothing — neither `app/sitemap.ts`, `app/robots.ts`, nor `app/sitemap.xml`/`robots.txt` exist. (3) `app/frontend/public/` directory does not exist at all, so static sitemap.xml/robots.txt fallback is also absent. (4) Confirmed pricing/page.tsx, coverage/page.tsx, docs/page.tsx, docs/layout.tsx, docs/[slug]/page.tsx, and (marketing)/layout.tsx export no metadata. (5) next.config.mjs has no metadata wiring. (6) docs/[slug]/page.tsx pre-renders 17 slugs via generateStaticParams, all sharing the same root title and description. Impact is real and not theoretical: for a marketing site whose explicit purpose is public discovery, duplicate <title>/OG tags across 17 docs URLs plus missing sitemap.xml and robots.txt are concrete SEO defects that crawlers will observe immediately on index. P1 is appropriate — not P0 because the site still renders and the in-product (app) routes are unaffected, but higher than P2 because this is a marketing site where SEO is a core function."
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "tenancy-leak",
+      "location": "app/backend/api/routes/today.py:146,160,165",
+      "claim": "`/api/v1/today/digest`, `/api/v1/findings`, and `_findings_summary` iterate `select(Watchlist)` with no `owner_id` filter — every user sees every other user's watchlists' findings and counts.",
+      "evidence": "today.py:146 `watchlists = list((await session.execute(select(Watchlist))).scalars().all())` is unscoped. Same at L160. There is no Depends(require_user) or Depends(optional_user) on these endpoints (routes/today.py:57, 157). Compare with routes/watchlists.py:88-89 which correctly applies `(Watchlist.owner_id == user.id) | (Watchlist.owner_id.is_(None))`. Also a strong N+1: `_findings_summary` runs one SELECT per watchlist (today.py:149-150). With N users × M watchlists each, the dashboard makes M+1 queries per request.",
+      "suggested_fix": "Add `user: User = Depends(require_user)` and `.where((Watchlist.owner_id == user.id) | (Watchlist.owner_id.is_(None)))` to digest, findings, and _findings_summary. Replace the per-watchlist findings loop with a single UNION ALL or batched query that scopes all to the user's watchlists in one round trip.",
+      "auditor": "db",
+      "verdict": {
+        "confirmed": true,
+        "reason": "Verified at the cited file. today.py has no auth Depends on `today_digest` (L58) or `findings` (L158), and both `select(Watchlist)` calls (L146 in `_findings_summary`, L160 in `findings`) are unscoped — no `owner_id` filter. The comparison with watchlists.py:88-89 is accurate; that route correctly applies `(Watchlist.owner_id == user.id) | (Watchlist.owner_id.is_(None))` via `optional_user`, proving the pattern is established. The N+1 in `_findings_summary` is also real (line 150 runs one query per watchlist inside the loop). Impact is concrete: `/api/v1/findings` returns `watchId`+`watchName` for every user's watchlists to ANY caller (the smoke test `test_today_digest_shape` uses unauthenticated `client` and asserts 200), so this isn't just cross-tenant — it's anonymous-exposed. `/api/v1/today/digest` similarly returns aggregate counts (`activeWatchlists`, `watchlistsWithFindings`, `totalNew`) computed over all tenants. The top-of-file comment says findings are \"mocked until PR #5\", but the mock still reads real Watchlist rows and exposes real names/IDs across tenants — the disclaimer doesn't excuse the live leak. Minor location nit: L165 is the call site to `_findings_for_watchlist`, not itself an unscoped select; the actual unscoped selects are L146 and L160. The substance of the finding stands. P1 is appropriate (auth is wired, owner_id exists, fix is mechanical, but data IS leaking now).",
+        "severity_adjusted": "P1"
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "deployment-completeness",
+      "location": "app/frontend/ (no Dockerfile) + app/DEPLOYMENT.md",
+      "claim": "There is no frontend Dockerfile and no documented frontend deployment story. DEPLOYMENT.md covers only the backend; the README mentions only `pnpm dev` / `pnpm build` for the frontend. The product cannot ship to production from what's in the repo.",
+      "evidence": "`find /Users/francisluong/Project/ASL/ImageExtractor/claude_csvbuilder/app/frontend -maxdepth 2 -name Dockerfile*` returns nothing. DEPLOYMENT.md:44-64 only documents `docker build … app/backend`. README.md:27 lists Dockerfile only under `backend/`. No mention of Vercel, static export, CDN, or container target for the Next.js app.",
+      "suggested_fix": "Either commit a Dockerfile under app/frontend (multi-stage: node-alpine deps → next build → next start) with a HEALTHCHECK and non-root user, OR document the external deployment target (Vercel, static export to S3/CloudFront, etc.) in DEPLOYMENT.md. Today there's no path from `pnpm build` to production.",
+      "auditor": "infra",
+      "verdict": {
+        "confirmed": true,
+        "reason": "All three evidence claims verified independently: (1) `find` against /Users/francisluong/Project/ASL/ImageExtractor/claude_csvbuilder/app/frontend returns no Dockerfile — only app/backend/Dockerfile exists; no vercel.json or .vercel/ anywhere in the repo. (2) DEPLOYMENT.md's \"Building the image\" section (lines 43-64) references only `docker build … app/backend` and `tradenet-api` — grep for frontend/next/vercel/nextjs across DEPLOYMENT.md returns zero hits. (3) README.md lists Dockerfile only under backend/ (line 27) and the frontend Quick start (lines 81-86) covers only `pnpm install` / `pnpm dev`. ARCHITECTURE.md describes the frontend structure but provides no deployment story either. The impact is real and concrete: an operator following DEPLOYMENT.md as written cannot deploy the Next.js app — there is no container target, no managed-platform config, and no documented runbook step that takes `pnpm build` to a running production process. P1 is appropriate because this gap blocks shipping the product end-to-end, even though the backend half is well-documented.</reason>\n<parameter name=\"severity_adjusted\">P1"
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "error-tracking",
+      "location": "app/backend/worker/run_worker.py:23, app/backend/worker/ingest.py:24",
+      "claim": "Worker process never initializes Sentry, so every ingest exception (the most likely source of real-world bugs) is invisible to the error tracker.",
+      "evidence": "`run_worker.py:main()` only calls `logging.basicConfig(level=logging.INFO, ...)`. There is no `sentry_sdk.init(...)` anywhere in `app/backend/worker/`. `grep -rn 'sentry_sdk' app/backend` returns only the two hits in `api/main.py`. So when `ingest.py:428` runs `logger.exception('Ingest failed for gazette %s', gazette_id)`, the traceback goes to stderr only — Sentry's DSN configuration is loaded into Settings but never consumed by the worker. The API gets Sentry; the heavy-lifting subsystem that fails the most (PDF parsing, image extraction crashes, DB session timeouts) does not.",
+      "suggested_fix": "Add `_init_sentry()` (or factor it out of `api/main.py`) and call it from `worker/run_worker.py:main()` before `worker.work()`. Use `sentry_sdk.integrations.rq.RqIntegration` so RQ job failures get tagged with job_id/queue. Same DSN, same env tag — operators get one inbox covering both processes.",
+      "auditor": "observability",
+      "verdict": {
+        "confirmed": true,
+        "reason": "Verified independently. `app/backend/worker/run_worker.py:23` only configures logging — no `sentry_sdk.init(...)` anywhere in `app/backend/worker/`. `grep -rn 'sentry' app/backend` confirms Sentry SDK is only imported/initialized in `api/main.py:14,42-50`, invoked from the FastAPI `lifespan` hook (line 58) which never runs in the worker process. The dependency `sentry-sdk[fastapi]==2.60.0` is in `requirements.txt` and `Settings.sentry_dsn` exists (settings.py:60), so the operator is paying for Sentry but only getting API coverage. Meanwhile the worker is where the heaviest failure-prone work happens (PDF parsing via pdfplumber, image extraction via PyMuPDF, batched DB writes, advisory locks). The exception handler at ingest.py:427-455 uses `logger.exception(...)` and re-raises — without Sentry init in the worker, the traceback goes to stderr only. The suggested fix (factor `_init_sentry` out of `api/main.py` and call it from `run_worker.py:main()` before `worker.work()`, with `RqIntegration`) is correct and minimal. The only nuance worth noting: failures aren't completely invisible — `gazette.error_message` captures up to 4000 chars of the exception string into the DB, stderr logs are written, and RQ's failed-job registry holds the traceback. So the gap is observability/inbox-unification, not pure data loss. P1 stands as defensible (error-tracking blind spot in the heaviest subsystem is a real operability issue)."
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "structured-logging",
+      "location": "app/backend/worker/run_worker.py:23",
+      "claim": "Worker bypasses the structlog pipeline used by the API, so logs are not JSON in prod and lose the request_id correlation that links API uploads to the jobs they enqueue.",
+      "evidence": "`run_worker.py` calls `logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s %(message)s')` instead of `from api.logging_config import configure_logging; configure_logging(get_settings().env)`. Meanwhile `api/logging_config.py:20` carefully wires structlog → JSON-in-prod and routes stdlib `logging.*` through the same renderer. Result: a single ingest run that an operator wants to trace produces JSON lines from the API process (`{level:'info', request_id:'abc123', event:'gazette uploaded'}`) and plain text lines from the worker (`2026-05-29 12:00:00 INFO worker.ingest Ingested 837 rows from B_T2_2026.pdf`) — the worker line has no request_id field, so log-aggregator joins by correlation ID silently drop the worker half of the story.",
+      "suggested_fix": "Replace `logging.basicConfig(...)` with `configure_logging(get_settings().env)`. Persist the API's request_id by passing it through `Queue.enqueue(..., meta={'request_id': req_id})` and binding it via `structlog.contextvars.bind_contextvars` inside the job. This makes 'find every log line for the upload that failed' a single Loki/Datadog query.",
+      "auditor": "observability",
+      "verdict": {
+        "confirmed": true,
+        "reason": "The finding is accurate and verifiable from the code. `app/backend/worker/run_worker.py:23` calls `logging.basicConfig(level=logging.INFO, format=\"%(asctime)s %(levelname)s %(name)s %(message)s\")` — a plain stdlib formatter — while `api/main.py:55-57` calls `configure_logging(get_settings().env)`, which sets up structlog with a `JSONRenderer` in prod/staging and routes stdlib logging through the same pipeline (`api/logging_config.py:35-54`). The worker's `ingest.py` uses `logger = logging.getLogger(\"worker.ingest\")` and emits lines like \"Ingested %s rows from %s\" — those would render as JSON if the worker booted with `configure_logging`, but as plain text under `basicConfig`. The impact claim about request_id is also correct: `RequestIDMiddleware` (api/errors.py:29) binds the request_id via `bind_request_context` (structlog contextvars), but `routes/gazettes.py:152` enqueues the job with `Queue.enqueue(\"worker.ingest.ingest_pdf\", str(g.id), ...)` — no `meta={\"request_id\": ...}` is passed, and the worker job doesn't pull or bind one. So a single ingest flow does produce mismatched log formats and no shared correlation ID, breaking the cross-process trace the suggested fix describes. The fix as proposed (call configure_logging + thread request_id through meta + bind_contextvars in the job) is correct and minimal. P1 severity is reasonable for an observability/operability gap of this scope in a system that already invested in structured logging for the other half of the pipeline; it's not a correctness bug, so not P0, but it actively negates the value of the existing request_id infrastructure for the worker side of every upload."
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "frontend-error-tracking",
+      "location": "app/frontend/app/ (no error.tsx, no global-error.tsx, no Sentry)",
+      "claim": "Frontend unhandled exceptions are completely invisible to operators — there is no error tracker, no global ErrorBoundary, and no Next.js `error.tsx` or `global-error.tsx` route.",
+      "evidence": "`find app/frontend/app -name 'error.tsx' -o -name 'global-error.tsx'` returns empty. `app/frontend/package.json` has no `@sentry/nextjs`, no logging or error-tracking dependency at all. `grep -rn 'ErrorBoundary\\|useErrorBoundary' app/frontend/app app/frontend/components` returns nothing. `lib/api.ts:json()` throws on any non-OK response (line 143) but no caller catches it into a reporter — the error lands in React's default uncaught handler, which in prod-mode Next.js silently swallows it after rendering a generic '500' page. A user who hits a P0 frontend bug has zero way to escalate it except a screenshot.",
+      "suggested_fix": "Add `app/(app)/error.tsx` and `app/global-error.tsx` per Next.js 15 conventions; install `@sentry/nextjs`, run `npx @sentry/wizard@latest -i nextjs`, configure with the same DSN the backend uses (different `tag.service`). At minimum, an in-house `lib/error-report.ts` that does `fetch('/api/v1/client-errors', { method: 'POST', body: ... })` would be better than nothing.",
+      "auditor": "observability",
+      "verdict": {
+        "confirmed": true,
+        "reason": "Verified independently. Filesystem walk of /Users/francisluong/Project/ASL/ImageExtractor/claude_csvbuilder/app/frontend/app/ confirms no error.tsx, no global-error.tsx, no not-found.tsx exist anywhere — neither in (app), (marketing), or login route groups. package.json has zero error-tracking dependencies (no @sentry/nextjs, no datadog, no bugsnag, no rollbar — only opentelemetry shows up as a transitive in pnpm-lock). Grep finds no ErrorBoundary class, no componentDidCatch, no useErrorBoundary, no window.onerror, no unhandledrejection listener, and no /api/v1/client-errors POST anywhere in app/components/lib or the backend api/ tree. lib/api.ts json() at line 138-144 does throw on non-OK responses as cited, but no top-level catch transports those to telemetry. The (app)/layout.tsx wraps AuthProvider + CmdKProvider + TopNav with no error boundary above or below. The impact is slightly softened by Next.js 15's built-in default error page (users see a generic error, not literal silence), but the operator-visibility claim stands: a P0 frontend bug produces no log line, no stack trace, no user-reportable trace ID. P1 is defensible for a product shipping authenticated revenue surfaces (Today digest, Watchlists, opposition windows) where a broken render directly degrades the value proposition. The suggested fix is sensible and Next.js-idiomatic.",
+        "severity_adjusted": "P1"
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "audit-trail",
+      "location": "app/backend/api/db/models.py (no AuditLog table), app/SECURITY.md:73-75",
+      "claim": "There is no append-only audit log for any sensitive action — gazette upload/reprocess, watchlist create/update/delete, user create/role change, mark enrichment runs. Forensic 'who saw what mark when' is impossible.",
+      "evidence": "Grep for `audit_log|AuditLog|audit_event` across `app/backend/` returns zero hits in code (only in docstrings and migration comments). `gazettes.uploaded_by` is a single nullable VARCHAR(255) — no FK to users, no timestamp of role change, no per-row history. SECURITY.md:74 explicitly says 'No append-only audit table for sensitive actions … logs aren't tamper-evident.' Structured logs go to stderr but no retention or signing is configured.",
+      "suggested_fix": "Add an `audit_events` table (id, actor_id, action, resource_type, resource_id, payload JSONB, created_at) and a thin `record_event(...)` helper invoked from each mutating route + the enrichment scripts. Keep it append-only by revoking UPDATE/DELETE at the role level. Required for any GDPR Article 30 record of processing.",
+      "auditor": "data",
+      "verdict": {
+        "confirmed": true,
+        "reason": "The finding is real and independently verifiable. (1) `app/backend/api/db/models.py` defines Gazette, Watchlist, Trademark, User, TmNameIndex — there is no AuditLog/audit_event table. (2) No migration in `app/backend/alembic/versions/` creates one (0001-0011 cover trademarks, watchlists, indexes, logo_path, users, tm_name_index — nothing audit). (3) `grep` for `audit_log|AuditLog|audit_event|AuditEvent` across the backend returns zero hits (the `scripts/audit_logos.py` matches are a logo-quality script, unrelated). (4) `Gazette.uploaded_by` is exactly as described: `String(255), nullable=True` set once at upload — no FK, no per-row history, no timestamp on role change in the User model. (5) `routes/watchlists.py:149-160` `delete_watchlist` performs `await session.delete(w); await session.commit()` with zero audit write — no `record_event`, no log-to-table call. Same pattern in the gazettes upload route (`uploaded_by=user.id` written to the row, but no separate immutable event). (6) `SECURITY.md:73-75` explicitly admits the gap, matching the cited evidence verbatim. Severity adjustment: the original P1 is appropriate. SECURITY.md still calls auth \"the biggest gap\" but `auth.py` is now real bcrypt+JWT — meaning the system IS moving toward production use, which makes the audit-log gap more load-bearing, not less. For a trademark gazette tool that processes PII-bearing applicant data (named individuals — flagged in SECURITY.md:82-85), the lack of forensic \"who deleted whose watchlist when\" / \"who reprocessed gazette X\" is a real compliance and incident-response gap. P1 (high but not P0 emergency) is the right call: no immediate exploitability, but unfixable retroactively once incidents happen.",
+        "severity_adjusted": "P1"
+      }
+    },
+    {
+      "severity": "P1",
+      "category": "gdpr",
+      "location": "app/backend/api/routes/auth.py (no DELETE), scripts/create_user.py (no companion delete script)",
+      "claim": "There is no user-account deletion or right-to-erasure flow. No API endpoint, no CLI. The only way to remove a user is manual SQL — and doing so orphans `gazettes.uploaded_by` and `watchlists.owner_id`, which are bare VARCHARs with no FK constraint.",
+      "evidence": "`scripts/create_user.py` exists; no `delete_user.py`. Searching routes returns no DELETE /users/* endpoint. Schema: `gazettes.uploaded_by Mapped[str | None] = mapped_column(String(255), nullable=True)` and `watchlists.owner_id Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)` — neither has a `ForeignKey('users.id')`. Combined with finding #2, an orphaned watchlist (owner_id pointing to a now-deleted user UUID) becomes readable by anonymous callers via the unauth list path.",
+      "suggested_fix": "Add (a) a soft-delete column on users (`deactivated_at`), (b) an admin endpoint `DELETE /api/v1/users/{id}` that purges/anonymises watchlists owned by that user and nulls `gazettes.uploaded_by`, (c) FK constraints with `ON DELETE SET NULL` so the schema enforces the invariant. Document the retention policy and PII inventory required for GDPR Article 30.",
+      "auditor": "data",
+      "verdict": {
+        "confirmed": true,
+        "reason": "The core claims are independently verifiable. I confirmed: (1) `auth.py` exposes only login/refresh/logout/me — no DELETE /users/{id} or self-delete endpoint; grepping all routes turns up only one DELETE handler (`/watchlists/{id}`). (2) `scripts/` contains `create_user.py` but no companion `delete_user.py` or any module containing `delete_user`/`erasure`. (3) `models.py` line 92 defines `uploaded_by: Mapped[str | None] = mapped_column(String(255), nullable=True)` and line 123 defines `owner_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)` — neither uses `ForeignKey(\"users.id\", …)`, while sibling columns like `gazette_id` clearly do (`ForeignKey(\"gazettes.id\", ondelete=\"CASCADE\")`). (4) Therefore a manual SQL `DELETE FROM users WHERE id=…` truly does orphan these fields with no DB-level guard. A partial mitigation exists — `User.is_active` is honored by login (auth.py:154) and refresh (auth.py:194), so soft-deactivation is available — but it's not exposed via any API/CLI and does not satisfy GDPR Article 17 erasure (PII in `users.email`, `users.name`, `password_hash` remains). One sub-claim is weak: the \"becomes readable by anonymous callers via the unauth list path\" framing is real but not orphan-specific — `watchlists.py:80` already returns ALL watchlists to anonymous callers regardless of owner_id, so orphaning doesn't materially worsen that exposure. That's a finding-#2 concern, not unique to erasure. Severity P1 is defensible for a product with a public marketing/pricing page (implying it may onboard external users) but the impact paragraph slightly overstates the cross-finding interaction. The underlying gap — no erasure mechanism at all, no FK constraints to enforce referential integrity on manual deletes — is genuine and warrants the suggested fix.",
+        "severity_adjusted": "P1"
+      }
+    }
+  ],
+  "passthrough_p2": [
+    {
+      "severity": "P2",
+      "category": "auth",
+      "location": "app/backend/api/routes/auth.py:170-202",
+      "claim": "Refresh-token rotation re-issues but does NOT invalidate the previous refresh token, contradicting the docstring's claim that 'a leaked refresh becomes useless after one use'.",
+      "evidence": "`refresh()` mints `new_refresh = issue_refresh_token(user)` and sets the cookie, but never bumps `user.token_version`, never persists the previous `jti` to a revocation list, and the old JWT continues to verify (same `tv`, signature still valid, exp not reached) until the 7-day TTL expires. An attacker who siphons a refresh cookie can keep redeeming it in parallel with the legitimate session for up to a week, undetected, until the user manually triggers /logout.",
+      "suggested_fix": "Either persist `(user_id, jti)` of issued refresh tokens to a `refresh_tokens` table with `used_at` / `revoked_at`, or bump `user.token_version` on every successful /refresh (this invalidates the current access token too — caller already gets the new one in the response). The latter is the smaller diff; the former preserves multi-device sessions.",
+      "auditor": "security"
+    },
+    {
+      "severity": "P2",
+      "category": "csp",
+      "location": "app/frontend/next.config.mjs:20-34",
+      "claim": "CSP `script-src` includes `'unsafe-inline'` and `'unsafe-eval'` in production builds, so any XSS sink that reaches the page has full script execution. The protective intent of CSP is effectively voided.",
+      "evidence": "`script-src 'self' 'unsafe-inline' 'unsafe-eval'` is emitted unconditionally. The trailing comment 'Next.js needs unsafe-eval in dev; tighten with nonces in prod build' acknowledges the intent but no `process.env.NODE_ENV` branching swaps to a stricter prod CSP. Compare to lines 43-45 where HSTS is gated on NODE_ENV — the same toggle was just not added here.",
+      "suggested_fix": "Use Next.js 15 strict CSP with per-request nonces (https://nextjs.org/docs/app/guides/content-security-policy) — Next can inject the nonce into its own runtime scripts so `'unsafe-inline'` and `'unsafe-eval'` can be dropped in the production build. Minimum acceptable: drop `'unsafe-eval'` in prod (Next.js production bundles do not require eval).",
+      "auditor": "security"
+    },
+    {
+      "severity": "P2",
+      "category": "rate-limit-bypass",
+      "location": "app/backend/Dockerfile:55 + app/backend/api/rate_limit.py:21",
+      "claim": "Combination of `uvicorn --forwarded-allow-ips=*` and slowapi `key_func=get_remote_address` lets any client bypass IP-based rate limits by setting `X-Forwarded-For` to a random value.",
+      "evidence": "`--forwarded-allow-ips=*` instructs uvicorn to trust `X-Forwarded-For` from any source. `get_remote_address` (slowapi) then reads `request.client.host`, which uvicorn rewrites to the XFF value. An attacker can issue thousands of /auth/login attempts with `X-Forwarded-For: <random-ip>` per request, each starting from a fresh 120/min bucket. Combined with finding 6 (no per-endpoint login limit), this enables effectively-unbounded password brute force.",
+      "suggested_fix": "If the API is behind a known proxy, set `--forwarded-allow-ips` to that proxy's IP only (e.g. `--forwarded-allow-ips=10.0.0.0/8`). If the API is direct-exposed, drop `--proxy-headers` entirely. Independently, validate slowapi keying by including request.headers['x-forwarded-for'] hash + remote_addr.",
+      "auditor": "security"
+    },
+    {
+      "severity": "P2",
+      "category": "brute-force",
+      "location": "app/backend/api/routes/auth.py:133-167",
+      "claim": "POST /auth/login has no per-endpoint rate limit — only the global 120/min default — and no per-account lockout.",
+      "evidence": "`upload_gazette` carries `@limiter.limit(_get_upload_limit)` (10/min), but `login()` has no `@limiter.limit(...)` decorator. With the bypass in finding 5, an attacker can iterate the full top-1000-passwords list against a single email well within the global default. The constant-time `_DUMMY_HASH` defends against email enumeration but not against credential stuffing.",
+      "suggested_fix": "Add `@limiter.limit('5/minute;30/hour')` on /auth/login keyed by the submitted email (slowapi supports custom key_func per route). Also add per-account: lock the account or impose increasing delays after N consecutive failures in M minutes, stored in Redis.",
+      "auditor": "security"
+    },
+    {
+      "severity": "P2",
+      "category": "async-blocking",
+      "location": "app/backend/api/main.py:178-185 + app/backend/api/routes/gazettes.py:148-159",
+      "claim": "Sync redis client (`redis.Redis.from_url(...).ping()` / `.enqueue(...)`) used inside async FastAPI handlers — blocks event loop on every readiness probe and every upload.",
+      "evidence": "main.py /health/ready: `r = Redis.from_url(get_settings().redis_url, socket_timeout=2); r.ping()` inside `async def ready`. gazettes.py upload: `Queue(\"ingest\", connection=Redis.from_url(...))).enqueue(...)` inside `async def upload_gazette`. The 2 s socket_timeout on ping means a flaky Redis stalls the loop for 2 s per probe.",
+      "suggested_fix": "Use `redis.asyncio` (aka `aioredis` since redis-py 4.2): `from redis.asyncio import Redis as ARedis; r = ARedis.from_url(...); await r.ping()`. For RQ enqueue, wrap in `await asyncio.to_thread(...)` since RQ doesn't have an async client.",
+      "auditor": "backend"
+    },
+    {
+      "severity": "P2",
+      "category": "data-quality",
+      "location": "app/backend/api/_filename.py:32-38 + app/backend/api/routes/gazettes.py:117",
+      "claim": "Filename whose first char isn't 'A' or 'B' silently maps to GazetteType.A. A B-file uploaded with a typo'd name (e.g. 'bulletin_T2_2026.pdf' starts with 'b' — OK, but 'gazette_B_T2.pdf' starts with 'g') becomes a type-A gazette, the parser uses (210) markers only, extracts 0 sections, and the gazette completes silently with row_count=0.",
+      "evidence": "`parse_filename_meta` line 33: `letter = filename[:1].upper() if filename else 'A'`. Line 34: `gazette_type = GazetteType.B if letter == 'B' else GazetteType.A`. There's no fallback / error — anything not starting with B is silently A. Upload route accepts the result without validation. The CLAUDE.md residual stats won't notice because they assume gazette_type matches reality.",
+      "suggested_fix": "Reject filenames whose first letter isn't [AaBb] with HTTP 400 in upload_gazette, OR require the user to explicitly select A/B in the upload form and stop inferring from filename at all. Returning `None` from parse_filename_meta and gating on it in the route is the smallest change.",
+      "auditor": "backend"
+    },
+    {
+      "severity": "P2",
+      "category": "datetime-naive",
+      "location": "app/backend/api/routes/today.py:76",
+      "claim": "Uses deprecated `datetime.utcnow()` (timezone-naive) as fallback when no gazettes exist. In Python 3.12+ this is deprecated; the result is also naive, so when serialised it becomes ambiguous in the API response.",
+      "evidence": "`last_sync = last.scalar_one_or_none() or datetime.utcnow()`. `Gazette.uploaded_at` is `DateTime(timezone=True)` so the DB path returns a tz-aware datetime; the fallback returns a tz-naive datetime. Pydantic serialises them differently (the naive one drops the tz suffix in JSON), and any consumer that diffs `lastSyncAt` against `datetime.now(tz.utc)` would silently get hours of skew when the fallback fires.",
+      "suggested_fix": "Replace with `datetime.now(UTC)` (the project already imports `from datetime import UTC, datetime` elsewhere). The same import pattern is used correctly in worker/ingest.py:419 and auth.py:98.",
+      "auditor": "backend"
+    },
+    {
+      "severity": "P2",
+      "category": "audit-baselines",
+      "location": "app/backend/scripts/audit_fields.py:320-329",
+      "claim": "Regression baselines are stale and only detect regressions ABOVE the baseline. After fixes drove counts below baseline (e.g. madrid_number_in_applicant from 14 → 12), the script will mark a re-climb from 12 to 13 as 'no regression' because 13 < 14.",
+      "evidence": "BASELINES dict: `\"madrid_number_in_applicant\": 14` but CLAUDE.md states `12 B rows have a Madrid registration number in (732) (was ~14)`. `\"address_fragment_in_applicant\": 7` but CLAUDE.md says `0 B rows have only an address fragment in (732)`. main() computes `delta = len(suspects) - baseline` and only flags regression when `delta > 0`, so any drift back upward toward the stale baseline is invisible.",
+      "suggested_fix": "Update baselines to the current observed counts after each fix, OR change semantics: store last-known-good counts in a small JSON file that the audit reads + updates on `--blessed` runs. Simpler short-term fix: set `address_fragment_in_applicant = 0`, `madrid_number_in_applicant = 12` to match CLAUDE.md.",
+      "auditor": "backend"
+    },
+    {
+      "severity": "P2",
+      "category": "ssr-stability",
+      "location": "app/frontend/app/(marketing)/docs/_articles/{api,article-112,image-search,first-watchlist}.mdx",
+      "claim": "Four MDX articles use `id=\"None\"` on every <DocsH2>, producing duplicate IDs that violate HTML uniqueness and break screen-reader heading navigation.",
+      "evidence": "api.mdx lines 17,22,40,44,58 — every DocsH2 has id=\"None\". article-112.mdx lines 9,17,27 — same. image-search.mdx lines 10,23,36 — same. first-watchlist.mdx lines 9,13,21,25 — same. DocsH2 (components/marketing/docs/DocsH2.tsx:41) renders `<h2 id={id}>` so the page ships with 3-5 elements all having id=\"None\". Looks like a copy-paste from a Python None default. None of these four articles have a DocsTOC so no anchor target is broken, but assistive tech (NVDA, JAWS, VoiceOver) reads them as unintended anchor targets.",
+      "suggested_fix": "Replace id=\"None\" with meaningful kebab-case ids in each file (e.g. api.mdx: id=\"auth\", \"search\", \"watchlists\", \"webhooks\", \"rate-limits\"). Add ESLint rule or grep guard against `id=\"None\"` in app/frontend/app/(marketing)/docs/_articles/.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P2",
+      "category": "react-hydration",
+      "location": "app/frontend/components/auth-context.tsx:69-75 + (app)/layout.tsx",
+      "claim": "Unauthenticated visitors to any /(app)/ route get a visible flash of TopNav + the protected page before the redirect-to-login effect fires.",
+      "evidence": "AuthProvider mounts in `(app)/layout.tsx` and renders children unconditionally (`<AuthProvider><CmdKProvider><TopNav /><main>{children}</main></CmdKProvider></AuthProvider>`). Inside AuthProvider, the loading→user check + router.replace lives in a useEffect that only runs after first commit. TodayPage starts its own data fetches in parallel, all 401, and only THEN the redirect happens. Net result: unauth user sees TopNav with a shimmer avatar + half-rendered Today page before being yanked to /login.",
+      "suggested_fix": "In (app)/layout.tsx, render a blocking <Splash /> while `loading || !user` instead of {children}. Or move the auth check to a server component / Next.js middleware that redirects before any JSX streams.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P2",
+      "category": "auth-ux",
+      "location": "app/frontend/components/top-nav.tsx:18 + app/(app)/admin/gazettes/page.tsx:32-40",
+      "claim": "The `Gazettes` tab is shown to non-admin users. Clicking it flashes the admin page and bounces back to /today.",
+      "evidence": "top-nav.tsx line 18 lists `{ href: '/admin/gazettes', label: 'Gazettes' }` in TABS with no role guard. admin/gazettes/page.tsx lines 32-40 calls `api.adminCheck()` on mount and `router.replace('/today')` if not admin. So a viewer clicks Gazettes → URL changes → 'Checking access…' renders → backend round-trip → bounce. UserMenu (top-nav.tsx:107-113) already reads user.role for the avatar but doesn't use it to filter tabs.",
+      "suggested_fix": "Filter TABS by role: `TABS.filter(t => t.href !== '/admin/gazettes' || user?.role === 'admin')`. Keep the server gate as defense-in-depth.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P2",
+      "category": "a11y",
+      "location": "app/frontend/components/cmdk.tsx:219 + watchlists/page.tsx:238-243 + watchlists/page.tsx:482-486 + components/tweaks-panel.tsx:91-95",
+      "claim": "All modal/dialog overlays lack `aria-modal=\"true\"`, focus traps, and inert backgrounds — keyboard users can tab out of the open dialog into the page behind.",
+      "evidence": "cmdk.tsx:219 `<div ... role=\"dialog\" aria-label=\"Command palette\">` — no aria-modal, no focus management beyond the initial input focus, no inert on backdrop. Tabbing past the last item escapes the palette. CreateModal (watchlists:238) and CSVImportModal (watchlists:482) use raw `<div onClick={onClose}>` backdrops with no role=\"dialog\" at all, no aria-labelledby, no focus restoration on close. TweaksPanel (tweaks-panel.tsx:91) has role=\"dialog\" + aria-label but same focus-trap gap.",
+      "suggested_fix": "Adopt Radix `<Dialog>` or @react-aria's `useModal` for all four. At minimum: add `aria-modal=\"true\"`, focus-trap (Tab cycles inside the panel), restore focus to the trigger on close, mark page content inert (`inert` attr) while open.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P2",
+      "category": "csv-parser",
+      "location": "app/frontend/app/(app)/watchlists/page.tsx:347-368",
+      "claim": "Watchlists CSV import parser has documented bugs (CRLF in quoted fields breaks it) and no upload size guard — a multi-MB paste freezes the tab.",
+      "evidence": "watchlists/page.tsx:345-346 the comment itself states: \"Doesn't handle CR/LF inside quoted fields\". Line 348: `text.replace(/\\r\\n?/g, \"\\n\").split(\"\\n\").filter((l) => l.length > 0)` — splits on newline BEFORE quote-state tracking, so any quoted multi-line cell (common in Vietnamese mark descriptions) corrupts the row. Line 387: a row missing only the name silently becomes a warning, but a multi-line cell would generate header-misaligned warnings the user can't diagnose. The submit loop (458-472) is sequential — 1000-row CSV makes 1000 sequential POSTs blocking on each, with no batch endpoint and no Promise.allSettled concurrency cap. No file size limit before reader.readAsText (line 437) — a 200MB CSV freezes the renderer thread.",
+      "suggested_fix": "Replace parseCSV with PapaParse (already-tested, handles quoted newlines + chunks). Cap file size at e.g. 5MB before reading. Cap inline rows at 500 with a warning. Add server-side `POST /watchlists/bulk` and call it once instead of N times.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P2",
+      "category": "performance",
+      "location": "app/frontend/components/specimen/index.tsx:111-128",
+      "claim": "MarkSpecimen `<img>` lacks `loading=\"lazy\"`, `decoding=\"async\"`, and explicit width/height; 50 result-grid specimens load immediately, hurting Search LCP and bandwidth.",
+      "evidence": "components/specimen/index.tsx lines 111-128 render `<img src={s.imageUrl} alt={s.text} style={{position: 'absolute', ...}}/>` with no loading attribute. ResultsGrid (search/results-grid.tsx:51) wraps MarkSpecimen inside a 50-card grid per page. Each PNG is hit-of-disk at backend `/static/image/<year>/<stem>/<reg>.png` — typically 30-80KB each, 50 × 50 = 2.5MB on initial paint. Next/image was deliberately avoided per the comment in specimen/index.tsx for the dynamic backend URLs, but loading=lazy alone is a one-line fix.",
+      "suggested_fix": "Add `loading=\"lazy\"` (or `loading=\"eager\"` only for above-the-fold first row) + `decoding=\"async\"` to the `<img>` in MarkSpecimen. Pass through width/height as attrs (not just style) so the browser can compute layout pre-load.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P2",
+      "category": "compare-crash",
+      "location": "app/frontend/app/(app)/compare/page.tsx:61 + 295",
+      "claim": "Compare page non-null-asserts `find()` results twice — if backend returns scores referencing a deleted/missing mark, page crashes with TypeError instead of showing a graceful error.",
+      "evidence": "compare/page.tsx line 61: `const anchor = data.marks.find((m) => m.id === data.anchorId)!;` — `!` masks the undefined case. Line 295 in ScorecardBand: `const m = marks.find((x) => x.id === s.markId)!;` — same. If the user calls /compare?ids=A,B,C and B has been deleted between Search and Compare, the backend may return marks=[A,C] and scores=[{markId:B,...}] (depending on backend behavior). The find() returns undefined; TypeScript is happy with `!`; runtime throws on the next property access. No error boundary catches it (the error state at line 51 only handles the catch from `api.compare`).",
+      "suggested_fix": "Replace `!` with explicit guards: `if (!anchor) { setError('Anchor mark not found'); return; }`. Same for ScorecardBand. Add a top-level ErrorBoundary so any future find()! pattern degrades to an error UI instead of a white screen.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P2",
+      "category": "dev-tool-in-prod",
+      "location": "app/frontend/components/tweaks-panel.tsx + (app)/layout.tsx:31",
+      "claim": "TweaksPanel (dev-only theme/density/serif knobs) is rendered for every authenticated user in production. Its file header literally calls it 'runtime theming knobs'.",
+      "evidence": "(app)/layout.tsx line 31 mounts `<TweaksPanel />` unconditionally. tweaks-panel.tsx file header (lines 1-15) describes it as a theme/density tweaker referenced from the 'design handoff README'. No NODE_ENV check, no role check. End users see a Sliders floating button bottom-right of every in-app page.",
+      "suggested_fix": "Wrap with `{process.env.NODE_ENV !== 'production' && <TweaksPanel />}` in (app)/layout.tsx. Or gate via role=admin if it's meant to be a real customer feature.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P2",
+      "category": "csp-prod",
+      "location": "app/frontend/next.config.mjs:22",
+      "claim": "Content Security Policy ships `'unsafe-eval'` in prod despite the comment promising it would be dev-only.",
+      "evidence": "next.config.mjs line 22: `\"script-src 'self' 'unsafe-inline' 'unsafe-eval'\"` with inline comment `// Next.js needs unsafe-eval in dev; tighten with nonces in prod build`. No `process.env.NODE_ENV === 'production'` branch follows. The HSTS header at lines 43-45 has the conditional, proving the pattern is understood — but the unsafe-eval one was never split out. Combined with 'unsafe-inline' for both script and style, this CSP gives essentially no protection.",
+      "suggested_fix": "Split CSP by env: production drops 'unsafe-eval' and uses Next.js nonces for inline scripts. If full nonce migration is too much, at minimum remove 'unsafe-eval' in prod and verify the build still works.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P2",
+      "category": "a11y",
+      "location": "app/frontend/components/search/results-grid.tsx:50-69 + results-table.tsx:54-69",
+      "claim": "Every result card / row contains TWO separate `<Link>` elements pointing to the same `/marks/<id>` URL — screen readers announce duplicated tab stops for the same destination.",
+      "evidence": "results-grid.tsx line 50 (image link wrapping MarkSpecimen) and line 61 (text link wrapping the name/meta). Both point to `/marks/${m.id}`. results-table.tsx line 55 (specimen link) + line 66 (name link). Tab key visits both. axe-core flags this as 'duplicated link names'. WCAG 2.4.4 (Link Purpose) is borderline because the text differs, but the duplication is undeniable UX noise — particularly painful with 50 cards × 2 links.",
+      "suggested_fix": "Wrap the entire card body in one `<Link>` and use `<button onClick stopPropagation>` for the checkbox toggle so the link captures all card surface. Or use a single Link with aria-label and visually-hidden surface around the card.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P2",
+      "category": "clipboard-fallback",
+      "location": "app/frontend/app/(app)/marks/[id]/page.tsx:441",
+      "claim": "Copy-link button crashes silently in non-secure contexts where `navigator.clipboard` is undefined.",
+      "evidence": "marks/[id]/page.tsx line 441: `<Button variant=\"tiny\" onClick={() => navigator.clipboard.writeText(window.location.href)}>Copy link</Button>`. No feature detect, no fallback to `document.execCommand('copy')`, no toast confirmation. If the app is ever served over plain HTTP (staging without TLS) or inside an iframe without clipboard-write permission, click throws TypeError or rejects with no user feedback.",
+      "suggested_fix": "Guard with `if (!navigator.clipboard) { /* fallback */ }`, then show a toast on success / error. Or use a battle-tested helper like react-use-clipboard.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P2",
+      "category": "next-link",
+      "location": "app/frontend/app/(marketing)/page.tsx:162,510,511",
+      "claim": "Marketing landing CTAs use plain `<a href>` for internal navigation, forcing full page reloads instead of client-side route transitions.",
+      "evidence": "page.tsx line 162: `<a href=\"/login\" className=\"btn btn-primary btn-lg\">`. Line 510: `<a href=\"/login\" ...>`. Line 511: `<a href=\"/pricing\" ...>`. MarketingNav (line 55-60) and pricing/page.tsx (line 186) DO use `<Link>` correctly, proving the pattern is known — the landing page just missed three. Result: clicking Hero CTA on / unmounts every component, refetches every font, re-runs the AuthProvider's `/auth/refresh` round-trip even though the user has zero need for it.",
+      "suggested_fix": "Replace the three `<a>` tags with `<Link>` from next/link.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P2",
+      "category": "wasted-index",
+      "location": "app/backend/alembic/versions/20260520_0001_init.py:54; live DB `gazettes`",
+      "claim": "`ix_gazettes_sha256` btree duplicates the index automatically created by `uq_gazettes_sha256 UNIQUE`. Both cover the same column; one is dead weight that costs write amplification on every gazette insert.",
+      "evidence": "`\\d gazettes` shows both `uq_gazettes_sha256 UNIQUE CONSTRAINT, btree (sha256)` AND `ix_gazettes_sha256 btree (sha256)`. pg_stat_user_indexes confirms `ix_gazettes_sha256` has been used 22 times but the UNIQUE index `uq_gazettes_sha256` has 0 scans — Postgres prefers the unique index. Init migration creates both: `op.create_index(\"ix_gazettes_sha256\", ...)` then `sa.UniqueConstraint(\"sha256\", ...)`. The model declares `sha256: Mapped[str] = mapped_column(..., index=True)` AND `__table_args__ = (UniqueConstraint(\"sha256\", ...))`, producing both.",
+      "suggested_fix": "Migration: `op.drop_index('ix_gazettes_sha256', table_name='gazettes')` and remove `index=True` from the model's `sha256` column declaration (the UniqueConstraint already provides the index).",
+      "auditor": "db"
+    },
+    {
+      "severity": "P2",
+      "category": "wasted-index",
+      "location": "app/backend/alembic/versions/20260527_0009_trigram_indexes.py:46-55; live DB",
+      "claim": "The partial WHERE clause `WHERE applicant_name IS NOT NULL` and `WHERE mark_sample IS NOT NULL` on the trigram indexes provides essentially zero size benefit. Only 3 of 46k rows have NULL applicant_name; ~12k of 46k rows have NULL mark_sample (the partial is moderately useful for mark_sample but trivial for applicant_name).",
+      "evidence": "`SELECT COUNT(*) FROM trademarks WHERE applicant_name IS NULL` → 3. The applicant_name partial WHERE excludes 3 of 46758 rows = 0.006%. The partial clause forces planner to verify `applicant_name IS NOT NULL` is implied by the user's WHERE, which it always is when querying ILIKE (NULL never matches ILIKE), so no real cost — but the doc claim that the partial saves space is wrong for applicant_name. The mark_sample partial does meaningfully reduce index size (26% NULL rows excluded).",
+      "suggested_fix": "Drop the `postgresql_where=text(\"applicant_name IS NOT NULL\")` on ix_trademarks_applicant_name_trgm (no meaningful benefit). Keep it for mark_sample. Not urgent — current behavior is correct, just under-documented in the rationale comment.",
+      "auditor": "db"
+    },
+    {
+      "severity": "P2",
+      "category": "wasted-index",
+      "location": "live DB `ix_trademarks_applicant_city`, `ix_trademarks_applicant_type`",
+      "claim": "Two declared btree indexes have effectively zero use in production access patterns: ix_trademarks_applicant_city (5 scans lifetime) and ix_trademarks_applicant_type (1 scan).",
+      "evidence": "pg_stat_user_indexes: `ix_trademarks_applicant_city idx_scan=5`, `ix_trademarks_applicant_type idx_scan=1`. applicant_type has 2 cardinality values (Personal | Company) — btree on a binary column is always cheaper as a seq scan. applicant_city has ~5k distinct values across 47k rows; if the filter is rarely used, the index size (968kB) + write cost is wasted. By contrast, ix_trademarks_applicant_name (1340 scans) and ix_trademarks_application_number (29315 scans) are heavily used.",
+      "suggested_fix": "If the search-page applicant_type facet is genuinely high-traffic, keep it (the index will warm up). Otherwise drop ix_trademarks_applicant_type and ix_trademarks_applicant_city. Confirm by running pg_stat_user_indexes after a few weeks of real use.",
+      "auditor": "db"
+    },
+    {
+      "severity": "P2",
+      "category": "n+1-query",
+      "location": "app/backend/api/routes/today.py:149-153, 163-181",
+      "claim": "`/api/v1/findings` and `_findings_summary` execute one SQL query per watchlist (`_findings_for_watchlist`). With M watchlists per user, response time grows linearly. Combined with the missing user-scoping (P1 above), this is M*N queries on a busy dashboard.",
+      "evidence": "today.py:149 `for w in watchlists:` then `rows = await _findings_for_watchlist(session, w, per_list=3)` which runs one SELECT per watchlist (L134-140). At today's seed data (0 watchlists) this is invisible. At 50 watchlists/user, each digest request fires 51 SQL roundtrips serially.",
+      "suggested_fix": "Rewrite `_findings_summary` as one query: build a WHERE clause UNION ALL'd across all watchlist queries, or use a CTE that joins watchlists to trademarks with a lateral subquery. Or precompute findings on each gazette ingest (the watchlist row already caches `total_count` / `new_count`).",
+      "auditor": "db"
+    },
+    {
+      "severity": "P2",
+      "category": "connection-pool",
+      "location": "app/backend/api/db/session.py:57-62; live DB `max_connections=100`",
+      "claim": "QueuePool with `pool_size=20, max_overflow=10` per uvicorn worker can exhaust Postgres connections under modest deployment.",
+      "evidence": "Postgres `SHOW max_connections;` = 100 (default). Each uvicorn worker holds up to 30 connections (20 base + 10 overflow). A typical 4-worker uvicorn launch with the RQ worker process (sync engine, default pool_size=5+10=15) = 4*30 + 15 = 135 connections, > 100. The sync engine in worker/ingest.py (line 95) uses the default pool (5+10) so its share is bounded, but the API side dominates. Documentation in session.py:10-11 promises this is \"safe and necessary for real traffic\" but doesn't reckon with Postgres' default cap.",
+      "suggested_fix": "Either lower pool_size to ~8-10 per worker (matches 4 workers × 18 = 72 < 100), document the assumed Postgres `max_connections` (raise to 200 in deploy), or front Postgres with PgBouncer in transaction mode.",
+      "auditor": "db"
+    },
+    {
+      "severity": "P2",
+      "category": "data-integrity",
+      "location": "app/backend/api/db/models.py:296-333; app/backend/scripts/enrich_mark_samples.py",
+      "claim": "tm_name_index has no link back to `trademarks` and no provenance column on `trademarks.mark_sample` recording that the value came from the index vs. the PDF parser. Re-running the loader with a stale CSV would silently clobber any rows whose mark_sample was originally parsed from PDF if the CSV value differs — only saved today by the `WHERE mark_sample IS NULL OR mark_sample = ''` guard, which has no `enriched_at`/`source` audit trail.",
+      "evidence": "models.py:333 `mark_sample: Mapped[str]` on TmNameIndex; trademarks.mark_sample has no source column. enrich_mark_samples.py:88-95 UPDATE only matches rows where existing mark_sample is NULL/empty, so today the guard is sufficient. But if a future operator runs `UPDATE trademarks SET mark_sample = NULL WHERE ...` to refresh from a new CSV, all PDF-parsed wordmarks would be lost. The provenance comment at models.py:13 says \"The reference table stays around after enrichment\" but no column on trademarks records this. The migration's downgrade is `DROP TABLE IF EXISTS tm_name_index CASCADE` — losing the source-of-truth for ~46k rows of `mark_sample` data, with no easy way to identify which rows came from the index.",
+      "suggested_fix": "Add `mark_sample_source: Mapped[str | None] = mapped_column(String(16), nullable=True)` with values `pdf|noip_index|manual` set by the parser and the enrich script. Or add a `enriched_from_noip_at` timestamp. Not a current bug, but a P2 quality-debt item that will compound once multiple enrichment sources exist.",
+      "auditor": "db"
+    },
+    {
+      "severity": "P2",
+      "category": "supply-chain-pinning",
+      "location": ".github/workflows/ci.yml (all `uses:` lines)",
+      "claim": "Every GitHub Action is pinned to a mutable tag (@v6, @v4, @v0.36.0) rather than a 40-char SHA. A maintainer/repo compromise of `actions/checkout`, `pnpm/action-setup`, `aquasecurity/trivy-action`, or `github/codeql-action` could silently inject a malicious step into every CI run — including a step that exfiltrates GITHUB_TOKEN, reads repo secrets, or tampers with the SBOM upload.",
+      "evidence": "ci.yml:41 `uses: actions/checkout@v6`, :86 `uses: pnpm/action-setup@v4`, :179 `uses: aquasecurity/trivy-action@v0.36.0`, :221 `uses: github/codeql-action/upload-sarif@v4`, :239 `uses: actions/upload-artifact@v7`, etc. None are SHA-pinned. GitHub's own published guidance for security-sensitive workflows is to pin third-party (and arguably first-party) actions to a full SHA and let Dependabot bump them.",
+      "suggested_fix": "Convert to SHA-pinned references: `actions/checkout@<40-char-sha> # v6.x.y`. Dependabot already updates github-actions (dependabot.yml:85), so the maintenance burden is one merged PR per month. Most critical for `aquasecurity/trivy-action` (drives the security gate) and `github/codeql-action/upload-sarif` (touches Security tab).",
+      "auditor": "infra"
+    },
+    {
+      "severity": "P2",
+      "category": "ci-permissions",
+      "location": ".github/workflows/ci.yml (no top-level `permissions:`)",
+      "claim": "No workflow-level `permissions:` block declared. Only the `image-scan` job has a per-job permissions stanza. The other four jobs (backend, frontend, audit, e2e) inherit the default GITHUB_TOKEN scope, which for the repo's settings could grant `contents: write` and other elevated scopes a CI lint/test job has no need for.",
+      "evidence": "ci.yml:160 is the ONLY `permissions:` block. backend/frontend/audit/e2e jobs declare none. `grep -nE '^permissions' .github/workflows/ci.yml` returns only line 160 (inside image-scan, indented). Without a workflow-default of `permissions: contents: read`, a compromised step (e.g. via the SHA-pinning gap above) could push to the repo.",
+      "suggested_fix": "Add at the top of ci.yml: `permissions: contents: read` and override per-job only where writes are needed (image-scan already does this correctly with security-events: write).",
+      "auditor": "infra"
+    },
+    {
+      "severity": "P2",
+      "category": "container-supply-chain",
+      "location": "app/docker-compose.yml:8,25 + .github/workflows/ci.yml:19,32,256,269",
+      "claim": "Postgres and Redis base images are pulled by floating tag (`postgres:16-alpine`, `redis:7-alpine`) and are never scanned by Trivy. Only the custom backend image is scanned. The two data-plane images are the highest-blast-radius attack surface (DB credential exfiltration, cache poisoning) and they get zero CVE gating.",
+      "evidence": "ci.yml:151-243 `image-scan` job runs Trivy only on `tradenet-backend:ci`. No Trivy invocation against `postgres:16-alpine` or `redis:7-alpine`. Tags are mutable: a new `postgres:16-alpine` push could ship a regressed CVE between dev runs.",
+      "suggested_fix": "(a) Pin postgres/redis to digest (`postgres:16-alpine@sha256:…`) in both docker-compose.yml and ci.yml services blocks. (b) Add a Trivy `image-ref` scan pass over each pinned data-plane digest in CI. Dependabot's docker ecosystem will keep them current.",
+      "auditor": "infra"
+    },
+    {
+      "severity": "P2",
+      "category": "healthcheck-semantics",
+      "location": "app/backend/Dockerfile:52-53 + app/backend/api/main.py:159-162",
+      "claim": "The Dockerfile HEALTHCHECK probes `/health` (pure liveness — returns ok unconditionally) rather than `/health/ready` (which actually checks DB and Redis connectivity). For docker-compose / Swarm deployments without a separate readiness probe, a container with broken DB connectivity will report 'healthy' indefinitely — load balancers will route traffic to it and every request will 500.",
+      "evidence": "Dockerfile:53 `CMD curl --fail --silent http://localhost:8000/health || exit 1`. api/main.py:159-162: `async def health() -> dict: return {'status':'ok'}` — zero dependency checks. The real readiness handler at main.py:164-188 (`/health/ready`) actually pings DB + Redis and returns `degraded` on failure. DEPLOYMENT.md:94-102 correctly distinguishes them for k8s, but the Dockerfile-embedded HEALTHCHECK is what compose/Swarm/Nomad use.",
+      "suggested_fix": "Either (a) change Dockerfile HEALTHCHECK to hit `/health/ready` and parse the JSON status field, or (b) document explicitly in DEPLOYMENT.md that compose deployments need a separate readiness gate (and that HEALTHCHECK is liveness-only). (a) is safer for non-k8s deploys.",
+      "auditor": "infra"
+    },
+    {
+      "severity": "P2",
+      "category": "migration-safety",
+      "location": "app/backend/alembic/versions/20260520_0001_init.py:123-126 + DEPLOYMENT.md:77,133-138",
+      "claim": "Rollback story relies on `alembic downgrade <revision>` (DEPLOYMENT.md:77) but downgrades are never exercised in CI, and several migrations have destructive downgrades (e.g. init drops trademarks + gazettes tables; 0004 drops watchlists; 0006 drops logo_path column). A botched rollback after a bad release silently deletes all production data. Forward-only migrations OR tested downgrades is the standard — this is neither.",
+      "evidence": "ci.yml:64-66 runs `alembic upgrade head` only. No `alembic downgrade` step. `20260520_0001_init.py:125-126` does `op.drop_table('trademarks'); op.drop_table('gazettes')`. `20260520_0004_watchlists.py:41` drops watchlists. `20260521_0006_logo_path.py:29` drops the logo_path column. DEPLOYMENT.md:137 already hints at this risk: 'If watchlists' query JSONB changed shape, do not roll back schema — instead, run a forward fix.'",
+      "suggested_fix": "Either (a) commit to forward-only migrations and explicitly remove the `alembic downgrade -1` instruction from DEPLOYMENT.md:77 (substitute: restore-from-backup), or (b) add a CI job that runs `alembic upgrade head && alembic downgrade -1 && alembic upgrade head` on every migration-touching PR. Today's docs promise a rollback path that is untested and destructive.",
+      "auditor": "infra"
+    },
+    {
+      "severity": "P2",
+      "category": "supply-chain-provenance",
+      "location": "app/backend/Dockerfile + .github/workflows/ci.yml",
+      "claim": "Backend container image is not signed and has no SLSA/in-toto provenance attestation. SBOM is generated (sbom.cdx.json) and uploaded as an artifact (retention 90d) but there is no cosign signing, no `--provenance=true` buildx flag, no keyless signing via OIDC. A consumer of the image (k8s, compose, or a future customer) has no cryptographic way to verify it came from this CI run.",
+      "evidence": "ci.yml:167-243 — `docker build` is plain BuildKit (no `--provenance`, no `--sbom` flag on the build). No `cosign sign` step. No `actions/attest-build-provenance` step (GitHub's first-party SLSA L3 action). SBOM is built post-hoc by Trivy, not bound to the image digest.",
+      "suggested_fix": "Add `actions/attest-build-provenance@v2` after the docker build step (GitHub-hosted, OIDC-backed, ~3 lines of YAML). For images destined for a registry, also add a `cosign sign --yes <registry>/<image>@<digest>` step. SBOM should attach to the registry as a referrer, not just an artifact.",
+      "auditor": "infra"
+    },
+    {
+      "severity": "P2",
+      "category": "secrets-defaults",
+      "location": "app/docker-compose.yml:11 + .github/workflows/ci.yml:22,259",
+      "claim": "Dev/CI POSTGRES_PASSWORD default is `tm` (same as user, same as db). docker-compose.yml gates this behind `${POSTGRES_PASSWORD:-tm}` so an operator who copies the file to a shared/staging host without overrides ships an open database. There is no startup validator on the Postgres side that rejects this default.",
+      "evidence": "docker-compose.yml:11 `POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tm}`. ci.yml:22,259 hardcode `POSTGRES_PASSWORD: tm`. Compose file has no comment warning operators that the default is unsafe outside CI (despite a top-of-file comment at line 1 about secret mgmt — this still gets copied around without overrides).",
+      "suggested_fix": "(a) Drop the `:-tm` default entirely — require POSTGRES_PASSWORD to be set explicitly even in dev. Operators add it to `.env` once; CI sets it in the job env. (b) Mirror the TM_SECRET_KEY validator pattern: at backend startup, if `database_url` contains `tm:tm@` AND TM_ENV not in _SAFE_DEV_ENVS, raise.",
+      "auditor": "infra"
+    },
+    {
+      "severity": "P2",
+      "category": "request-logging",
+      "location": "app/backend/api/routes/*.py (none log) and no access-log middleware",
+      "claim": "There is no HTTP access log and no per-request timing — the API surfaces no record of which endpoints were hit, response status, or latency, so debugging a 'this query is slow' or 'who deleted this watchlist' report is forensically impossible.",
+      "evidence": "`grep -rn 'logger\\|logging\\|getLogger' app/backend/api/routes/*.py` returns nothing — not a single route logs anything. `RequestIDMiddleware` in `api/errors.py:29` binds a request_id but never emits a log line on request start/end. `grep -rn 'duration\\|elapsed\\|time\\.perf' app/backend/api` shows zero timing instrumentation. Uvicorn's default access logger is the only thing producing access logs, and after `logging_config.py:52` does `root.handlers.clear()` it routes through structlog — but uvicorn access lines come from `uvicorn.access` at INFO level only if `--access-log` is passed (Dockerfile CMD does not pass it). The Prometheus instrumentator captures `http_request_duration_seconds`, but only when `enable_prometheus=True` and the operator has a Prom scrape configured — no log-based fallback.",
+      "suggested_fix": "Add an HTTP-access middleware that logs `{method, path, status, duration_ms, request_id, user_id}` at request end via structlog. Even 5 lines of `BaseHTTPMiddleware.dispatch` covering `t0 = time.perf_counter(); response = await call_next(request); logger.info('request', method=..., path=..., status=response.status_code, duration_ms=...)` would give operators a baseline. Pass `--access-log` to uvicorn in the Dockerfile as a stopgap.",
+      "auditor": "observability"
+    },
+    {
+      "severity": "P2",
+      "category": "queue-observability",
+      "location": "app/backend/worker/ — no RQ metrics, queue depth or failed-job exporter",
+      "claim": "RQ queue depth, in-flight jobs, retry counts, and failed-registry size are not observable at all — operators can't see the ingest backlog, can't alert on stuck jobs, and can't tell when retries are hammering a flaky PDF.",
+      "evidence": "`grep -rn 'rq_dashboard\\|JobStatus\\|queue_depth\\|failed_job' app/backend` returns nothing. The Prometheus instrumentator (`api/main.py:194`) only instruments HTTP — it does not export RQ-specific metrics. `DEPLOYMENT.md:112` says 'RQ queue depth (scrape from Redis directly)' as future work but no Redis-scrape exporter is configured. RQ's default `FailedJobRegistry` retains failed jobs (gazettes.py:157 sets `failure_ttl=86400 * 7`) but there is no UI, no API endpoint, no alert. A worker dying mid-job leaves the gazette stuck in `status=processing` (ingest.py:344 logs a warning on the *next* attempt), but until someone manually re-queues, the row is wedged with no signal to operators.",
+      "suggested_fix": "Add `rq-exporter` (Python Prometheus exporter for RQ) to the worker docker image, expose port 9726, scrape into the same Prometheus. Alert on `rq_jobs_failed_count > 0` and `rq_jobs_queue_size{queue='ingest'} > 5 for 10m`. Optionally mount `rq-dashboard` behind admin auth at `/admin/rq` so the on-call can re-queue without SSH.",
+      "auditor": "observability"
+    },
+    {
+      "severity": "P2",
+      "category": "frontend-error-feedback",
+      "location": "app/frontend/lib/api.ts:138-145",
+      "claim": "Backend errors lose their `request_id` correlation in the frontend — the error message is shown but the request_id needed to find the server-side log line is discarded.",
+      "evidence": "`json()` parses `body?.error?.message ?? body?.detail` (line 143) but ignores `body.error.request_id`, which the backend (`api/errors.py:_envelope`) does include. A user reporting 'I got an error' has no way to give support a correlation ID. The X-Request-ID response header is also discarded by `json()` before `r.json()`.",
+      "suggested_fix": "In `lib/api.ts:json()`, attach `request_id = r.headers.get('X-Request-ID') ?? body?.error?.request_id` to the thrown Error (e.g. via a custom ApiError class with a `requestId` field). Surface it in the user-facing toast: 'Error (ref: a1b2c3d4)'. Then operators can `grep request_id=a1b2c3d4` in structured logs.",
+      "auditor": "observability"
+    },
+    {
+      "severity": "P2",
+      "category": "auth-audit-log",
+      "location": "app/backend/api/routes/auth.py, app/backend/api/auth.py",
+      "claim": "Authentication events — failed logins, token refresh attempts, password resets — are not logged anywhere, so brute-force attacks and credential-stuffing campaigns are invisible.",
+      "evidence": "`grep -rn 'logger\\|logging' app/backend/api/auth.py app/backend/api/routes/auth.py` returns nothing. Rate limits in `settings.py:57` (`rate_limit_default='120/minute'`) provide some protection but no log emission means an attacker hitting the limit just sees 429 and operators see nothing. SECURITY review depends on observability; without it, the only signal of 'is someone trying to break in?' is `slowapi` returning 429s, which themselves are not surfaced beyond a one-line response.",
+      "suggested_fix": "Add `structlog.get_logger('auth')` and emit `logger.info('auth.login.success', user_id=...)`, `logger.warning('auth.login.failed', email_hash=..., ip=request.client.host)`, `logger.warning('auth.refresh.failed', reason=...)`. Hash or truncate the email so log search still works but the raw PII doesn't sit in logs forever. Set up an alert on `auth.login.failed` rate > N/min from a single IP.",
+      "auditor": "observability"
+    },
+    {
+      "severity": "P2",
+      "category": "ingest-debuggability",
+      "location": "app/backend/worker/ingest.py:267-461",
+      "claim": "When `ingest_pdf` fails on a specific PDF, operators get the gazette filename and a one-line exception, but no per-section progress, no row-count-when-it-died, no wall-clock duration — the 'which section made it crash' question requires re-running with extra prints.",
+      "evidence": "The success path logs only `'Ingested %s rows from %s'` (line 424). The failure path logs only `'Ingest failed for gazette %s'` with exc_info. There is no `logger.info('progress', rows_so_far=N, last_marker=...)` inside the `for section in processor.extract_records(...)` loop (line 401). There is no `time.perf_counter()` start/end, so 'this gazette took 23 minutes' is not in logs. If the extractor crashes on section #500 of a 1500-section PDF, the operator has no idea whether it crashed on 5, 500, or 1499 — they have to re-run with a debugger. Image extraction is similarly opaque: success logs `extracted_pngs` count (line 191), but failure logs only the directory path without telling you how many PNGs had been written before the crash.",
+      "suggested_fix": "(a) Wrap the ingest body in `t0 = time.perf_counter()` and log `duration_ms` on completion. (b) Inside the loop, log progress every N sections: `if row_count % 500 == 0: logger.info('ingest.progress', gazette_id=..., rows=row_count)`. (c) In the except handler, bind the last-seen section's primary marker (`(210)`/`(111)`/`(116)`) so the failure log says 'crashed after processing section (111)=4-2026-00734'. These three changes turn 'sorry I have no idea what broke' into a one-look fix.",
+      "auditor": "observability"
+    },
+    {
+      "severity": "P2",
+      "category": "e2e-coverage",
+      "location": "app/frontend/tests/e2e/ (no marketing nav tests)",
+      "claim": "No e2e test exercises marketing-page routing or the MarketingNav: there's no assertion that the nav links on /, /pricing, /coverage, /docs actually work, that the (marketing) layout doesn't accidentally mount AuthProvider (which would force-redirect anonymous traffic), or that internal anchor links inside docs MDX resolve.",
+      "evidence": "search.spec.ts:14 comments 'the marketing landing renders MarketingNav with no Cmd-K search box' as a reason to navigate to /today instead — but doesn't verify MarketingNav itself. Login.spec.ts:13 confirms /today bounces to /login but doesn't verify /pricing or /coverage stay accessible anonymously. A regression where (marketing) layout starts requiring auth would break the entire public site without failing any current test.",
+      "suggested_fix": "Add tests/e2e/marketing.spec.ts (anonymous storage state) that visits each marketing route (/, /pricing, /coverage, /docs, /docs/getting-started) and (a) asserts no /login redirect, (b) clicks the MarketingNav 'Pricing' / 'Docs' links and verifies destination URLs, (c) ensures the 'Sign in' CTA goes to /login.",
+      "auditor": "tests"
+    },
+    {
+      "severity": "P2",
+      "category": "test-isolation",
+      "location": "app/frontend/tests/e2e/auth.setup.ts:19-20 + app/frontend/tests/e2e/README.md:14",
+      "claim": "Local Playwright suite uses a literal hardcoded password ('playwright-test-password') that is created out-of-band by `python -m scripts.create_user`. If the user re-runs create_user with --password 'foo' for any reason (manual debugging, doc-following), or if a password-rotation policy lands, every local Playwright run silently fails at the auth.setup step with the same generic 'incorrect' error the test for bad-password assertion expects. The CI path overrides via env so CI is safe, but the local dev-loop is brittle.",
+      "evidence": "auth.setup.ts:20 `const ADMIN_PASSWORD = process.env.PLAYWRIGHT_ADMIN_PASSWORD ?? 'playwright-test-password';`. create_user.py overrides user records on re-run (per its docstring 'Re-running with an existing email updates the user (rotates password, changes role)'), so any dev who runs create_user with a different password silently breaks Playwright. There is no health-check on setup that distinguishes 'password drift' from 'app down'.",
+      "suggested_fix": "auth.setup.ts should detect a 401 specifically and emit an actionable error: 'Test admin password mismatch — re-run `python -m scripts.create_user --email playwright@local --password playwright-test-password` or set PLAYWRIGHT_ADMIN_PASSWORD'. Alternatively, make auth.setup.ts auto-bootstrap the user via a backend admin endpoint if the env exposes a setup token, removing the manual create_user step entirely.",
+      "auditor": "tests"
+    },
+    {
+      "severity": "P2",
+      "category": "auth-coverage",
+      "location": "app/backend/tests/test_auth.py",
+      "claim": "Token-expiry behavior is not tested at all. The auth module sets `exp` claims on both access and refresh tokens (auth.py:115, 132) but no test verifies that an expired access token returns 401, that a refresh token past its TTL is rejected, or that the clock-skew tolerance (if any) behaves correctly. A bug shipping that disables the `exp` validation in jose.decode would silently turn every JWT into a permanent credential — undetected.",
+      "evidence": "`grep -n 'expired|exp_minutes|ACCESS_TOKEN_EXPIRE' app/backend/tests/test_auth.py` returns zero. test_auth.py covers bad password, unknown email, inactive user, logout-bumping-token-version, but nothing exercises the temporal dimension. The settings model presumably has an access_token_ttl knob (need to inspect) but no test passes a backdated `exp` claim or freezes time.",
+      "suggested_fix": "Add test_expired_access_token_returns_401 that mints a token with `exp` set to (now - 60s) using the same secret_key and assert /auth/me returns 401. Add test_expired_refresh_cookie_returns_401 doing the same for /auth/refresh. Use freezegun or just construct the JWT manually with a backdated claim.",
+      "auditor": "tests"
+    },
+    {
+      "severity": "P2",
+      "category": "audit-script-coverage",
+      "location": "app/backend/scripts/audit_fields.py + audit_logos.py",
+      "claim": "Both audit scripts are documented as the canonical regression-detection harness for data-quality issues ('Each check reports count vs documented baseline + delta — delta > 0 flags a regression'). Yet neither script has any unit test. A breaking change to a SQL check (e.g., changing a LIKE pattern that no longer matches the Madrid-number-in-applicant case) would silently mask regressions — the script would still run clean but stop detecting the issue it was built to detect.",
+      "evidence": "`grep -r 'audit_fields|audit_logos' app/backend/tests/` returns zero. CLAUDE.md states the residual counts (e.g., '12 B rows have a Madrid registration number in (732) (was ~14)') ARE the baseline these checks track. If a future tightening of the SQL check accidentally relaxes match criteria, the count drops to zero and the audit reports 'CLEAN' while the real-world data is no better — the worst possible failure mode.",
+      "suggested_fix": "Add fixture-based tests: seed 5 known-bad rows matching each audit pattern (one row per pattern), run each audit check, assert each detects exactly the seeded row. This protects against false-negative drift in the audit regexes.",
+      "auditor": "tests"
+    },
+    {
+      "severity": "P2",
+      "category": "property-based-testing",
+      "location": "app/backend/tm_extractor/ + app/backend/api/similarity.py",
+      "claim": "No property-based testing (hypothesis) anywhere in the suite. The extractor and similarity engine are both ideal candidates: the extractor's marker regexes operate over an effectively infinite input space (every NOIP gazette line variation), and the similarity composite has invariants that should hold under all weight permutations (sum-to-1, verdict monotonicity, threshold-band boundaries).",
+      "evidence": "`grep -r hypothesis app/backend/` returns no matches (excluding node_modules). test_similarity.py:316 manually asserts `sum(DEFAULT_WEIGHTS.values()) == pytest.approx(1.0)` for the single default — but per-matter weights from test_composite_per_matter_weights_override could violate this and no test would catch it. The extractor's marker patterns are all hand-tested with a few cases; an INID code arriving with unusual whitespace, mixed punctuation, or Vietnamese diacritics in unexpected positions has no fuzz coverage.",
+      "suggested_fix": "For similarity: add hypothesis tests that (a) generate random weight dicts summing to 1 and assert composite_score never exceeds 1.0 / never goes negative, (b) generate identical strings and assert phonetic_similarity == 1.0, (c) generate random per-matter weights and assert verdict respects band boundaries. For extractor: hypothesis-generate line strings with random INID-code-shaped substrings and assert extract_markers_from_line never raises and only emits keys in the allowlist.",
+      "auditor": "tests"
+    },
+    {
+      "severity": "P2",
+      "category": "ingest-coverage",
+      "location": "app/backend/tests/test_ingest_atomic.py + worker/ingest.py",
+      "claim": "There is no end-to-end test from 'drop a PDF in storage' to 'trademark rows appear in DB' using a real (or synthetically-non-trivial) PDF. test_ingest_atomic monkeypatches PDFProcessor with a `FakeProcessor` that yields canned dicts, which exercises only the orchestration layer — never the actual parser→mapper→DB integration. The mapper, _resolve_logo_path coupling, and section_to_trademark conversion are individually covered, but the contract between extractor and mapper is not.",
+      "evidence": "test_ingest_atomic.py:101-108 `class FakeProcessor: def extract_records(self, *a, **k): yield from sections` skips the real parse path entirely. The /input/ directory has 8 real gazette PDFs (A_T1_2026 through B_T4_2026) but none are referenced by any test. smoke_ingest.py exists as a manual script but is not a pytest target. A schema-shape mismatch between `extract_records` output and `section_to_trademark` input would not be caught.",
+      "suggested_fix": "Add tests/integration/test_ingest_real_pdf.py: copy a small representative gazette (or build a 1-page synthetic PDF with 1-2 sections matching real NOIP layout) into tests/fixtures/, run the full ingest_pdf with REAL PDFProcessor (no monkeypatch), and assert (a) rows in DB have plausible application_number / mark_sample / nice_classes, (b) logo_path resolves to a real PNG when one exists, (c) ingest completes without error. Mark slow/integration so it can be skipped in fast-loop runs but included in CI.",
+      "auditor": "tests"
+    },
+    {
+      "severity": "P2",
+      "category": "data-integrity",
+      "location": "app/backend/scripts/enrich_mark_samples.py:86-96",
+      "claim": "The wordmark backfill UPDATE joins solely on `application_number` with no `record_type` predicate. The companion script `enrich_from_per_pdf_csvs.py:199-211` IS record-type-scoped — and its docstring explicitly warns the same app number can collide across types ('the A_T<n> application becomes the parent of a B_T<n+k> certificate').",
+      "evidence": "```\nUPDATE trademarks t\nSET mark_sample = idx.mark_sample\nFROM tm_name_index idx\nWHERE t.application_number = idx.application_number\n  AND t.application_number IS NOT NULL\n  AND t.application_number <> ''\n  AND (t.mark_sample IS NULL OR t.mark_sample = '')\n```\nCompare to `enrich_from_per_pdf_csvs.py`:\n```\nAND t.record_type = %s\n```\nA `B_domestic` row whose `application_number` was preserved through to grant (the cert-issued path) will accept the A-file wordmark even though `tm_name_index` is by definition only A-file filings. In most cases this is the correct mark — but it's an unverified assumption, not a guard.",
+      "suggested_fix": "Add `AND t.record_type = 'A'` to the WHERE clause (or normalize: every row in `tm_name_index` IS an A-file, so the right-side join inherits the type). Re-run audit and confirm the cross-type case count is what was intended.",
+      "auditor": "data"
+    },
+    {
+      "severity": "P2",
+      "category": "data-integrity",
+      "location": "app/backend/scripts/load_tm_name_index.py:112-130",
+      "claim": "The loader for `tm_name_index` does not filter Excel error tokens (#N/A, #REF!, #VALUE!, etc.) even though the sister script `enrich_from_per_pdf_csvs.py:75-85` defines exactly this frozen set for the same data path. If NOIP ever ships a CSV with a propagated VLOOKUP error in the (540) column, it loads cleanly into the reference table and then propagates into `trademarks.mark_sample` via `enrich_mark_samples.py`.",
+      "evidence": "load_tm_name_index.py only checks `if not mark: skipped_no_mark += 1; continue` — any non-empty string passes. PR #48's own commit message documents finding 12 such tokens in `csv/B_T1_2026.csv` (8x #N/A, 4x #NAME?), so the upstream-data risk is empirically present. enrich_from_per_pdf_csvs.py:159 has `if mark in _EXCEL_ERRORS: continue` — same check missing here.",
+      "suggested_fix": "Import or duplicate the `_EXCEL_ERRORS` frozenset into `load_tm_name_index.py` and skip rows whose mark token matches. Add a count-of-skipped log line alongside the existing `skipped_no_mark` counter.",
+      "auditor": "data"
+    },
+    {
+      "severity": "P2",
+      "category": "rate-limit",
+      "location": "app/backend/api/rate_limit.py:21, app/SECURITY.md:78-80",
+      "claim": "The rate limiter keys on `get_remote_address` which reads `request.client.host`. Behind any reverse proxy (Nginx, ALB, Cloudflare), every request appears to come from the proxy IP, making per-user rate limiting effectively a single shared bucket — and behind the public internet without a proxy, header-spoofed `X-Forwarded-For` is unhonored, so the limiter can be defeated either way.",
+      "evidence": "```\nreturn Limiter(\n    key_func=get_remote_address,\n    ...\n)\n```\n`slowapi.util.get_remote_address` returns `request.client.host` directly — no `X-Forwarded-For` parsing. No `trusted_proxies` config exists. SECURITY.md:78 acknowledges 'Rate limiting is per-IP only — trivially bypassed via header spoofing if the load balancer doesn't supply X-Forwarded-For.'",
+      "suggested_fix": "Either: (a) switch `key_func` to a custom resolver that reads `X-Forwarded-For` and trusts only the configured proxy CIDR; or (b) once auth is universally required, key by `user.id` instead of IP. For unauthenticated routes, do (a). Also tighten the per-endpoint limit on the export-like routes (`/trademarks?limit=500`, `/search?limit=200`) — 120/min × 500 rows = 60k rows/min trivially dumps the corpus in under a minute.",
+      "auditor": "data"
+    },
+    {
+      "severity": "P2",
+      "category": "data-integrity",
+      "location": "app/backend/scripts/enrich_mark_samples.py (no validation of mark_sample content)",
+      "claim": "The backfill never validates that the wordmark coming from `tm_name_index` looks like a wordmark. There is no length cap, no Vienna-code shape check, no marker-leakage check. A malicious or corrupt source CSV could write arbitrary text (megabyte-long strings, embedded INID markers, control characters) into `mark_sample`, which is then served unfiltered to the API and rendered in the UI.",
+      "evidence": "enrich_mark_samples.py performs a raw `SET mark_sample = idx.mark_sample` — no `LENGTH(idx.mark_sample) < N`, no `idx.mark_sample !~ '\\(\\d{3}\\)'` to catch marker leakage that `audit_fields.check_marker_leakage_in_mark_sample()` is supposed to flag. The audit script checks this *after* the fact (baseline=0); a one-off bad load won't be caught until someone re-runs the audit.",
+      "suggested_fix": "Add a WHERE-side validation in the UPDATE: e.g., `AND char_length(idx.mark_sample) < 1024 AND idx.mark_sample !~ '\\(\\d{3}\\)'`. Or pre-filter on insert in `load_tm_name_index.py`. Run `audit_fields.py` as a post-commit step in any CI that exercises enrichment.",
+      "auditor": "data"
+    }
+  ],
+  "passthrough_p3": [
+    {
+      "severity": "P3",
+      "category": "session-fixation",
+      "location": "app/backend/api/routes/auth.py:133-167",
+      "claim": "Successful login does not bump `token_version`, so a prior valid access token from before login still validates against the user record.",
+      "evidence": "`login()` reads the user, verifies password, issues new tokens — but never touches `User.token_version`. If an attacker pre-authentication had any access token or refresh token from the same account (e.g., from a recent session they never logged out of, or from a hijacked refresh cookie they want to keep), it remains usable post-login. Logout-all bumps `tv`; login does not.",
+      "suggested_fix": "Optional defense-in-depth: bump `token_version` on each fresh password authentication. This invalidates any prior outstanding session — at the cost of forcing the user's other tabs/devices to re-login (which is often actually desired UX after a password-entry event).",
+      "auditor": "security"
+    },
+    {
+      "severity": "P3",
+      "category": "cors",
+      "location": "app/backend/api/settings.py:50 + main.py:90-105",
+      "claim": "`cors_origin_list` accepts any string the operator passes via `TM_CORS_ORIGINS`, including the literal `*`. Combined with `allow_credentials=True`, a misconfigured `TM_CORS_ORIGINS=*` would silently produce a fully-open credentialed CORS policy.",
+      "evidence": "`cors_origin_list` just splits the env var by comma; no validation rejects '*' or wildcards. Starlette's CORSMiddleware will then echo the request Origin (with `allow_credentials=True`) for any origin, enabling cross-site credentialed reads of every endpoint. Settings has a field_validator that hard-fails the dev secret_key in prod (good) — the same belt-and-braces would suit cors_origins.",
+      "suggested_fix": "Add a `@field_validator('cors_origins')` that raises if `*` appears OR if `is_production` is true and the list contains http:// origins. Likewise reject blank-only lists in production.",
+      "auditor": "security"
+    },
+    {
+      "severity": "P3",
+      "category": "resource-leak",
+      "location": "app/backend/scripts/audit_logos.py:139-162, app/backend/scripts/audit_fields.py:47-50",
+      "claim": "Audit scripts create a SQLAlchemy `create_engine` per query / per PDF and never call `engine.dispose()`. Each engine owns a connection pool; running the audit across all 8 gazettes leaks 8 pools' worth of idle connections.",
+      "evidence": "audit_logos.py `_db_logo_status`: `engine = create_engine(settings.database_url_sync, future=True); with engine.connect() as conn: ...` — connection is closed, engine is NOT disposed. Called once per PDF inside `audit()` loop. audit_fields.py `_conn()`: same pattern, called 8× per `main()` (once per check function). Each engine holds 5 connections by default.",
+      "suggested_fix": "Hoist `engine = create_engine(...)` to module scope (or to `main()`) and reuse it across calls; or call `engine.dispose()` in a `finally:` block. Same fix in both files.",
+      "auditor": "backend"
+    },
+    {
+      "severity": "P3",
+      "category": "scripts-not-type-checked",
+      "location": "app/backend/pyproject.toml:57",
+      "claim": "mypy `exclude = \"(alembic/|scripts/|tm_extractor/|image_extractor/)\"` skips the scripts/ directory, so new loaders like `scripts/load_tm_name_index.py`, `scripts/enrich_mark_samples.py`, `scripts/enrich_from_per_pdf_csvs.py` get no type checking despite holding real DB-write logic. CI passes even if a script breaks an import or annotation.",
+      "evidence": "pyproject.toml `[tool.mypy]` exclude regex covers scripts/. The new PR #48 family of loaders ingest 770k rows of NOIP data — exactly the place a type bug (wrong arg order on execute_values, wrong column name in tuple) hurts most. mypy currently silent on all of them.",
+      "suggested_fix": "Drop `scripts/` from the exclude regex and accept the migration cost (most scripts already have annotations). At minimum, type-check the loaders that hit the DB. Alembic/versions/ stays excluded — auto-generated; that's a fair exemption.",
+      "auditor": "backend"
+    },
+    {
+      "severity": "P3",
+      "category": "data-quality",
+      "location": "app/backend/api/routes/_filters.py:99-108,128,136",
+      "claim": "Free-text `q`, `applicant`, and `ip_agency` are interpolated directly into an `ILIKE '%{val}%'` pattern without escaping `%` or `_`. Not a SQL injection (parameterised), but a user typing `100%` matches any string containing `100`, and `_` becomes a single-char wildcard.",
+      "evidence": "`like = f\"%{q.lower()}%\"` then `Trademark.application_number.ilike(like)`. SQLAlchemy parameterises the value but Postgres still interprets `%` and `_` as LIKE wildcards. So `q=\"a_b\"` matches \"a1b\", \"aXb\", etc. — surprising for a literal-search feature labelled 'text' in the UI.",
+      "suggested_fix": "Escape with `q.replace('\\\\', '\\\\\\\\').replace('%', '\\\\%').replace('_', '\\\\_')` then add `.ilike(like, escape='\\\\')`. Same for applicant + ip_agency filters.",
+      "auditor": "backend"
+    },
+    {
+      "severity": "P3",
+      "category": "regex-rigidity",
+      "location": "app/backend/scripts/enrich_from_per_pdf_csvs.py:108-110",
+      "claim": "Filename routing regexes only match single-digit T numbers — `B_T10_2026_madrid.csv` would be silently skipped once NOIP publishes a 10th issue in a year.",
+      "evidence": "`re.compile(r\"^B_T\\d_\\d{4}_madrid\\.csv$\")` — `\\d` matches exactly one digit. Three patterns all use the same `\\d`. NOIP currently publishes 4 issues/year so the cap is academic, but the failure mode (silent skip in `_classify`) means a future T10 file produces zero enrichment with no error.",
+      "suggested_fix": "Change `\\d` → `\\d+` in all three patterns. Or, if T must stay 1-2 digits, `\\d{1,2}`.",
+      "auditor": "backend"
+    },
+    {
+      "severity": "P3",
+      "category": "schema-fragility",
+      "location": "app/backend/api/routes/watchlists.py:223,180",
+      "claim": "`WatchQuery(**w.query)` on every watchlist read will raise pydantic.ValidationError if the stored JSONB has a field that's been since removed from the model or has an incompatible value (e.g. an old `mode` value).",
+      "evidence": "`_to_out` does `query=WatchQuery(**w.query)` with no error handling. `watchlist_findings` also does `WatchQuery(**w.query)`. With pydantic v2's default `extra='ignore'` unknown fields wouldn't raise, but a type mismatch (e.g. old watchlist where `threshold` was an int) would. The model has no migration story.",
+      "suggested_fix": "Wrap in try/except ValidationError, falling back to a default WatchQuery and logging the offending row. Or add a migration step that validates + rewrites legacy JSONB on read.",
+      "auditor": "backend"
+    },
+    {
+      "severity": "P3",
+      "category": "react-keys",
+      "location": "app/frontend/app/(marketing)/page.tsx:341,363,389,462 + compare/page.tsx:423 + detail/timeline.tsx:24",
+      "claim": "Several .map() loops use `key={i}` (array index) as the React key. Safe today because lists are static, but a refactor that reorders/inserts mid-list will break component state.",
+      "evidence": "landing page.tsx:341,389,462 — `bodyParas.map((p, i) => <p key={i}>...)`. landing page.tsx:363 — opp-cal-row uses `key={i}`. compare/page.tsx:423 — `cells.slice(0, n).map((cell, i) => <div key={i}>...)`. detail/timeline.tsx:24 — `events.map((e, i) => <li key={i}>...)`. The timeline one is most concerning because events ARE dynamic by mark.",
+      "suggested_fix": "Use stable identifiers: paragraph text hash (or just `key={p.slice(0,20)}`), `event.date + event.kind` for timeline events, etc.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P3",
+      "category": "wasted-network",
+      "location": "app/frontend/components/auth-context.tsx:38-50 + app/login/layout.tsx:30",
+      "claim": "Every cold visit to /login fires a `/api/v1/auth/refresh` POST even when no refresh cookie can plausibly exist.",
+      "evidence": "auth-context.tsx lines 38-50 always run `refresh()` on mount with no skip condition. login/layout.tsx wraps `/login` in `<AuthProvider>` (its header even claims provider doesn't hit /auth/me — but it does call /auth/refresh, same round-trip). lib/auth.ts:65-77 confirms refresh() hits the network unconditionally. Result: every anonymous landing on the login page pays a 401 round-trip before the form is interactive.",
+      "suggested_fix": "Read `document.cookie` for the existence of the refresh cookie name (set httpOnly=false on a sentinel cookie if needed) and skip refresh() when it's absent. Or split AuthProvider into a 'check' provider only used on (app)/ pages and let /login skip it entirely.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P3",
+      "category": "ux",
+      "location": "app/frontend/components/search/results-table.tsx:41",
+      "claim": "Table rows have `cursor-pointer` styling but no actual row onClick — only the inner Link works. Misleads users that any cell is clickable.",
+      "evidence": "results-table.tsx line 41: `<tr className={'... cursor-pointer'}>`. No onClick handler on the tr. Inner `<Link>` elements are at columns 'Mark' and 'Name/Applicant' only. Hovering an empty cell shows the pointer cursor but nothing happens on click.",
+      "suggested_fix": "Either remove `cursor-pointer` from the row and only apply it to actual interactive cells, OR add an onClick to navigate to /marks/<id> with proper a11y (role='link' + keyboard nav) and event delegation that excludes the checkbox cell.",
+      "auditor": "frontend"
+    },
+    {
+      "severity": "P3",
+      "category": "schema-mismatch",
+      "location": "app/backend/api/db/models.py:293; alembic/versions/20260527_0010_users_table.py:62",
+      "claim": "users.token_version is documented as `Postgres BIGINT so we never wrap` but is actually declared as `Integer` (sa.Integer / Postgres int4). Doc/code mismatch only; INTEGER's 2.1B range will not wrap in practice.",
+      "evidence": "models.py:291-293 docstring: 'Stored as Postgres BIGINT so we never wrap'. Actual column at L293: `token_version: Mapped[int] = mapped_column(Integer, ...)`. Migration 0010 L62: `sa.Column(\"token_version\", sa.Integer(), nullable=False, server_default=\"0\")`. Postgres `\\d users` confirms `token_version | integer`.",
+      "suggested_fix": "Either update the model + migration to `BIGINT` to match the docstring, or update the docstring to say 'INTEGER (2B range is plenty)'. The latter is simpler and equally correct.",
+      "auditor": "db"
+    },
+    {
+      "severity": "P3",
+      "category": "missing-analyze",
+      "location": "app/backend/scripts/enrich_mark_samples.py:86-100",
+      "claim": "After updating ~42k trademarks rows (touching mark_sample, which is covered by the GIN trigram index), the script does not run `ANALYZE trademarks`. Planner stats lag until autovacuum picks it up.",
+      "evidence": "enrich_mark_samples.py:86-98 executes the UPDATE and commits; no `cur.execute('ANALYZE trademarks')`. pg_stat_user_tables shows last_autoanalyze on trademarks ran 2026-05-28 11:17, which presumably captured it, but on production loads autovacuum_analyze_threshold may delay this. The trigram GIN re-builds incrementally per UPDATE; only ANALYZE refreshes histogram for planning.",
+      "suggested_fix": "After `conn.commit()` add `cur.execute('ANALYZE trademarks')`. Same recommendation for load_tm_name_index.py after the COPY/bulk insert.",
+      "auditor": "db"
+    },
+    {
+      "severity": "P3",
+      "category": "dependency-debt-tracking",
+      "location": ".github/workflows/ci.yml:142-148 + .trivyignore",
+      "claim": "Four CVEs are ignored in pip-audit and Trivy with hand-written rationale comments but no automated expiry. When python-multipart 0.0.22 / starlette 1.0.1 / jaraco.context 6.1.0 / wheel 0.46.2 ship, nothing will surface that fact — the ignores are durable and CI stays quiet.",
+      "evidence": "ci.yml:144-148 hardcodes `--ignore-vuln CVE-2026-24486 CVE-2026-40347 CVE-2026-42561 PYSEC-2026-161`. .trivyignore lines 12-14 mirror three of them. Both files carry comments like 'needs unreleased 0.0.22' but no `# expires: 2026-07-01` and no scheduled job to re-evaluate.",
+      "suggested_fix": "Add a monthly scheduled workflow that runs `pip-audit` WITHOUT the ignores and opens an issue if any of the listed CVEs no longer matches a current dep version. Trivy supports `expiredAt:` in ignore files — adopt it. Pair the .trivyignore line with a Dependabot label that opens a tracking issue.",
+      "auditor": "infra"
+    },
+    {
+      "severity": "P3",
+      "category": "data-persistence",
+      "location": "app/backend/Dockerfile:55 + api/settings.py:45",
+      "claim": "TM_UPLOAD_DIR defaults to `/tmp/tm_uploads` inside the container. `/tmp` survives container restart but not container recreate (image redeploy). There is no VOLUME directive declaring it as a persistent mount point, and DEPLOYMENT.md only mentions mounting it in the `docker run` example — k8s/compose users have no machine-readable hint.",
+      "evidence": "Dockerfile has no `VOLUME /tmp/tm_uploads` or `VOLUME /srv/backend/uploads` declaration. settings.py:45 default `Path('/tmp/tm_uploads')`. Routes/gazettes.py:68 creates it lazily. DEPLOYMENT.md:53-64 mentions `-v /tmp/tm_uploads:/tmp/tm_uploads:rw` but no docker-compose service example. SECURITY.md:71 acknowledges the volume's loss-on-removal risk for pgdata; same risk applies here, undocumented.",
+      "suggested_fix": "(a) Add `VOLUME ['/srv/backend/uploads']` to the Dockerfile and change the default to `/srv/backend/uploads` so the contract is self-documenting; (b) extend DEPLOYMENT.md with a compose service example wiring a named volume. (c) Note: PDFs are recoverable by re-upload (SHA dedup), so this is operational annoyance not data-loss — hence P3.",
+      "auditor": "infra"
+    },
+    {
+      "severity": "P3",
+      "category": "dependabot-policy",
+      "location": ".github/dependabot.yml:104-106",
+      "claim": "Dependabot is configured to schedule pip / npm / actions checks MONTHLY. Security advisories still trigger immediate PRs (Dependabot's default), so the practical risk is low — but a monthly cadence for routine bumps means transitive minor-version regressions (e.g. a regex CVE in a Pydantic minor) wait up to 30 days for non-security categorized advisories.",
+      "evidence": "dependabot.yml:23 `interval: 'monthly'` (and lines 52, 87 — all three ecosystems). Industry baseline for a tool with security-sensitive deps (auth, file upload, PDF parsing) is weekly. The dependabot config helpfully calls out that security PRs aren't delayed (lines 42-46), which is correct, but version-update PRs for minor bumps still are.",
+      "suggested_fix": "Move to `interval: 'weekly'` for pip + npm. Keep github-actions monthly (less code, lower regression risk). Grouped PRs (already configured) keep the noise manageable.",
+      "auditor": "infra"
+    },
+    {
+      "severity": "P3",
+      "category": "metrics-exposure",
+      "location": "app/backend/api/main.py:191-196",
+      "claim": "`/metrics` is exposed with no authentication and enabled by default, leaking internal endpoint paths and traffic patterns to anyone who can reach the API.",
+      "evidence": "`settings.enable_prometheus: bool = True` (settings.py:61) and `Instrumentator(...).expose(app, endpoint='/metrics', include_in_schema=False)` is mounted with no `Depends(require_admin)`. `include_in_schema=False` only hides it from OpenAPI — it does not gate access. Anyone who knows the URL gets `http_requests_total{handler='/api/v1/marks/{id}', status='404'}` etc., which reveals route shape, traffic volume, and error rates to an attacker. The metrics middleware groups by handler+status (`should_group_status_codes=True`), which is good for cardinality but still leaks the endpoint inventory.",
+      "suggested_fix": "Either restrict by network (only allow `/metrics` from the Prometheus scrape pod's IP) or require basic-auth (`PROM_METRICS_BASIC_AUTH` env). The prometheus-fastapi-instrumentator exposes an `auth` callable for this. Alternatively, mount `/metrics` only when `TM_ENV != 'production'` AND a dedicated `enable_public_metrics` flag is set.",
+      "auditor": "observability"
+    },
+    {
+      "severity": "P3",
+      "category": "slow-query-visibility",
+      "location": "app/backend/api/db/session.py:43-49",
+      "claim": "No SQLAlchemy query echo, no `pg_stat_statements` enablement, no slow-query log: operators cannot find which queries are slow without re-running with `echo=True`.",
+      "evidence": "`_engine_kwargs['echo'] = False` (line 44) is hardcoded with no env flag. `grep -rn 'echo=\\|SQL_ECHO\\|log_statement\\|pg_stat_statements' app/backend` returns only the `echo=False` line. `postgres:16-alpine` in `docker-compose.yml` is launched with no `command:` overrides, so `log_min_duration_statement` is at its default (off). The 30s `statement_timeout` (session.py:48) caps damage from a runaway query but tells nothing about the 25s queries that complete and slowly degrade UX.",
+      "suggested_fix": "Add `TM_DB_ECHO: bool = False` to Settings and wire it to `_engine_kwargs['echo']`. In compose, add `command: ['postgres', '-c', 'log_min_duration_statement=500', '-c', 'shared_preload_libraries=pg_stat_statements']` to capture slow queries to the postgres logs. Add an admin endpoint or `psql` runbook to read `pg_stat_statements`.",
+      "auditor": "observability"
+    },
+    {
+      "severity": "P3",
+      "category": "healthcheck-coverage",
+      "location": "app/backend/Dockerfile (HEALTHCHECK), app/backend/api/main.py:159-188",
+      "claim": "The container HEALTHCHECK probes `/health` (liveness only) instead of `/health/ready`, so when Postgres or Redis is down the container is marked healthy and continues receiving traffic.",
+      "evidence": "Dockerfile: `HEALTHCHECK ... CMD curl --fail --silent http://localhost:8000/health || exit 1`. The `/health` endpoint (main.py:159-162) just returns `{'status': 'ok'}` unconditionally. `/health/ready` (lines 164-188) is the one that actually probes DB and Redis, but is not used by Docker. Production orchestrators (k8s liveness vs readiness) would need to be configured explicitly to differentiate, and the Dockerfile sets the precedent for `docker run` and Docker Swarm users who'll inherit the wrong default.",
+      "suggested_fix": "Keep `/health` as the liveness probe in the Dockerfile HEALTHCHECK (correct — restarts on a wedged process), but document in `DEPLOYMENT.md` that orchestrators MUST configure `readinessProbe.httpGet.path = /health/ready` separately so degraded states drain traffic. Optionally add a `compose.override.yml` example showing both probes for non-k8s deployments.",
+      "auditor": "observability"
+    },
+    {
+      "severity": "P3",
+      "category": "e2e-coverage",
+      "location": "app/frontend/tests/e2e/visual.spec.ts-snapshots/",
+      "claim": "Visual baseline coverage gap: 4 of 15 routes have no baseline — /gazettes (legacy in-app gazettes page), /dev/showcase (component showcase, may be intentional), /marks/[id] (depends on seeded data, intentional), /trademarks/[id] (legacy detail page, may be redirect-only). A new design regression on /gazettes would not be caught by visual tests.",
+      "evidence": "Routes inventory (find -name page.tsx): landing, login, docs, pricing, coverage, today, watchlists, search, gazettes, compare, docs/[slug], marks/[id], admin/gazettes, trademarks/[id], dev/showcase. Baselines under visual.spec.ts-snapshots: 10 files covering 10 routes (landing, today, pricing, coverage, docs-getting-started, search-empty, compare-empty, admin-gazettes, watchlists, login). The 4 uncovered routes are deterministic except marks/[id] and trademarks/[id] which depend on data.",
+      "suggested_fix": "Add visual baselines for /gazettes (chrome-only, no data) and /dev/showcase. Document in visual.spec.ts comment why /marks/[id] + /trademarks/[id] are excluded (data-dependent) so future devs don't add them and create flakes.",
+      "auditor": "tests"
+    },
+    {
+      "severity": "P3",
+      "category": "data-retention",
+      "location": "app/backend/api/routes/gazettes.py:114 (upload_dir keeps files forever)",
+      "claim": "Uploaded gazette PDFs accumulate in `TM_UPLOAD_DIR` (default `/tmp/tm_uploads`) with no TTL or retention policy. Each is 10-100 MB; over time this fills disk and complicates GDPR-style data-subject deletion (the source PDF contains all the applicant PII).",
+      "evidence": "upload_gazette renames the temp file to `{digest[:16]}_{safe_name}.pdf` and stores `storage_path` permanently. No DELETE handler. `_purge_trademarks` only removes DB rows, never the file. The dedup-by-sha256 path even keeps reuploads idempotent — but never expires.",
+      "suggested_fix": "Define a retention policy in `Settings` (e.g. `TM_UPLOAD_RETENTION_DAYS`) and add a background job (RQ cron, or a simple `find -mtime +N -delete` cron) that purges files older than that AND nulls/anonymises the `gazettes.storage_path`. Document the policy alongside the GDPR section in SECURITY.md.",
+      "auditor": "data"
+    }
+  ],
+  "refuted_p0p1": [
+    {
+      "original": {
+        "severity": "P0",
+        "category": "data-integrity",
+        "location": "app/backend/api/db/models.py:123, app/backend/api/routes/watchlists.py:106",
+        "claim": "Watchlist.owner_id stores a stringified user UUID in `String(255)` with no foreign key to `users.id`. When a user is deleted (or `users` is rebuilt), watchlists become orphaned and `_assert_owned` will allow nobody (or, worse, an attacker who creates a user whose row gets the recycled UUID — defended only by UUID collision impossibility)."
+      },
+      "refutation": "The structural observation is accurate — `Watchlist.owner_id` (models.py:123) and `Gazette.uploaded_by` (models.py:92) are `String(255)` with no FK to `users.id`, and `routes/watchlists.py:106` stores `owner_id=user.id` (a stringified UUID). However the claimed impact does not hold: (1) There is NO user-delete endpoint in the entire backend — `grep router.delete` returns only the watchlist delete route. So orphaning via normal app use cannot occur. (2) Even if a user were deleted by direct DB manipulation, the `_assert_owned` check at line 167 (`if w.owner_id and w.owner_id != user.id`) would correctly 403 every other user because `w.owner_id` is still a non-null stringified UUID that matches nobody — i.e., \"allow nobody\" is the safe-failure behavior, not a vulnerability. The finding's \"allow nobody (or worse...)\" framing inverts the actual semantics: the orphan stays locked, it doesn't open up. (3) The \"attacker creates a user with recycled UUID\" vector requires a UUIDv4 collision (cryptographically impossible) AND the attacker would need to choose their own UUID, which `User.id` defaults via server-side `uuid.uuid4()` (models.py:275) — attackers can't pick it via the auth registration path. The finding itself concedes \"defended only by UUID collision impossibility,\" which is in fact a complete defense for any real-world adversary. Adding the FK is reasonable schema hygiene (defense-in-depth, prevents typo'd manual inserts, enables ON DELETE SET NULL semantics for future delete endpoints), but it is P3 at most — not a P0 data-integrity issue with material risk to existing users or production data."
+    },
+    {
+      "original": {
+        "severity": "P1",
+        "category": "missing-index",
+        "location": "app/backend/api/db/models.py:185,189; app/backend/api/routes/_filters.py:141-144",
+        "claim": "submission_date and registration_date_151 are queried in WHERE/range filters but neither has an index. Both queries seq-scan trademarks."
+      },
+      "refutation": "Partially refuted. The registration_date_151 half is real: app/backend/api/routes/_filters.py:141-144 wires grant_date_from/to to Trademark.registration_date_151 with no backing index (verified across all 11 alembic migrations — only ix_trademarks_* indexes exist on gazette_id, record_type, application/certificate/madrid numbers, country_code, city, applicant_type, applicant_name, ip_agency, month, year). However, the submission_date half is fabricated: a repo-wide grep finds zero WHERE clauses on Trademark.submission_date. Every use in app/backend/api/routes/ (marks.py:106-107, 444) is an attribute read on an already PK-fetched row, never a filter. The finding's cited EXPLAIN against `WHERE submission_date >= ...` is a synthetic query not issued anywhere in the application. The \"timeline/today routes also hit these dates\" claim is also wrong — today.py and search.py filter and order on publication_date_441, not submission_date or registration_date_151 (publication_date_441 is itself unindexed, but that's a different finding the author didn't raise). Additionally, the cited 12.8ms/20.8ms EXPLAIN numbers don't justify P1 today — they're sub-30ms and not user-perceptible. The scaling argument to 750k rows is plausible but speculative (no booked timeline for 16x growth). At best this should be a P2/P3 single-column finding on registration_date_151 alone, with the submission_date claim dropped entirely. Because the finding bundles a real issue with a fabricated one and uses synthetic EXPLAIN evidence for a query that doesn't exist, the evidence fails adversarial review as written."
+    },
+    {
+      "original": {
+        "severity": "P1",
+        "category": "data-pipeline-coverage",
+        "location": "app/backend/scripts/load_tm_name_index.py + app/backend/scripts/enrich_mark_samples.py",
+        "claim": "PR #48's wordmark backfill landed two production scripts that mutate ~42k trademark rows, yet there are no pytest assertions on either loader or enrichment behavior. The script is the canonical mechanism to remediate ~100% of A-record mark_sample NULLs, but neither dry-run output, idempotency, nor the JOIN logic is verified."
+      },
+      "refutation": "The evidence is factually accurate — both scripts exist with the cited behaviors (BOM-strip via utf-8-sig, %y date parsing, ON CONFLICT DO UPDATE, 5000-row batches, skip counters, `(mark_sample IS NULL OR = '')` guard), and grepping app/backend/tests/ returns zero matches for either script name. However, the P1 severity and the framing as a data-pipeline-coverage risk do not survive scrutiny. (1) The same pattern holds for every script in app/backend/scripts/ — backfill_logo_paths, audit_logos, audit_fields, audit_enrichment, enrich_from_per_pdf_csvs, smoke_ingest, create_user all lack pytest coverage. The absence of tests for these new scripts is consistent with project convention, not a regression introduced by PR #48. (2) These are one-shot operator-run remediation scripts, not request-path code; both default to --dry-run (rollback) and require an explicit --execute flag. (3) A dedicated audit_enrichment.py script (151 lines, also in the PR) provides 10-row DB↔CSV spot-checking plus a coverage-gap report — a direct functional mitigation that the finding did not credit. (4) The cited harm (\"inverting the guard would overwrite real (540) data\") is purely hypothetical — there is no evidence of a typo in the current code, and dry-run + audit_enrichment.py would catch such a regression at run time. (5) PR #48 was already executed and verified live (per the commit message: /search?q=MARVIS, Today digest opposition windows), with documented residual coverage figures that match the audit script's output. Adding tests would be a reasonable maintainability improvement (P3), but characterizing this as a P1 data-pipeline risk overstates the actual exposure given the operator-controlled invocation, dry-run default, and existing audit tooling."
+    }
+  ]
+}

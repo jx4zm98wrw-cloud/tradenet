@@ -178,6 +178,13 @@ def _enrich_one_file(cur, csv_path: Path, kind: CsvKind) -> int:
     if not pairs:
         return 0
 
+    # Dedup by id BEFORE staging (last write wins). A single execute_values
+    # batch cannot contain the same ON CONFLICT key twice — Postgres raises
+    # CardinalityViolation ("cannot affect row a second time"). The CSVs do
+    # carry intra-file duplicate ids (multi-row / multi-class entries), so the
+    # SQL-level ON CONFLICT alone is not enough; we must collapse them in Python.
+    pairs = list({pid: mark for pid, mark in pairs}.items())
+
     # Per-file temp table; auto-dropped at transaction end.
     # Using a temp table + UPDATE-FROM-JOIN is significantly faster than
     # per-row UPDATE in a loop — one round-trip per file regardless of
@@ -186,7 +193,8 @@ def _enrich_one_file(cur, csv_path: Path, kind: CsvKind) -> int:
     execute_values(
         cur,
         "INSERT INTO _enrich_batch (id, mark) VALUES %s "
-        # CSV may have intra-file duplicates (rare but seen); last write wins.
+        # Defence-in-depth across page_size batches; intra-batch dupes are
+        # already removed above so this only guards cross-page collisions.
         "ON CONFLICT (id) DO UPDATE SET mark = EXCLUDED.mark",
         pairs,
         page_size=5_000,

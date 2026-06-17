@@ -157,6 +157,16 @@ def _token_jw(a: str, b: str) -> float:
 # ---------------------------------------------------------------------------
 # Phonetic similarity
 
+# Aural length-disparity tolerance. JW + Metaphone ignore syllable count and
+# rhythm — Metaphone drops vowels, so "KAITO" and "KAT" both encode to "KT" and
+# spuriously score ~0.93. When the two surface forms differ in length by more
+# than this fraction, the phonetic score is scaled down proportionally; within
+# it (the shorter is ≥80% of the longer) the score is unchanged, so plurals /
+# minor variants (NIKE/NIKEE, APPLE/APPLES) and same-length sound-alikes
+# (MONTINIS/MONTANIS) are unaffected. Mirrors how USPTO/EUIPO examiners weigh
+# syllable count and overall length in the aural-similarity assessment.
+_PHONETIC_LENGTH_TOLERANCE = 0.8
+
 
 def phonetic_similarity(a: str | None, b: str | None) -> float:
     """Return token-level Jaro-Winkler phonetic similarity in [0, 1].
@@ -197,6 +207,13 @@ def phonetic_similarity(a: str | None, b: str | None) -> float:
 
     raw = _token_jw(na, nb)
 
+    # Aural length-disparity dampener (see _PHONETIC_LENGTH_TOLERANCE): scale the
+    # score down when the two surface forms differ a lot in length, mirroring how
+    # examiners weigh syllable count / rhythm. Within the tolerance the factor is
+    # 1.0 (no change).
+    la, lb = len(na.replace(" ", "")), len(nb.replace(" ", ""))
+    length_factor = min(1.0, (min(la, lb) / max(la, lb)) / _PHONETIC_LENGTH_TOLERANCE) if la and lb else 1.0
+
     # Metaphone per token, then best-pair JW on the resulting codes.
     # Encoding the whole multi-word string in one call produces a single
     # blob ("OMBRSTNTRS") that loses the same word-boundary information
@@ -204,11 +221,11 @@ def phonetic_similarity(a: str | None, b: str | None) -> float:
     ma_codes = [c for c in (jellyfish.metaphone(t) for t in _tokens(na)) if c]
     mb_codes = [c for c in (jellyfish.metaphone(t) for t in _tokens(nb)) if c]
     if not ma_codes or not mb_codes:
-        return round(raw, 3)
+        return round(raw * length_factor, 3)
     short, long = (ma_codes, mb_codes) if len(ma_codes) <= len(mb_codes) else (mb_codes, ma_codes)
     phon = _best_pair_jw(short, long)
 
-    return round(0.7 * raw + 0.3 * phon, 3)
+    return round((0.7 * raw + 0.3 * phon) * length_factor, 3)
 
 
 # ---------------------------------------------------------------------------
@@ -346,6 +363,33 @@ visual drops to 25 to make room for vienna at 15, class stays at 20.
 A trademark professional working a specific matter (e.g. pharma where
 phonetics dominate) should tune these per matter — exactly the design's
 'tunable per matter' requirement."""
+
+
+def resolve_weights(overrides: dict[str, float] | None) -> dict[str, float]:
+    """Merge per-matter weight overrides over DEFAULT_WEIGHTS and renormalise to 1.
+
+    The single source of truth for turning a stored/requested weights dict into
+    the normalised weights `composite_score` expects. Shared by the per-matter
+    surfaces (watchlist-scoped similar marks) and the /compare endpoint so they
+    validate identically.
+
+    - None / empty → DEFAULT_WEIGHTS (a fresh copy).
+    - Only the four known keys (phonetic/visual/class/vienna) are honoured;
+      unknown keys are ignored and missing keys inherit their default.
+    - Non-numeric / negative values are dropped (fall back to the default for
+      that key); a non-positive total falls back entirely to DEFAULT_WEIGHTS.
+    """
+    if not overrides:
+        return dict(DEFAULT_WEIGHTS)
+    merged = dict(DEFAULT_WEIGHTS)
+    for k in DEFAULT_WEIGHTS:
+        v = overrides.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0:
+            merged[k] = float(v)
+    total = sum(merged.values())
+    if total <= 0:
+        return dict(DEFAULT_WEIGHTS)
+    return {k: v / total for k, v in merged.items()}
 
 
 @dataclass(frozen=True)

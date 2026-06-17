@@ -17,11 +17,11 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import and_, desc, func, select
+from sqlalchemy import and_, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import similarity as sim
-from ..db import RecordType, Trademark, get_session
+from ..db import RecordType, Trademark, Watchlist, get_session
 from ..schemas import TrademarkOut
 from ..settings import get_settings
 from .today import DEMO_TODAY, _opp_close_date
@@ -287,26 +287,34 @@ _SIMILAR_MIN_COMPOSITE = 0.30
 # pages stay fast even for popular classes.
 _SIMILAR_CANDIDATE_POOL = 40
 
+# Stage-1 recall cap for wordmark anchors: max candidates pulled by trigram /
+# dmetaphone similarity on `mark_sample` before the composite rerank. Ordered by
+# trigram similarity so the genuinely-similar marks come first; bounded so the
+# per-candidate pHash work stays fast.
+_SIMILAR_RECALL_CAP = 50
+
 
 @router.get("/{id}/similar", response_model=list[SimilarMark])
 async def similar_marks(
-    id: uuid.UUID, limit: int = 4, session: AsyncSession = Depends(get_session)
+    id: uuid.UUID,
+    limit: int = 4,
+    watchlist_id: uuid.UUID | None = None,
+    session: AsyncSession = Depends(get_session),
 ) -> list[SimilarMark]:
     """Return marks similar to the given one, ranked by composite score.
 
-    Pipeline:
-      1. Pre-screen via SQL — share at least one Nice class, published
-         within ±60 days. This is a 100x reduction of the candidate set
-         before any Python similarity work runs.
-      2. For each candidate, compute the full composite score (phonetic
-         + visual + class + vienna) via api.similarity.
-      3. Drop candidates whose composite < 0.30 (irrelevant noise).
-      4. Sort by composite descending, return top `limit`.
-
-    The prior implementation sorted by md5 jitter — the recommendations
-    were random within the SQL pre-screen pool, which surfaced
-    'Montinis → MF11RCE / SPRINGFERM' as 'similar' even though no
-    examiner would group those together.
+    Two-stage retrieval (mirrors the search route):
+      1. RECALL — for marks with a wordmark, pull candidates whose `mark_sample`
+         is trigram- or Double-Metaphone-similar to this mark's wordmark
+         (index-backed), scoped to the ±60-day "this period" window. This
+         replaces the old "40 most-recent rows sharing any Nice class" screen,
+         which — in a crowded class like 35 (10k+ marks) — surfaced unrelated
+         class-mates rather than genuinely confusable marks. Figurative-only
+         marks (no wordmark) fall back to the class + period screen, since there
+         is no text to recall by and no pHash index.
+      2. RERANK — composite score (phonetic + visual + class + vienna) per
+         candidate, drop < 0.30, sort descending, return top `limit`. An empty
+         result is correct here: "no confusable marks landed this period".
     """
     m = await session.get(Trademark, id)
     if m is None:
@@ -318,16 +326,48 @@ async def similar_marks(
         hi = m.publication_date_441 + timedelta(days=60)
         pub_range = [Trademark.publication_date_441.between(lo, hi)]
 
-    q = select(Trademark).where(Trademark.id != m.id).where(Trademark.mark_sample.is_not(None))
-    if m.nice_classes:
-        q = q.where(Trademark.nice_classes.op("&&")(m.nice_classes))
-    if pub_range:
-        q = q.where(and_(*pub_range))
-    q = q.order_by(desc(Trademark.publication_date_441), Trademark.id).limit(_SIMILAR_CANDIDATE_POOL)
-
-    candidates = list((await session.execute(q)).scalars().all())
+    anchor_word = (m.mark_sample or "").strip()
+    if anchor_word:
+        # Stage 1: similarity recall on the wordmark — trigram `%` OR same
+        # Double-Metaphone code, ordered by trigram similarity (index-backed).
+        ql = anchor_word.lower()
+        recall = (
+            select(Trademark)
+            .where(Trademark.id != m.id, Trademark.mark_sample.is_not(None))
+            .where(
+                or_(
+                    func.lower(Trademark.mark_sample).op("%")(ql),
+                    func.dmetaphone(func.lower(Trademark.mark_sample)) == func.dmetaphone(ql),
+                )
+            )
+        )
+        if pub_range:
+            recall = recall.where(and_(*pub_range))
+        recall = recall.order_by(
+            func.similarity(func.lower(Trademark.mark_sample), ql).desc(), Trademark.id
+        ).limit(_SIMILAR_RECALL_CAP)
+        await session.execute(text("SET LOCAL pg_trgm.similarity_threshold = 0.15"))
+        candidates = list((await session.execute(recall)).scalars().all())
+    else:
+        # Figurative-only anchor (no wordmark): class + period screen is the best
+        # cheap option absent a pHash index. Same behaviour as before.
+        fq = select(Trademark).where(Trademark.id != m.id, Trademark.mark_sample.is_not(None))
+        if m.nice_classes:
+            fq = fq.where(Trademark.nice_classes.op("&&")(m.nice_classes))
+        if pub_range:
+            fq = fq.where(and_(*pub_range))
+        fq = fq.order_by(desc(Trademark.publication_date_441), Trademark.id).limit(_SIMILAR_CANDIDATE_POOL)
+        candidates = list((await session.execute(fq)).scalars().all())
     image_root = get_settings().data_dir / "image"
     m_text = m.mark_sample or m.applicant_name
+
+    # Per-matter weights: when a watchlist context is supplied, rank with that
+    # matter's weight profile (e.g. pharma up-weights phonetic); else defaults.
+    weights = None
+    if watchlist_id is not None:
+        wl = await session.get(Watchlist, watchlist_id)
+        if wl is not None:
+            weights = sim.resolve_weights(wl.weights)
 
     scored: list[tuple[Trademark, float, str]] = []
     for r in candidates:
@@ -342,7 +382,9 @@ async def similar_marks(
         )
         class_o = sim.class_overlap(m.nice_classes, r.nice_classes)
         vienna_o = sim.vienna_overlap(m.vienna_codes, r.vienna_codes)
-        cs = sim.composite_score(phon, vis.score, class_o, vienna_o, visual_confidence=vis.confidence)
+        cs = sim.composite_score(
+            phon, vis.score, class_o, vienna_o, weights=weights, visual_confidence=vis.confidence
+        )
         if cs.composite >= _SIMILAR_MIN_COMPOSITE:
             scored.append((r, cs.composite, vis.confidence))
 

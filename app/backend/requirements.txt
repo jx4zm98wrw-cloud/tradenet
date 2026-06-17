@@ -17,15 +17,18 @@ pyyaml==6.0.3
 
 # === API + DB ===
 fastapi==0.136.3              # was 0.115.5
-starlette==0.49.3             # explicit pin (fastapi only constrains <1.0,>=0.40 — without
-                              # this, pip-audit caught starlette 0.41 still in the lockfile
-                              # with PYSEC-2026-161 + CVE-2025-54121 + 62727 unpatched)
+starlette==1.3.1              # explicit pin. fastapi requires >=0.46.0 (no upper cap);
+                              # the real cap was prometheus-fastapi-instrumentator<1.0,
+                              # lifted by bumping it to 8.0.0 below. 1.3.1 clears the
+                              # 0.49.x advisories (CVE-2026-48817/48818/54282/54283,
+                              # PYSEC-2026-161).
 uvicorn[standard]==0.48.0
 sqlalchemy[asyncio]==2.0.50
 alembic==1.18.4
 asyncpg==0.31.0
 psycopg2-binary==2.9.12
-python-multipart==0.0.29      # was 0.0.17; latest available. Future CVE-2026-* require >=0.0.22
+python-multipart==0.0.32      # clears CVE-2026-53538/53539/53540 (fixed in 0.0.30/0.0.31)
+                              # and the earlier CVE-2026-24486/40347/42561 advisories.
                               # which isn't on PyPI yet — ignored in pip-audit per ci.yml
 pydantic==2.13.4
 pydantic-settings==2.14.1
@@ -42,7 +45,7 @@ rq==2.9.0
 # === Observability ===
 structlog==24.4.0
 sentry-sdk[fastapi]==2.60.0
-prometheus-fastapi-instrumentator==7.1.0
+prometheus-fastapi-instrumentator==8.0.0   # 8.x supports starlette>=1.0 (7.x capped <1.0)
 
 # === File handling ===
 python-magic==0.4.27

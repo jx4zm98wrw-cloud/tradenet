@@ -71,7 +71,13 @@ export default function WatchlistsPage() {
       ) : (
         <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))" }}>
           {items.map((w) => (
-            <WatchCard key={w.id} w={w} findings={findings[w.id] ?? []} onDelete={() => onDelete(w)} />
+            <WatchCard
+              key={w.id}
+              w={w}
+              findings={findings[w.id] ?? []}
+              onDelete={() => onDelete(w)}
+              onUpdated={(u) => setItems((prev) => (prev ? prev.map((x) => (x.id === u.id ? u : x)) : prev))}
+            />
           ))}
           <AddCard onClick={() => setCreating(true)} />
         </div>
@@ -108,7 +114,26 @@ export default function WatchlistsPage() {
 
 /* =========================================================================== */
 
-function WatchCard({ w, findings, onDelete }: { w: Watchlist; findings: Trademark[]; onDelete: () => void }) {
+function WatchCard({ w, findings, onDelete, onUpdated }: { w: Watchlist; findings: Trademark[]; onDelete: () => void; onUpdated: (w: Watchlist) => void }) {
+  const [editing, setEditing] = React.useState(false);
+  const [profile, setProfile] = React.useState<Record<string, number>>(
+    w.weights ? { ...DEFAULT_PROFILE, ...w.weights } : { ...DEFAULT_PROFILE }
+  );
+  const [busy, setBusy] = React.useState(false);
+
+  async function saveWeights(reset: boolean) {
+    setBusy(true);
+    try {
+      // Reset sends {} → server stores NULL → default profile.
+      const updated = await api.updateWatchlist(w.id, { weights: reset ? {} : profile });
+      onUpdated(updated);
+      if (reset) setProfile({ ...DEFAULT_PROFILE });
+      setEditing(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <Card className="flex flex-col">
       <header className="px-5 py-4 flex items-start justify-between gap-3 border-b border-line">
@@ -131,6 +156,32 @@ function WatchCard({ w, findings, onDelete }: { w: Watchlist; findings: Trademar
       <div className="px-5 py-3 border-b border-line">
         <p className="text-[10.5px] font-mono uppercase tracking-wider text-mute">Query</p>
         <p className="font-mono text-[12.5px] text-ink-2 mt-1 break-words">{w.queryDesc || queryToText(w.query)}</p>
+      </div>
+
+      <div className="px-5 py-3 border-b border-line">
+        <div className="flex items-center justify-between">
+          <p className="text-[10.5px] font-mono uppercase tracking-wider text-mute">
+            Similarity weights{w.weights ? "" : " · default"}
+          </p>
+          <button onClick={() => setEditing((v) => !v)} className="text-[11px] text-stamp hover:underline">
+            {editing ? "Cancel" : "Edit"}
+          </button>
+        </div>
+        {editing ? (
+          <div className="mt-2 space-y-2">
+            <WeightFields profile={profile} onChange={setProfile} />
+            <div className="flex items-center gap-3">
+              <Button variant="primary" type="button" onClick={() => saveWeights(false)} disabled={busy}>
+                {busy ? "Saving…" : "Save weights"}
+              </Button>
+              <button type="button" onClick={() => saveWeights(true)} disabled={busy} className="text-[11.5px] text-mute hover:text-ink-2">
+                Reset to default
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-1.5"><WeightProfileChips weights={w.weights} /></div>
+        )}
       </div>
 
       <div className="flex-1 min-h-[60px]">
@@ -204,6 +255,8 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [q, setQ] = React.useState("");
   const [country, setCountry] = React.useState("");
   const [classes, setClasses] = React.useState("");
+  const [customWeights, setCustomWeights] = React.useState(false);
+  const [profile, setProfile] = React.useState<Record<string, number>>({ ...DEFAULT_PROFILE });
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
 
@@ -226,6 +279,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         client: client.trim() || undefined,
         matter: matter.trim() || undefined,
         query,
+        weights: customWeights ? profile : undefined,
       });
       onCreated(created);
     } catch (e) {
@@ -282,6 +336,15 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
               <input value={classes} onChange={(e) => setClasses(e.target.value)} placeholder="05, 10, 35" className="w-full text-sm px-2.5 h-9 border border-line rounded bg-surface" />
             </Field>
           </div>
+          <hr className="border-line" />
+          <label className="flex items-center gap-2 text-[12.5px] cursor-pointer">
+            <input type="checkbox" checked={customWeights} onChange={(e) => setCustomWeights(e.target.checked)} />
+            <span>
+              <strong className="text-ink-2">Custom similarity weights</strong> · tune how this matter
+              ranks conflicts (else default 40 / 25 / 20 / 15).
+            </span>
+          </label>
+          {customWeights && <WeightFields profile={profile} onChange={setProfile} />}
           {err && <p className="text-rose-600 text-xs">{err}</p>}
         </div>
         <footer className="px-5 py-3 border-t border-line flex items-center justify-end gap-2 bg-paper-2">
@@ -303,6 +366,60 @@ function Field({ label, required, children }: { label: string; required?: boolea
       </span>
       <div className="mt-1">{children}</div>
     </label>
+  );
+}
+
+/* ===== Per-matter similarity weights ===== */
+
+const WEIGHT_CHANNELS = [
+  { key: "phonetic", label: "Phonetic" },
+  { key: "visual", label: "Visual" },
+  { key: "class", label: "Class" },
+  { key: "vienna", label: "Vienna" },
+] as const;
+
+/** UI defaults shown as whole numbers (backend normalises to sum 1). Mirrors
+ *  api.similarity.DEFAULT_WEIGHTS (40/25/20/15). */
+const DEFAULT_PROFILE: Record<string, number> = { phonetic: 40, visual: 25, class: 20, vienna: 15 };
+
+function normalizedPct(p: Record<string, number>, key: string): number {
+  const total = Object.values(p).reduce((a, b) => a + (b || 0), 0) || 1;
+  return Math.round(((p[key] || 0) / total) * 100);
+}
+
+/** Four number inputs + a live normalised-% readout. Controlled by the parent. */
+function WeightFields({ profile, onChange }: { profile: Record<string, number>; onChange: (p: Record<string, number>) => void }) {
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {WEIGHT_CHANNELS.map(({ key, label }) => (
+        <label key={key} className="block">
+          <span className="label-meta">{label}</span>
+          <input
+            type="number"
+            min={0}
+            step={5}
+            value={profile[key] ?? 0}
+            onChange={(e) => onChange({ ...profile, [key]: Math.max(0, Number(e.target.value) || 0) })}
+            className="mt-1 w-full text-sm px-2 h-8 border border-line rounded bg-surface tabular"
+          />
+          <span className="text-[10.5px] text-mute">{normalizedPct(profile, key)}%</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/** Read-only normalised-% chips for a stored profile (or the default). */
+function WeightProfileChips({ weights }: { weights: Record<string, number> | null }) {
+  const p = weights ?? DEFAULT_PROFILE;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {WEIGHT_CHANNELS.map(({ key, label }) => (
+        <span key={key} className="text-[10.5px] font-mono px-1.5 py-0.5 rounded bg-paper-2 text-ink-2">
+          {label} {normalizedPct(p, key)}%
+        </span>
+      ))}
+    </div>
   );
 }
 

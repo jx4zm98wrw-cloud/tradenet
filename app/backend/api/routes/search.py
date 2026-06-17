@@ -21,7 +21,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import similarity as sim
@@ -32,6 +32,20 @@ from ._filters import build_trademark_where, normalize_vienna_code, vienna_code_
 router = APIRouter(prefix="/api/v1/search", tags=["search"])
 
 SearchMode = Literal["text", "phonetic", "image", "vienna"]
+
+# Phonetic search is a two-stage retrieval: a cheap pg_trgm `%` candidate recall
+# in Postgres (stage 1), then a precise rerank by api.similarity (stage 2). This
+# is the recall cap — the max candidates pulled from the DB before reranking.
+# Generous so the trigram net surfaces sound-alikes the engine will score high
+# (NEUREX/NEUROFAX share the "neu"/"eur" trigrams), bounded so the Python
+# rerank stays fast. Marks whose true phonetic match shares no trigram with the
+# query are the known recall gap; widening it is a Metaphone-key-index follow-up.
+PHONETIC_RECALL_CAP = 1000
+
+# Widen pg_trgm's `%` operator below its 0.3 default: recall should be permissive
+# (the reranker decides), and short brand names often sit at 0.15–0.30 similarity
+# even when clearly sound-alike.
+_PHONETIC_TRGM_THRESHOLD = 0.15
 
 
 class ScoredMark(BaseModel):
@@ -163,8 +177,12 @@ async def search_trademarks(
 
     # The shared WHERE builder uses ALL semantics for array contains.
     # For ANY semantics we run a separate where with array overlap.
+    # Phonetic mode does NOT want the literal `ILIKE %q%` filter — NEUROFAX must
+    # be reachable from a "NEUREX" query even though it doesn't contain that
+    # substring. Recall is handled by the pg_trgm `%` operator below instead.
     where = build_trademark_where(
         q=q,
+        exclude="q" if mode == "phonetic" else None,
         country=country,
         nice_class=nice_class if nice_class_mode == "all" else None,
         vienna_codes=norm_vienna if vienna_codes_mode == "all" else None,
@@ -186,6 +204,73 @@ async def search_trademarks(
         # (each is exact-or-prefix per vienna_code_match).
         where.append(or_(*[vienna_code_match(c) for c in norm_vienna]))
 
+    has_vienna = bool(norm_vienna)
+
+    # ---- Phonetic: two-stage retrieval ------------------------------------
+    # Stage 1 (recall, in Postgres): pg_trgm `%` over BOTH phonetic-target
+    # columns, ordered by best trigram similarity, capped at PHONETIC_RECALL_CAP.
+    # Stage 2 (rerank, in Python): the real Jaro-Winkler + Metaphone engine.
+    # This replaces the old path that only scored a date-ordered ~100-row window
+    # and therefore could never surface the global top conflicts.
+    if mode == "phonetic" and q:
+        ql = q.lower()
+        # Recall = trigram-similar OR same Double-Metaphone code. The dmetaphone
+        # equality path catches sound-alikes that share no trigram with the query
+        # but encode to the same phonemes (the pure-trigram recall gap). Both
+        # paths are index-backed (GIN trgm + btree dmetaphone from migrations
+        # 0012/0013); the Python engine reranks the union precisely.
+        dmeta_q = func.dmetaphone(ql)
+        recall_clauses = [
+            *where,
+            or_(
+                func.lower(Trademark.mark_sample).op("%")(ql),
+                func.lower(Trademark.applicant_name).op("%")(ql),
+                func.dmetaphone(func.lower(Trademark.mark_sample)) == dmeta_q,
+                func.dmetaphone(func.lower(Trademark.applicant_name)) == dmeta_q,
+            ),
+        ]
+        # Best trigram similarity across either target column. A NULL column
+        # yields NULL similarity, which greatest() skips — so A-files (no
+        # mark_sample) rank purely on applicant_name and vice-versa.
+        trgm_rank = func.greatest(
+            func.similarity(func.lower(Trademark.mark_sample), ql),
+            func.similarity(func.lower(Trademark.applicant_name), ql),
+        )
+        recall_stmt = (
+            select(Trademark)
+            .where(and_(*recall_clauses))
+            .order_by(trgm_rank.desc(), Trademark.id)
+            .limit(PHONETIC_RECALL_CAP)
+        )
+        # Widen the `%` threshold for this statement only. SET LOCAL is scoped
+        # to the surrounding transaction and resets automatically; the value is
+        # a trusted module constant, not user input, so inlining it is safe.
+        await session.execute(text(f"SET LOCAL pg_trgm.similarity_threshold = {_PHONETIC_TRGM_THRESHOLD}"))
+        candidates = list((await session.execute(recall_stmt)).scalars().all())
+
+        scored = [(m, _score(m, q, mode)) for m in candidates]
+        scored = [(m, s) for (m, s) in scored if s >= threshold]
+        if sort == "publication-desc":
+            scored.sort(key=lambda x: x[0].publication_date_441 or date.min, reverse=True)
+        elif sort == "applicant-asc":
+            scored.sort(key=lambda x: (x[0].applicant_name is None, (x[0].applicant_name or "")))
+        elif sort == "class-count":
+            scored.sort(key=lambda x: -len(x[0].nice_classes or []))
+        else:
+            scored.sort(key=lambda x: (-x[1], str(x[0].id)))
+        # total reflects candidates passing the threshold within the recall cap,
+        # not the full filter-match count — the honest "how many similar marks"
+        # number for a similarity search.
+        total = len(scored)
+        page = scored[offset : offset + limit]
+        return SearchResultsOut(
+            items=[ScoredMark(mark=TrademarkOut.model_validate(m), score=s) for m, s in page],
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
+
+    # ---- All other modes: filter in SQL, score the over-fetch window -------
     stmt = select(Trademark)
     cnt_stmt = select(func.count()).select_from(Trademark)
     if where:
@@ -199,7 +284,8 @@ async def search_trademarks(
     elif sort == "class-count":
         stmt = stmt.order_by(func.cardinality(Trademark.nice_classes).desc().nulls_last(), Trademark.id)
     else:
-        # similarity: fetch then sort in Python (mock scores).
+        # similarity sort without a phonetic target (filter-only / vienna /
+        # image): scores are 1.0 or a coverage fraction; date order is stable.
         stmt = stmt.order_by(Trademark.publication_date_441.desc().nulls_last(), Trademark.id)
 
     # Over-fetch so we can post-filter by threshold without ruining pagination.
@@ -207,7 +293,6 @@ async def search_trademarks(
     rows = list((await session.execute(stmt.limit(fetch_limit))).scalars().all())
     total = (await session.execute(cnt_stmt)).scalar_one()
 
-    has_vienna = bool(norm_vienna)
     scored = [(m, _score(m, q, mode, has_vienna=has_vienna, vienna_query=norm_vienna)) for m in rows]
     scored = [(m, s) for (m, s) in scored if s >= threshold]
     if sort == "similarity":
