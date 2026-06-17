@@ -447,10 +447,18 @@ function Breadcrumb({ mark, onBack }: { mark: Trademark; onBack: () => void }) {
 }
 
 function Claims({ mark: m }: { mark: Trademark }) {
-  // Only render rows where the gazette explicitly carried the data — no demo fillers.
+  // Only render rows where the gazette explicitly carried the data — no demo
+  // fillers. Field set is dataset-driven: 531 Vienna (~57% coverage) sits first
+  // since it describes the figurative elements of the specimen shown above;
+  // 551 Status was dropped (0% populated across the corpus); validity (171/176)
+  // is registration-only so it's null on applications.
   const rows: { label: string; value: React.ReactNode }[] = [];
-  if (m.mark_status) rows.push({ label: "Status (551)", value: m.mark_status });
+  if (m.vienna_codes && m.vienna_codes.length > 0) {
+    rows.push({ label: "Vienna codes (531)", value: m.vienna_codes.join(" · ") });
+  }
   if (m.protected_colors) rows.push({ label: "Color claim (591)", value: m.protected_colors });
+  if (m.validity_171) rows.push({ label: "Validity (171)", value: m.validity_171 });
+  else if (m.validity_176) rows.push({ label: "Validity (176)", value: m.validity_176 });
   if (m.applicant_type) rows.push({ label: "Applicant type", value: m.applicant_type });
   if (rows.length === 0) {
     return (

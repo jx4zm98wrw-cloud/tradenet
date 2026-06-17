@@ -32,6 +32,8 @@ export type Trademark = {
   registration_date_151: string | null;
   nice_classes: string[] | null;
   nice_total: number | null;
+  /** WIPO 531 figurative-element classification codes (e.g. "26.1.2"). */
+  vienna_codes: string[] | null;
   mark_sample: string | null;
   /** Path relative to /static/image/ of the extracted logo PNG, or null when
    * no logo was extracted (text-only mark, extraction skipped, or pre-Phase-2
