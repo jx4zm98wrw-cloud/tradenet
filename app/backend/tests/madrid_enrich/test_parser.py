@@ -4,10 +4,19 @@ from pathlib import Path
 from madrid_enrich.parser import parse
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "madrid" / "1266721.html"
+MULTICLASS_FIXTURE = Path(__file__).parent.parent / "fixtures" / "madrid" / "1248225.html"
 
 
 def _rec():
     return parse(FIXTURE.read_text(encoding="utf-8"))
+
+
+def test_parses_all_nice_classes_multiclass():
+    # IRN 1248225 (Hennessy PARADIS) covers Nice 21/32/33. The INID 511 field
+    # packs all three classes' goods text into one blob, so the parser must read
+    # the authoritative "Nice classes" summary cell, not just the first class.
+    r = parse(MULTICLASS_FIXTURE.read_text(encoding="utf-8"))
+    assert r.nice_classes == ["21", "32", "33"]
 
 
 def test_parses_bibliographic_scalars():
@@ -61,9 +70,7 @@ def test_old_record_with_9sexies_designations_includes_vn():
     from madrid_enrich.parser import parse
     from pathlib import Path
 
-    html = (Path(__file__).parent.parent / "fixtures" / "madrid" / "0183259.html").read_text(
-        encoding="utf-8"
-    )
+    html = (Path(__file__).parent.parent / "fixtures" / "madrid" / "0183259.html").read_text(encoding="utf-8")
     r = parse(html)
     assert "VN" in r.designated_countries
     from madrid_enrich.derive import derive_vn

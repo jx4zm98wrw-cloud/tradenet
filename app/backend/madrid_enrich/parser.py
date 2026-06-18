@@ -129,6 +129,23 @@ def parse(html_src: str) -> MadridRecord:
                 if cc not in rec.designated_countries:
                     rec.designated_countries.append(cc)
 
+    # Authoritative Nice classes: the summary table's "Nice classes" cell holds
+    # WIPO's clean comma-separated list (e.g. "21, 32, 33"). The INID 511 field
+    # packs every class's goods text into one blob, so scraping it for class
+    # numbers is lossy (we only ever caught the first). Prefer the cell,
+    # normalized to the 2-digit zero-padded form used elsewhere. The 511
+    # first-class read above remains a fallback when no cell is present.
+    nice_cell = re.search(r'<td[^>]*class="[^"]*\bnice\b[^"]*"[^>]*>(.*?)</td>', html_src, re.S | re.I)
+    if nice_cell:
+        classes: list[str] = []
+        for n in re.findall(r"\d{1,2}", re.sub(r"<[^>]+>", " ", nice_cell.group(1))):
+            v = int(n)
+            c = f"{v:02d}"
+            if 1 <= v <= 45 and c not in classes:
+                classes.append(c)
+        if classes:
+            rec.nice_classes = classes
+
     # Mark text from the page title line "1266721- Clalen".
     for ln in lines[:30]:
         m = re.match(r"^\d{6,}\s*-\s*(.+)$", ln)
