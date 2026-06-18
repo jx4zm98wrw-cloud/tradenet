@@ -17,6 +17,7 @@ import { markDisplay } from "@/lib/mark-display";
 import { Icon } from "@/components/icons";
 import { Timeline } from "@/components/detail/timeline";
 import { OppositionBox } from "@/components/detail/opposition-box";
+import { MadridEnrichment } from "@/components/detail/madrid-enrichment";
 import { markCategoryMeta } from "@/components/badges";
 import {
   api, countryDisplay, NICE_LABELS,
@@ -236,6 +237,9 @@ export default function MarkDetailPage() {
               })()}
             </Card>
           )}
+
+          {/* WIPO Madrid enrichment — only for enriched Madrid marks */}
+          {detail.enrichment && <MadridEnrichment e={detail.enrichment} />}
 
           {/* Similar marks */}
           {similar.length > 0 && (
