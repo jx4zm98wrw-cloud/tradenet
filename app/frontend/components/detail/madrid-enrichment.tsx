@@ -50,6 +50,8 @@ export function MadridTimeline({ e }: { e: MadridEnrichmentData }) {
 
 export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
   const granted = e.vn_status === "granted";
+  // The full designated-jurisdiction set is ~80 chips; collapse it by default.
+  const [showJurisdictions, setShowJurisdictions] = React.useState(false);
 
   const countries = [...(e.designated_countries ?? [])].sort((a, b) =>
     a === "VN" ? -1 : b === "VN" ? 1 : 0,
@@ -122,25 +124,39 @@ export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
 
       {/* Designated jurisdictions */}
       <Card>
-        <CardHead title={`Designated jurisdictions (${countries.length})`} />
-        <div className="flex flex-wrap gap-1.5 px-4 py-4">
-          {countries.length === 0 ? (
-            <span className="text-sm text-mute">No designated jurisdictions parsed.</span>
-          ) : (
-            countries.map((cc) => (
-              <span
-                key={cc}
-                className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs ${
-                  cc === "VN" ? "bg-ok-2 font-semibold text-ok" : "bg-paper-2 text-ink-2"
-                }`}
-                title={cname(cc)}
+        <CardHead
+          title={`Designated jurisdictions (${countries.length})`}
+          action={
+            countries.length > 0 ? (
+              <button
+                onClick={() => setShowJurisdictions((o) => !o)}
+                className="text-[12.5px] font-medium text-stamp hover:text-stamp-deep"
               >
-                <Flag code={cc} size={12} />
-                {cc}
-              </span>
-            ))
-          )}
-        </div>
+                {showJurisdictions ? "Collapse" : "Expand"}
+              </button>
+            ) : undefined
+          }
+        />
+        {countries.length === 0 ? (
+          <div className="px-4 py-4 text-sm text-mute">No designated jurisdictions parsed.</div>
+        ) : (
+          showJurisdictions && (
+            <div className="flex flex-wrap gap-1.5 px-4 py-4">
+              {countries.map((cc) => (
+                <span
+                  key={cc}
+                  className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs ${
+                    cc === "VN" ? "bg-ok-2 font-semibold text-ok" : "bg-paper-2 text-ink-2"
+                  }`}
+                  title={cname(cc)}
+                >
+                  <Flag code={cc} size={12} />
+                  {cc}
+                </span>
+              ))}
+            </div>
+          )
+        )}
       </Card>
 
       {e.source_url && (
