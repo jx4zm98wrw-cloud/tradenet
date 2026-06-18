@@ -34,6 +34,11 @@ claude_csvbuilder/
 │   │   │                           Populates `madrid_records` (keyed by IRN,
 │   │   │                           soft-joined to `trademarks.lineage_key`)
 │   │   │                           with WIPO-fetched Madrid bibliographic data.
+│   │   │                           Admin progress view: GET
+│   │   │                           /api/v1/admin/madrid-enrichment →
+│   │   │                           app/(app)/admin/madrid reports coverage
+│   │   │                           (unique IRNs vs validated vs remaining),
+│   │   │                           all derived live from the DB.
 │   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
 │   │   ├── alembic/                Migrations
 │   │   ├── scripts/                One-off scripts (smoke_ingest.py)

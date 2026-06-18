@@ -1,6 +1,6 @@
 # Madrid Enrichment Admin Panel (Design)
 
-**Status:** Approved for planning · 2026-06-18
+**Status:** Implemented · 2026-06-18
 
 **Goal:** Surface live Madrid (WIPO) enrichment progress in the admin UI — how many
 unique Madrid IRNs the system holds, how many have been validated via the WIPO
