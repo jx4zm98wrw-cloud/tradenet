@@ -52,6 +52,10 @@ async def seed() -> AsyncIterator[None]:
                 gazette_id=_GZ,
                 record_type=RecordType.B_madrid,
                 madrid_number=_IRN,
+                # Future pub date so this row sorts to the top of the
+                # publication-date-desc list and lands inside the first
+                # page (limit=50) of the filtered search results.
+                publication_date_441=date(2099, 1, 1),
             )
         )
         # Domestic row: lineage_key resolves to the application_number, which
@@ -107,3 +111,20 @@ async def test_domestic_detail_has_null_enrichment(client: AsyncClient) -> None:
     r = await client.get(f"/api/v1/marks/{_DOMESTIC_ID}")
     assert r.status_code == 200
     assert r.json()["enrichment"] is None
+
+
+@pytest.mark.asyncio
+async def test_search_filter_designated_country(client: AsyncClient) -> None:
+    r_sg = await client.get("/api/v1/trademarks", params={"designated_country": "SG", "limit": 50})
+    ids = {row["id"] for row in r_sg.json()["items"]}
+    assert str(_MADRID_ID) in ids
+    r_us = await client.get("/api/v1/trademarks", params={"designated_country": "US", "limit": 50})
+    assert str(_MADRID_ID) not in {row["id"] for row in r_us.json()["items"]}
+
+
+@pytest.mark.asyncio
+async def test_search_filter_vn_status(client: AsyncClient) -> None:
+    r = await client.get("/api/v1/trademarks", params={"vn_status": "granted", "limit": 50})
+    assert str(_MADRID_ID) in {row["id"] for row in r.json()["items"]}
+    r2 = await client.get("/api/v1/trademarks", params={"vn_status": "refused", "limit": 50})
+    assert str(_MADRID_ID) not in {row["id"] for row in r2.json()["items"]}

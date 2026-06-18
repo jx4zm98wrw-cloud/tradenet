@@ -11,10 +11,11 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.sql.elements import ColumnElement
 
 from ..db import RecordType, Trademark
+from ..db.models import MadridRecord
 
 
 def vienna_code_match(code: str) -> ColumnElement:
@@ -82,6 +83,8 @@ def build_trademark_where(
     month: int | None = None,
     gazette_id: UUID | None = None,
     ip_agency: str | None = None,
+    designated_country: str | None = None,
+    vn_status: str | None = None,
     grant_date_from: date | None = None,
     grant_date_to: date | None = None,
     exclude: str | None = None,
@@ -141,6 +144,19 @@ def build_trademark_where(
         where.append(Trademark.gazette_id == gazette_id)
     if ip_agency and exclude != "ip_agency":
         where.append(Trademark.ip_agency.ilike(f"%{ip_agency.lower()}%"))
+    # Designated-jurisdiction filter: marks whose Madrid record covers country
+    # `cc`. Joined via lineage_key against madrid_records.designated_countries
+    # (a GIN-indexed Postgres array; `@>` containment hits the index). A
+    # non-correlated IN-subquery keeps this a single appendable clause.
+    if designated_country and exclude != "designated_country":
+        cc = designated_country.upper()
+        irns = select(MadridRecord.irn).where(MadridRecord.designated_countries.contains([cc]))
+        where.append(Trademark.lineage_key.in_(irns))
+    # VN protection-status filter (granted | pending | refused), also via the
+    # lineage_key join.
+    if vn_status and exclude != "vn_status":
+        irns = select(MadridRecord.irn).where(MadridRecord.vn_status == vn_status)
+        where.append(Trademark.lineage_key.in_(irns))
     # Grant date = INID (151), the date the registration certificate was
     # issued. Only B-files (domestic + Madrid registrations) carry this;
     # A-files have NULL here, so they're naturally excluded from any

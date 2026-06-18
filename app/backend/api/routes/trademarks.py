@@ -39,6 +39,10 @@ async def search(
     month: int | None = Query(None, ge=1, le=12),
     gazette_id: uuid.UUID | None = None,
     ip_agency: str | None = None,
+    designated_country: str | None = Query(
+        None, description="ISO-2 country covered by the mark's Madrid designation"
+    ),
+    vn_status: str | None = Query(None, description="VN protection status: granted | pending | refused"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
@@ -58,6 +62,8 @@ async def search(
         month=month,
         gazette_id=gazette_id,
         ip_agency=ip_agency,
+        designated_country=designated_country,
+        vn_status=vn_status,
     )
 
     base = select(Trademark)
