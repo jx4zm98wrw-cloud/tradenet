@@ -49,23 +49,26 @@ export function MadridTimeline({ e }: { e: MadridEnrichmentData }) {
 }
 
 // Designated-jurisdiction chips (~80). Rendered in the right sidebar (under Raw
-// INID markers) on the detail page; collapsed by default.
+// INID markers) on the detail page. Shows the first 5 grid rows by default.
 export function MadridJurisdictions({ e }: { e: MadridEnrichmentData }) {
   const [show, setShow] = React.useState(false);
   const countries = [...(e.designated_countries ?? [])].sort((a, b) =>
     a === "VN" ? -1 : b === "VN" ? 1 : 0,
   );
+  const PREVIEW = 20; // 5 rows × 4 columns
+  const collapsible = countries.length > PREVIEW;
+  const visible = show ? countries : countries.slice(0, PREVIEW);
   return (
     <Card>
       <CardHead
         title={`Designated jurisdictions (${countries.length})`}
         action={
-          countries.length > 0 ? (
+          collapsible ? (
             <button
               onClick={() => setShow((o) => !o)}
               className="text-[12.5px] font-medium text-stamp hover:text-stamp-deep"
             >
-              {show ? "Collapse" : "Expand"}
+              {show ? "Show less" : `Show all ${countries.length}`}
             </button>
           ) : undefined
         }
@@ -73,22 +76,20 @@ export function MadridJurisdictions({ e }: { e: MadridEnrichmentData }) {
       {countries.length === 0 ? (
         <div className="px-4 py-4 text-sm text-mute">No designated jurisdictions parsed.</div>
       ) : (
-        show && (
-          <div className="grid grid-cols-4 gap-1.5 px-4 py-4">
-            {countries.map((cc) => (
-              <span
-                key={cc}
-                className={`flex items-center justify-center gap-1 rounded px-1.5 py-1 text-xs ${
-                  cc === "VN" ? "bg-ok-2 font-semibold text-ok" : "bg-paper-2 text-ink-2"
-                }`}
-                title={cname(cc)}
-              >
-                <Flag code={cc} size={12} />
-                {cc}
-              </span>
-            ))}
-          </div>
-        )
+        <div className="grid grid-cols-4 gap-1.5 px-4 py-4">
+          {visible.map((cc) => (
+            <span
+              key={cc}
+              className={`flex items-center justify-center gap-1 rounded px-1.5 py-1 text-xs ${
+                cc === "VN" ? "bg-ok-2 font-semibold text-ok" : "bg-paper-2 text-ink-2"
+              }`}
+              title={cname(cc)}
+            >
+              <Flag code={cc} size={12} />
+              {cc}
+            </span>
+          ))}
+        </div>
       )}
     </Card>
   );
