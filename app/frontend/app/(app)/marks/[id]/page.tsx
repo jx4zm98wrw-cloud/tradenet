@@ -17,7 +17,7 @@ import { markDisplay } from "@/lib/mark-display";
 import { Icon } from "@/components/icons";
 import { Timeline } from "@/components/detail/timeline";
 import { OppositionBox } from "@/components/detail/opposition-box";
-import { MadridEnrichment } from "@/components/detail/madrid-enrichment";
+import { MadridEnrichment, MadridTimeline } from "@/components/detail/madrid-enrichment";
 import { markCategoryMeta } from "@/components/badges";
 import {
   api, countryDisplay, NICE_LABELS,
@@ -189,6 +189,9 @@ export default function MarkDetailPage() {
               <Timeline events={timeline} />
             </Card>
           )}
+
+          {/* WIPO Prosecution timeline — leads the Madrid section, above Goods & services. */}
+          {detail.enrichment && <MadridTimeline e={detail.enrichment} />}
 
           {/* Goods & services */}
           {m.nice_classes && m.nice_classes.length > 0 && (

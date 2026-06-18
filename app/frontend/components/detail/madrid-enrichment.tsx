@@ -15,19 +15,45 @@ const cname = (cc: string) => countryDisplay(cc).name;
 const cleanEventType = (t: string | undefined) =>
   (t ?? "").replace(/,\s*[A-Z]{2}(?:\s*,\s*[A-Z]{2})*\s*$/, "").trim();
 
+// VN-focused prosecution timeline. Rendered as its own card (positioned above
+// Goods & services on the detail page) so it leads the Madrid section.
+export function MadridTimeline({ e }: { e: MadridEnrichmentData }) {
+  // Only events where Vietnam is a party (IR designation, VN provisional
+  // refusal, grant, renewals). Other jurisdictions' prosecution is noise here.
+  const timeline = [...(e.transaction_history ?? [])]
+    .filter((t) => t.date && (t.parties ?? []).includes("VN"))
+    .sort((a, b) => ((a.date ?? "") < (b.date ?? "") ? -1 : 1));
+  return (
+    <Card>
+      <CardHead title="Prosecution timeline" />
+      <div className="flex flex-col gap-2 px-4 py-4">
+        {timeline.length === 0 ? (
+          <div className="text-sm text-mute">No transaction history parsed.</div>
+        ) : (
+          timeline.map((ev, i) => {
+            const isVN = (ev.parties ?? []).includes("VN");
+            return (
+              <div key={i} className={`border-l-2 pl-3 ${isVN ? "border-ok" : "border-line"}`}>
+                <div className="text-xs text-mute">
+                  {ev.date ? formatDate(ev.date) : ""}
+                  {ev.gazette ? ` · Gaz ${ev.gazette}` : ""}
+                </div>
+                <div className="text-sm text-ink-2">{cleanEventType(ev.type)}</div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
   const granted = e.vn_status === "granted";
 
   const countries = [...(e.designated_countries ?? [])].sort((a, b) =>
     a === "VN" ? -1 : b === "VN" ? 1 : 0,
   );
-
-  // VN-focused product: the prosecution timeline shows only events where
-  // Vietnam is a party (IR designation, VN provisional refusal, grant,
-  // renewals). Other jurisdictions' prosecution is noise here.
-  const timeline = [...(e.transaction_history ?? [])]
-    .filter((t) => t.date && (t.parties ?? []).includes("VN"))
-    .sort((a, b) => ((a.date ?? "") < (b.date ?? "") ? -1 : 1));
 
   return (
     <div className="space-y-5">
@@ -113,29 +139,6 @@ export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
                 {cc}
               </span>
             ))
-          )}
-        </div>
-      </Card>
-
-      {/* Two-pane: status by jurisdiction + prosecution timeline */}
-      <Card>
-        <CardHead title="Prosecution timeline" />
-        <div className="flex flex-col gap-2 px-4 py-4">
-          {timeline.length === 0 ? (
-            <div className="text-sm text-mute">No transaction history parsed.</div>
-          ) : (
-            timeline.map((ev, i) => {
-              const isVN = (ev.parties ?? []).includes("VN");
-              return (
-                <div key={i} className={`border-l-2 pl-3 ${isVN ? "border-ok" : "border-line"}`}>
-                  <div className="text-xs text-mute">
-                    {ev.date ? formatDate(ev.date) : ""}
-                    {ev.gazette ? ` · Gaz ${ev.gazette}` : ""}
-                  </div>
-                  <div className="text-sm text-ink-2">{cleanEventType(ev.type)}</div>
-                </div>
-              );
-            })
           )}
         </div>
       </Card>
