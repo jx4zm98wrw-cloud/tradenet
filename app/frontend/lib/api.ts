@@ -98,6 +98,11 @@ export type SearchParams = {
   month?: number;
   gazette_id?: string;
   ip_agency?: string;
+  /** Madrid designated jurisdiction (ISO2). Matches marks whose Madrid record
+   * covers this country. "VN" = protected/processed in Vietnam. */
+  designated_country?: string;
+  /** VN protection status: granted | pending | refused. */
+  vn_status?: string;
   /** ISO date strings (YYYY-MM-DD). Filter by INID (151) certificate issue
    * date. Only B-files (domestic + Madrid registrations) carry this, so
    * A-files are naturally excluded by any grant-date filter. */
@@ -268,6 +273,35 @@ export type ScoredSearchParams = SearchParams & {
   sort?: SortKey;
 };
 
+/** WIPO Madrid Monitor enrichment for a Madrid mark, joined from
+ * `madrid_records` on `irn == trademarks.lineage_key`. Detail-only —
+ * never on the lean list/search Trademark shape. */
+export type MadridEnrichment = {
+  irn: string;
+  holder_name: string | null;
+  holder_address: string | null;
+  holder_country: string | null;
+  holder_legal_status: string | null;
+  mark_text: string | null;
+  representative: string | null;
+  registration_date: string | null;
+  expiration_date: string | null;
+  nice_classes: string[] | null;
+  designated_countries: string[] | null;
+  basic_registration: string | null;
+  language: string | null;
+  vn_designated: boolean | null;
+  vn_status: string | null;
+  vn_grant_date: string | null;
+  vn_refusal_date: string | null;
+  /** WIPO per-country snapshot: { "VN": { date, status, gazette? }, ... } */
+  designation_status: Record<string, { date?: string; status?: string; gazette?: string }> | null;
+  /** Chronological WIPO events: [{ type, date, parties:[ISO2], gazette? }] */
+  transaction_history: Array<{ type?: string; date?: string; parties?: string[]; gazette?: string }> | null;
+  source_url: string | null;
+  fetched_at: string | null;
+};
+
 export type MarkDetail = {
   mark: Trademark;
   oppositionEnds: string | null;
@@ -279,6 +313,8 @@ export type MarkDetail = {
   // format for VN A-files + B-domestic; bare class list ("05, 12.") for
   // Madrid B. Empty when the row was published without a (511) value.
   raw_511_text: string | null;
+  /** WIPO Madrid enrichment — present only for enriched Madrid marks. */
+  enrichment: MadridEnrichment | null;
 };
 
 export type TimelineEvent = {
@@ -375,6 +411,8 @@ export const api = {
     json<CountBucket[]>(`/api/v1/facets/ip-agencies?${qs({ ...filters, limit, offset: undefined })}`, init),
   facetsMarkCategories: (filters: SearchParams, init?: RequestInit) =>
     json<CountBucket[]>(`/api/v1/facets/mark-categories?${qs({ ...filters, offset: undefined })}`, init),
+  facetsVnStatus: (filters: SearchParams, init?: RequestInit) =>
+    json<CountBucket[]>(`/api/v1/facets/vn-status?${qs({ ...filters, offset: undefined })}`, init),
   statsTopApplicants: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-applicants?limit=${limit}`),
   statsTopAgents: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-agents?limit=${limit}`),
   getMark: (id: string) => json<MarkDetail>(`/api/v1/marks/${id}`),
@@ -464,6 +502,13 @@ export const MARK_CATEGORY_LABELS: Record<string, string> = {
   madrid_registration: "Madrid registration",
   madrid_renewal: "Madrid renewal",
   unknown: "Unclassified",
+};
+
+// VN protection-status labels (mirrors backend VN_STATUS_LABELS in facets.py).
+export const VN_STATUS_LABELS: Record<string, string> = {
+  granted: "Granted in VN",
+  pending: "Pending in VN",
+  refused: "Refused in VN",
 };
 
 // Short Nice class labels (mirrors backend/api/v1/routes/stats.py NICE_LABELS).
