@@ -1,17 +1,28 @@
-/** ISO-2 country code → flag emoji. Lookup-only; for the full name use
- * `countryDisplay()` from `lib/api`. */
+/** ISO-2 country code → flag emoji. Built from Unicode regional-indicator
+ * symbols so every valid country renders without a hand-maintained map (the
+ * old ~27-entry map left the other ~190 codes blank). For the full name use
+ * `countryDisplay()` from `lib/api`.
+ *
+ * A few WIPO Madrid designation codes are organisations, not countries, and
+ * have no national flag (OA=OAPI, AP=ARIPO, BX=Benelux, WO/IB=WIPO, GC=GCC);
+ * EM (the EU, EUIPO) is overridden to the EU flag, the rest fall back to a
+ * neutral marker. */
 
-const FLAGS: Record<string, string> = {
-  VN: "🇻🇳", CN: "🇨🇳", US: "🇺🇸", KR: "🇰🇷", JP: "🇯🇵",
-  SG: "🇸🇬", GB: "🇬🇧", DE: "🇩🇪", IN: "🇮🇳", FR: "🇫🇷",
-  TH: "🇹🇭", TW: "🇹🇼", ID: "🇮🇩", MY: "🇲🇾", PH: "🇵🇭",
-  AU: "🇦🇺", CA: "🇨🇦", NL: "🇳🇱", ES: "🇪🇸", IT: "🇮🇹",
-  CH: "🇨🇭", TR: "🇹🇷", RU: "🇷🇺", BR: "🇧🇷", MX: "🇲🇽",
-  HK: "🇭🇰", MO: "🇲🇴",
+const OVERRIDES: Record<string, string> = {
+  EM: "🇪🇺", // EUIPO — WIPO designates the European Union as "EM"
 };
 
+/** Convert a 2-letter ISO code to its flag emoji (regional indicators). Returns
+ * null for anything that isn't two ASCII letters. */
+function isoToEmoji(code: string): string | null {
+  const cc = code.toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) return null;
+  const BASE = 0x1f1e6; // 🇦
+  return String.fromCodePoint(BASE + cc.charCodeAt(0) - 65, BASE + cc.charCodeAt(1) - 65);
+}
+
 export function Flag({ code, size = 14 }: { code?: string | null; size?: number }) {
-  const flag = (code && FLAGS[code]) || "🏳️";
+  const flag = (code && (OVERRIDES[code.toUpperCase()] ?? isoToEmoji(code))) || "🏳️";
   return (
     <span
       style={{
