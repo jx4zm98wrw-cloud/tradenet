@@ -20,6 +20,15 @@ export type Gazette = {
 
 export type AdminCheck = { isAdmin: boolean; role: "admin" | "editor" | "viewer"; reason: string };
 
+export type MadridEnrichmentStats = {
+  unique_irns: number;
+  validated: number;
+  remaining: number;
+  pct_complete: number; // 0..1
+  vn_granted: number;
+  by_category: Record<string, number>;
+};
+
 export type Trademark = {
   id: string;
   gazette_id: string;
@@ -452,6 +461,7 @@ export const api = {
   deleteWatchlist: (id: string) => mutateVoid(`/api/v1/watchlists/${id}`, { method: "DELETE" }),
   pipelineStats: () => json<PipelineStats>(`/api/v1/stats/pipeline`),
   adminCheck: () => json<AdminCheck>(`/api/v1/admin/check`),
+  adminMadridStats: () => json<MadridEnrichmentStats>(`/api/v1/admin/madrid-enrichment`),
   uploadGazette: (file: File): Promise<Gazette> => {
     const fd = new FormData();
     fd.append("file", file);
