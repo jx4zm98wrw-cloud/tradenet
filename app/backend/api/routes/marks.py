@@ -22,7 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import similarity as sim
 from ..db import RecordType, Trademark, Watchlist, get_session
-from ..schemas import TrademarkOut
+from ..db.models import MadridRecord
+from ..schemas import MadridEnrichmentOut, TrademarkOut
 from ..settings import get_settings
 from .today import DEMO_TODAY, _opp_close_date
 
@@ -45,6 +46,10 @@ class MarkDetailOut(BaseModel):
     # surfaces it. Empty for Madrid rows where the gazette only printed a
     # bare class-number list.
     raw_511_text: str | None = None
+    # WIPO Madrid enrichment, present only for Madrid marks that have a
+    # madrid_records row (joined on lineage_key). None for domestic marks
+    # and for Madrid marks not yet enriched — never fabricated.
+    enrichment: MadridEnrichmentOut | None = None
 
 
 @router.get("/{id}", response_model=MarkDetailOut)
@@ -52,10 +57,15 @@ async def get_mark(id: uuid.UUID, session: AsyncSession = Depends(get_session)) 
     m = await session.get(Trademark, id)
     if m is None:
         raise HTTPException(404, "Mark not found")
-    return _build_detail(m)
+    enrichment = None
+    if m.lineage_key:
+        rec = await session.get(MadridRecord, m.lineage_key)
+        if rec is not None:
+            enrichment = MadridEnrichmentOut.model_validate(rec)
+    return _build_detail(m, enrichment)
 
 
-def _build_detail(m: Trademark) -> MarkDetailOut:
+def _build_detail(m: Trademark, enrichment: MadridEnrichmentOut | None = None) -> MarkDetailOut:
     today = DEMO_TODAY
     opp_ends, opp_left, opp_open = None, None, False
     if m.record_type == RecordType.A and m.publication_date_441:
@@ -76,6 +86,7 @@ def _build_detail(m: Trademark) -> MarkDetailOut:
         statusLabel=status_label,
         statusTone=status_tone,
         raw_511_text=m.raw_511_text,
+        enrichment=enrichment,
     )
 
 
