@@ -84,3 +84,33 @@ class TrademarkListOut(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class MadridEnrichmentOut(BaseModel):
+    """WIPO Madrid Monitor enrichment for a Madrid mark, joined from
+    `madrid_records` on `irn == trademarks.lineage_key`. Detail-only —
+    never on TrademarkOut (keeps list/search responses lean)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    irn: str
+    holder_name: str | None = None
+    holder_address: str | None = None
+    holder_country: str | None = None
+    holder_legal_status: str | None = None
+    mark_text: str | None = None
+    representative: str | None = None
+    registration_date: date | None = None
+    expiration_date: date | None = None
+    nice_classes: list[str] | None = None
+    designated_countries: list[str] | None = None
+    basic_registration: str | None = None
+    language: str | None = None
+    vn_designated: bool | None = None
+    vn_status: str | None = None
+    vn_grant_date: date | None = None
+    vn_refusal_date: date | None = None
+    designation_status: dict | None = None
+    transaction_history: list | None = None
+    source_url: str | None = None
+    fetched_at: datetime | None = None
