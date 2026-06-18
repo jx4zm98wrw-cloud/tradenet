@@ -94,33 +94,37 @@ export function MadridJurisdictions({ e }: { e: MadridEnrichmentData }) {
   );
 }
 
-export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
+// The 🇻🇳 "Protected in Vietnam" banner. Rendered as its own card so the detail
+// page can lead the Madrid section with it (above the Prosecution timeline).
+export function MadridVnBanner({ e }: { e: MadridEnrichmentData }) {
   const granted = e.vn_status === "granted";
-
   return (
-    <div className="space-y-5">
-      {/* VN banner */}
-      <div
-        className={`flex items-center gap-3 rounded-lg border p-4 ${
-          granted ? "border-[oklch(0.85_0.05_165)] bg-ok-2" : "border-line bg-paper-2"
-        }`}
-      >
-        <span className="text-2xl leading-none" aria-hidden="true">
-          {granted ? "🇻🇳" : "🏳️"}
-        </span>
-        <div className="min-w-0">
-          <div className={`font-semibold ${granted ? "text-ok" : "text-ink"}`}>
-            {granted
-              ? `Protected in Vietnam — granted${e.vn_grant_date ? ` ${formatDate(e.vn_grant_date)}` : ""}`
-              : `VN status: ${e.vn_status ?? "—"}`}
-          </div>
-          <div className="mt-0.5 text-sm text-mute">
-            {e.vn_refusal_date ? `refused ${formatDate(e.vn_refusal_date)} · ` : ""}
-            expires {e.expiration_date ? formatDate(e.expiration_date) : "—"}
-          </div>
+    <div
+      className={`flex items-center gap-3 rounded-lg border p-4 ${
+        granted ? "border-[oklch(0.85_0.05_165)] bg-ok-2" : "border-line bg-paper-2"
+      }`}
+    >
+      <span className="text-2xl leading-none" aria-hidden="true">
+        {granted ? "🇻🇳" : "🏳️"}
+      </span>
+      <div className="min-w-0">
+        <div className={`font-semibold ${granted ? "text-ok" : "text-ink"}`}>
+          {granted
+            ? `Protected in Vietnam — granted${e.vn_grant_date ? ` ${formatDate(e.vn_grant_date)}` : ""}`
+            : `VN status: ${e.vn_status ?? "—"}`}
+        </div>
+        <div className="mt-0.5 text-sm text-mute">
+          {e.vn_refusal_date ? `refused ${formatDate(e.vn_refusal_date)} · ` : ""}
+          expires {e.expiration_date ? formatDate(e.expiration_date) : "—"}
         </div>
       </div>
+    </div>
+  );
+}
 
+export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
+  return (
+    <div className="space-y-5">
       {/* WIPO Madrid record card */}
       <Card>
         <CardHead>

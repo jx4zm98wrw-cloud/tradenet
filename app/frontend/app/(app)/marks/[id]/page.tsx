@@ -21,6 +21,7 @@ import {
   MadridEnrichment,
   MadridJurisdictions,
   MadridTimeline,
+  MadridVnBanner,
 } from "@/components/detail/madrid-enrichment";
 import { markCategoryMeta } from "@/components/badges";
 import {
@@ -196,7 +197,10 @@ export default function MarkDetailPage() {
             </Card>
           )}
 
-          {/* WIPO Prosecution timeline — leads the Madrid section, above Goods & services. */}
+          {/* VN protection banner leads the Madrid section, above the timeline. */}
+          {detail.enrichment && <MadridVnBanner e={detail.enrichment} />}
+
+          {/* WIPO Prosecution timeline — above Goods & services. */}
           {detail.enrichment && <MadridTimeline e={detail.enrichment} />}
 
           {/* Goods & services */}
