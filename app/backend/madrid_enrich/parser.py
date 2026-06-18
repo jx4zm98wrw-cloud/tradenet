@@ -107,9 +107,12 @@ def parse(html_src: str) -> MadridRecord:
             rec.expiration_date = _ddmmyyyy(val)
         elif code == "732" and not rec.holder_name:
             rec.holder_address = val
-            # holder name is the first chunk before the street number
-            m = re.match(r"^(.+?)(?=\d|$)", val)
-            rec.holder_name = (m.group(1).strip().rstrip(",") if m else val) or val
+            # The holder NAME is the first value line; the following lines are the
+            # street / postcode / city / country. The old "split at the first
+            # digit" rule mashed the name together with the street (e.g.
+            # "Société Jas Hennessy & Co. rue de la Richonne F-").
+            first = summary[i + 2].strip() if i + 2 < len(summary) and not _INID.match(summary[i + 2]) else ""
+            rec.holder_name = first.rstrip(",") or val
         elif code == "811" and not rec.holder_country:
             rec.holder_country = val[:2].upper() if val else None
         elif code == "842" and not rec.holder_legal_status:

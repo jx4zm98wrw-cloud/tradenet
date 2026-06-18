@@ -19,6 +19,15 @@ def test_parses_all_nice_classes_multiclass():
     assert r.nice_classes == ["21", "32", "33"]
 
 
+def test_holder_name_is_clean_not_mashed_with_address():
+    # The (732) block lists the holder name on the first line, then the address
+    # on following lines. The name must be just the name — not name + street
+    # ("Société Jas Hennessy & Co. rue de la Richonne F-").
+    r = parse(MULTICLASS_FIXTURE.read_text(encoding="utf-8"))
+    assert r.holder_name == "Société Jas Hennessy & Co."
+    assert "rue de la Richonne" in (r.holder_address or "")
+
+
 def test_parses_per_class_goods_services():
     # Full per-class goods text comes from the basic (BASICGS) goods list; later
     # blocks are subsequent-designation limitations and must not override it.
