@@ -128,3 +128,11 @@ async def test_search_filter_vn_status(client: AsyncClient) -> None:
     assert str(_MADRID_ID) in {row["id"] for row in r.json()["items"]}
     r2 = await client.get("/api/v1/trademarks", params={"vn_status": "refused", "limit": 50})
     assert str(_MADRID_ID) not in {row["id"] for row in r2.json()["items"]}
+
+
+@pytest.mark.asyncio
+async def test_facet_vn_status(client: AsyncClient) -> None:
+    r = await client.get("/api/v1/facets/vn-status")
+    assert r.status_code == 200
+    buckets = {b["key"]: b["count"] for b in r.json()}
+    assert buckets.get("granted", 0) >= 1

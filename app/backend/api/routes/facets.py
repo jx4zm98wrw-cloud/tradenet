@@ -13,6 +13,7 @@ from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import RecordType, Trademark, get_session
+from ..db.models import MadridRecord
 from ._filters import build_trademark_where
 from .stats import NICE_LABELS, CountBucket
 
@@ -32,6 +33,8 @@ def _filter_params(
     month: int | None = Query(None, ge=1, le=12),
     gazette_id: uuid.UUID | None = None,
     ip_agency: str | None = Query(None),
+    designated_country: str | None = Query(None),
+    vn_status: str | None = Query(None),
     grant_date_from: date | None = Query(None),
     grant_date_to: date | None = Query(None),
 ):
@@ -47,6 +50,8 @@ def _filter_params(
         month=month,
         gazette_id=gazette_id,
         ip_agency=ip_agency,
+        designated_country=designated_country,
+        vn_status=vn_status,
         grant_date_from=grant_date_from,
         grant_date_to=grant_date_to,
     )
@@ -155,6 +160,33 @@ async def facet_mark_categories(
         stmt = stmt.where(and_(*where))
     rows = (await session.execute(stmt)).all()
     return [CountBucket(key=cat, label=MARK_CATEGORY_LABELS.get(cat, cat), count=n) for cat, n in rows]
+
+
+VN_STATUS_LABELS: dict[str, str] = {
+    "granted": "Granted in VN",
+    "pending": "Pending in VN",
+    "refused": "Refused in VN",
+}
+
+
+@router.get("/vn-status", response_model=list[CountBucket])
+async def facet_vn_status(
+    filters: dict = Depends(_filter_params),
+    session: AsyncSession = Depends(get_session),
+) -> list[CountBucket]:
+    """Count marks per VN protection status under the current filter set
+    (excluding the vn_status filter itself), via the lineage_key join."""
+    where = build_trademark_where(**filters, exclude="vn_status")
+    stmt = (
+        select(MadridRecord.vn_status, func.count())
+        .join(Trademark, Trademark.lineage_key == MadridRecord.irn)
+        .where(*where)
+        .group_by(MadridRecord.vn_status)
+    )
+    rows = (await session.execute(stmt)).all()
+    return [
+        CountBucket(key=st, label=VN_STATUS_LABELS.get(st, st), count=n) for st, n in rows if st is not None
+    ]
 
 
 @router.get("/ip-agencies", response_model=list[CountBucket])
