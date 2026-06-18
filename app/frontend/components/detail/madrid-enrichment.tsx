@@ -74,11 +74,11 @@ export function MadridJurisdictions({ e }: { e: MadridEnrichmentData }) {
         <div className="px-4 py-4 text-sm text-mute">No designated jurisdictions parsed.</div>
       ) : (
         show && (
-          <div className="flex flex-wrap gap-1.5 px-4 py-4">
+          <div className="grid grid-cols-4 gap-1.5 px-4 py-4">
             {countries.map((cc) => (
               <span
                 key={cc}
-                className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs ${
+                className={`flex items-center justify-center gap-1 rounded px-1.5 py-1 text-xs ${
                   cc === "VN" ? "bg-ok-2 font-semibold text-ok" : "bg-paper-2 text-ink-2"
                 }`}
                 title={cname(cc)}
