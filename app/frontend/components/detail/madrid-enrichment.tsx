@@ -8,6 +8,13 @@ import { formatDate } from "@/lib/format";
 
 const cname = (cc: string) => countryDisplay(cc).name;
 
+// In the VN-only timeline, a WIPO event type ends with the full member-country
+// list (e.g. "Renewal, AG, AL, …, VN, ZM"). Strip that trailing list so each
+// event reads as a clean VN-scoped action ("Renewal", "International
+// Registration", "Statement of grant of protection made under Rule 18ter(1)").
+const cleanEventType = (t: string | undefined) =>
+  (t ?? "").replace(/,\s*[A-Z]{2}(?:\s*,\s*[A-Z]{2})*\s*$/, "").trim();
+
 function statusTone(s: string | null | undefined): PillTone {
   if (s === "granted") return "ok";
   if (s === "refused") return "warn";
@@ -32,15 +39,11 @@ export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
     a === "VN" ? -1 : b === "VN" ? 1 : 0,
   );
 
-  const statEntries = Object.entries(ds).sort((a, b) => {
-    if (a[0] === "VN") return -1;
-    if (b[0] === "VN") return 1;
-    const ord = (s?: string) => (s === "granted" ? 0 : s === "refused" ? 1 : 2);
-    return ord(a[1]?.status) - ord(b[1]?.status);
-  });
-
+  // VN-focused product: the prosecution timeline shows only events where
+  // Vietnam is a party (IR designation, VN provisional refusal, grant,
+  // renewals). Other jurisdictions' prosecution is noise here.
   const timeline = [...(e.transaction_history ?? [])]
-    .filter((t) => t.date)
+    .filter((t) => t.date && (t.parties ?? []).includes("VN"))
     .sort((a, b) => ((a.date ?? "") < (b.date ?? "") ? -1 : 1));
 
   return (
@@ -134,33 +137,27 @@ export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
       {/* Two-pane: status by jurisdiction + prosecution timeline */}
       <div className="grid gap-5 md:grid-cols-2">
         <Card>
-          <CardHead title="Status by jurisdiction" />
+          <CardHead title="Vietnam status" />
           <div className="flex flex-col gap-1.5 px-4 py-4">
-            {statEntries.length === 0 ? (
-              <div className="text-sm text-mute">No per-country status parsed.</div>
-            ) : (
-              statEntries.map(([cc, s]) => {
-                const isVN = cc === "VN";
-                // VN row: show OUR gazette-authoritative verdict as the badge;
-                // surface any WIPO divergence as a muted side-note, never a
-                // second contradicting badge.
-                const badgeStatus = isVN ? e.vn_status : s?.status;
-                const dt = isVN ? e.vn_grant_date ?? "" : s?.date ?? "";
-                const note =
-                  isVN && wipoDiffers ? `WIPO: ${vnWipo?.status}${vnWipo?.date ? ` ${vnWipo.date}` : ""}` : null;
-                return (
-                  <div key={cc} className={`flex items-center gap-2 ${isVN ? "font-medium" : ""}`}>
-                    <span className="flex w-28 shrink-0 items-center gap-1.5">
-                      <Flag code={cc} size={12} />
-                      {cname(cc)}
-                    </span>
-                    <span className="flex-1 text-xs text-mute">{dt ? formatDate(dt) : ""}</span>
-                    {note && <span className="text-[11px] text-mute">{note}</span>}
-                    <StatusBadge status={badgeStatus} />
-                  </div>
-                );
-              })
-            )}
+            {/* VN only: OUR gazette-authoritative verdict is the badge; any WIPO
+                divergence (e.g. a provisional refusal the gazette later overrode)
+                is a muted side-note, never a second contradicting badge. */}
+            <div className="flex items-center gap-2 font-medium">
+              <span className="flex w-28 shrink-0 items-center gap-1.5">
+                <Flag code="VN" size={12} />
+                Vietnam
+              </span>
+              <span className="flex-1 text-xs text-mute">
+                {e.vn_grant_date ? formatDate(e.vn_grant_date) : ""}
+              </span>
+              {wipoDiffers && (
+                <span className="text-[11px] text-mute">
+                  WIPO: {vnWipo?.status}
+                  {vnWipo?.date ? ` ${vnWipo.date}` : ""}
+                </span>
+              )}
+              <StatusBadge status={e.vn_status} />
+            </div>
           </div>
         </Card>
 
@@ -181,7 +178,7 @@ export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
                       {ev.date ? formatDate(ev.date) : ""}
                       {ev.gazette ? ` · Gaz ${ev.gazette}` : ""}
                     </div>
-                    <div className="text-sm text-ink-2">{ev.type ?? ""}</div>
+                    <div className="text-sm text-ink-2">{cleanEventType(ev.type)}</div>
                   </div>
                 );
               })

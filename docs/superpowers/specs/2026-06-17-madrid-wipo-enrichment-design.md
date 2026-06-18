@@ -221,10 +221,14 @@ implementation. Decisions locked from that review:
   - **"WIPO Madrid record" card** — holder/address/legal-nature/representative,
     registered, expiration (+ `renewed` badge), basic registration, language,
     and **designated jurisdictions** as flag chips (VN highlighted + GRANTED).
-  - **Two-pane card**: **Prosecution timeline** (registration 151 →
-    grants/refusals → subsequent designations → renewal → expiration 180, VN
-    event emphasized) ‖ **Status by jurisdiction** (per-country snapshot, VN
-    pinned top, then GRANTED by date, then PENDING).
+  - **Two-pane card (Vietnam-scoped)**: **Prosecution timeline** — only events
+    where VN is a party (IR designation → VN provisional refusal → grant →
+    renewal), with each event label stripped of its trailing member-country list
+    so it reads as a clean VN action ‖ **Vietnam status** — a single VN row
+    showing our gazette-authoritative verdict as the badge, with any WIPO
+    divergence (e.g. a provisional refusal the gazette overrode) as a muted note.
+    (Tradenet is a Vietnam product; other jurisdictions are noise here. The
+    full designated-jurisdiction set still appears as flag chips above.)
   - **Goods & services** (511, full text).
 - **Sidebar**: `Source` gains a `● enriched` indicator; a new **Renewal watch**
   widget (next renewal due = expiration 180, “≈ N years · last renewed YYYY”).
