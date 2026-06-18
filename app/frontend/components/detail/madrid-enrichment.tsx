@@ -3,7 +3,7 @@
 import * as React from "react";
 import type { MadridEnrichment as MadridEnrichmentData } from "@/lib/api";
 import { countryDisplay } from "@/lib/api";
-import { Card, CardHead, Pill, Flag, type PillTone } from "@/components/ui";
+import { Card, CardHead, Pill, Flag } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 
 const cname = (cc: string) => countryDisplay(cc).name;
@@ -15,25 +15,8 @@ const cname = (cc: string) => countryDisplay(cc).name;
 const cleanEventType = (t: string | undefined) =>
   (t ?? "").replace(/,\s*[A-Z]{2}(?:\s*,\s*[A-Z]{2})*\s*$/, "").trim();
 
-function statusTone(s: string | null | undefined): PillTone {
-  if (s === "granted") return "ok";
-  if (s === "refused") return "warn";
-  return "mute";
-}
-
-function StatusBadge({ status }: { status: string | null | undefined }) {
-  return (
-    <Pill tone={statusTone(status)} size="sm" className="uppercase tracking-[0.04em]">
-      {status ?? "—"}
-    </Pill>
-  );
-}
-
 export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
   const granted = e.vn_status === "granted";
-  const ds = e.designation_status ?? {};
-  const vnWipo = ds["VN"];
-  const wipoDiffers = !!vnWipo?.status && vnWipo.status !== e.vn_status;
 
   const countries = [...(e.designated_countries ?? [])].sort((a, b) =>
     a === "VN" ? -1 : b === "VN" ? 1 : 0,
@@ -135,57 +118,27 @@ export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
       </Card>
 
       {/* Two-pane: status by jurisdiction + prosecution timeline */}
-      <div className="grid gap-5 md:grid-cols-2">
-        <Card>
-          <CardHead title="Vietnam status" />
-          <div className="flex flex-col gap-1.5 px-4 py-4">
-            {/* VN only: OUR gazette-authoritative verdict is the badge; any WIPO
-                divergence (e.g. a provisional refusal the gazette later overrode)
-                is a muted side-note, never a second contradicting badge. */}
-            <div className="flex items-center gap-2 font-medium">
-              <span className="flex w-28 shrink-0 items-center gap-1.5">
-                <Flag code="VN" size={12} />
-                Vietnam
-              </span>
-              <span className="flex-1 text-xs text-mute">
-                {e.vn_grant_date ? formatDate(e.vn_grant_date) : ""}
-              </span>
-              {wipoDiffers && (
-                <span className="text-[11px] text-mute">
-                  WIPO: {vnWipo?.status}
-                  {vnWipo?.date ? ` ${vnWipo.date}` : ""}
-                </span>
-              )}
-              <StatusBadge status={e.vn_status} />
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <CardHead title="Prosecution timeline" />
-          <div className="flex flex-col gap-2 px-4 py-4">
-            {timeline.length === 0 ? (
-              <div className="text-sm text-mute">No transaction history parsed.</div>
-            ) : (
-              timeline.map((ev, i) => {
-                const isVN = (ev.parties ?? []).includes("VN");
-                return (
-                  <div
-                    key={i}
-                    className={`border-l-2 pl-3 ${isVN ? "border-ok" : "border-line"}`}
-                  >
-                    <div className="text-xs text-mute">
-                      {ev.date ? formatDate(ev.date) : ""}
-                      {ev.gazette ? ` · Gaz ${ev.gazette}` : ""}
-                    </div>
-                    <div className="text-sm text-ink-2">{cleanEventType(ev.type)}</div>
+      <Card>
+        <CardHead title="Prosecution timeline" />
+        <div className="flex flex-col gap-2 px-4 py-4">
+          {timeline.length === 0 ? (
+            <div className="text-sm text-mute">No transaction history parsed.</div>
+          ) : (
+            timeline.map((ev, i) => {
+              const isVN = (ev.parties ?? []).includes("VN");
+              return (
+                <div key={i} className={`border-l-2 pl-3 ${isVN ? "border-ok" : "border-line"}`}>
+                  <div className="text-xs text-mute">
+                    {ev.date ? formatDate(ev.date) : ""}
+                    {ev.gazette ? ` · Gaz ${ev.gazette}` : ""}
                   </div>
-                );
-              })
-            )}
-          </div>
-        </Card>
-      </div>
+                  <div className="text-sm text-ink-2">{cleanEventType(ev.type)}</div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </Card>
 
       {e.source_url && (
         <a

@@ -177,14 +177,18 @@ export default function MarkDetailPage() {
             </div>
           </Card>
 
-          {/* Timeline */}
-          <Card>
-            <CardHead
-              title="Procedural timeline"
-              sub="Reconstructed from gazette entries. Status flags surface deadlines automatically."
-            />
-            <Timeline events={timeline} />
-          </Card>
+          {/* Procedural timeline (gazette-derived). Madrid marks have no
+              procedural dates here; their WIPO "Prosecution timeline" (in the
+              enrichment section below) supersedes this, so hide it for them. */}
+          {!detail.enrichment && (
+            <Card>
+              <CardHead
+                title="Procedural timeline"
+                sub="Reconstructed from gazette entries. Status flags surface deadlines automatically."
+              />
+              <Timeline events={timeline} />
+            </Card>
+          )}
 
           {/* Goods & services */}
           {m.nice_classes && m.nice_classes.length > 0 && (
