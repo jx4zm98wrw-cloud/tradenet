@@ -198,8 +198,14 @@ export default function MarkDetailPage() {
                 }
               />
               {(() => {
+                // Prefer the full per-class goods text fetched from WIPO (Madrid
+                // marks — the gazette only prints a bare class list); fall back
+                // to the gazette's parsed (511) text for VN-domestic files.
+                const wipoGoods = detail.enrichment?.goods_services ?? null;
                 const perClass = parseGoodsServices(detail.raw_511_text);
-                const hasPerClassText = perClass.size > 0;
+                const goodsFor = (c: string) =>
+                  wipoGoods?.[c.padStart(2, "0")] ?? perClass.get(c) ?? null;
+                const hasPerClassText = !!wipoGoods || perClass.size > 0;
                 return (
                   <div className="px-5 py-4 space-y-3">
                     {hasPerClassText
@@ -213,7 +219,7 @@ export default function MarkDetailPage() {
                               <ClassChipFull n={c} />
                             </div>
                             <p className="text-[13px] text-ink-2 leading-relaxed whitespace-pre-wrap">
-                              {perClass.get(c) ??
+                              {goodsFor(c) ??
                                 `Nice class ${parseInt(c, 10)} (${NICE_LABELS[c] || "—"}) — no per-class text in source.`}
                             </p>
                           </div>

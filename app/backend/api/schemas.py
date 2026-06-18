@@ -103,6 +103,7 @@ class MadridEnrichmentOut(BaseModel):
     registration_date: date | None = None
     expiration_date: date | None = None
     nice_classes: list[str] | None = None
+    goods_services: dict[str, str] | None = None
     designated_countries: list[str] | None = None
     basic_registration: str | None = None
     language: str | None = None

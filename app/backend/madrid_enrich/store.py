@@ -12,7 +12,7 @@ from api.db.models import MadridRecord
 from .derive import VnStatus
 from .parser import MadridRecord as ParsedRecord
 
-PARSE_VERSION = 6
+PARSE_VERSION = 7
 
 
 async def upsert(
@@ -42,6 +42,7 @@ async def upsert(
         registration_date=rec.registration_date,
         expiration_date=rec.expiration_date,
         nice_classes=rec.nice_classes or None,
+        goods_services=rec.goods_services or None,
         designated_countries=rec.designated_countries or None,
         basic_registration=rec.basic_registration,
         language=rec.language,

@@ -287,6 +287,10 @@ export type MadridEnrichment = {
   registration_date: string | null;
   expiration_date: string | null;
   nice_classes: string[] | null;
+  /** Per-class full goods & services text from WIPO, keyed by 2-digit Nice
+   * class ({ "33": "Alcoholic beverages …" }). The gazette only has the bare
+   * class list for Madrid marks, so this is the only source of full wording. */
+  goods_services: Record<string, string> | null;
   designated_countries: string[] | null;
   basic_registration: string | null;
   language: string | null;

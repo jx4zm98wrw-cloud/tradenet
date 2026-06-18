@@ -37,6 +37,7 @@ class MadridRecord(BaseModel):
     registration_date: date | None = None
     expiration_date: date | None = None
     nice_classes: list[str] = []
+    goods_services: dict[str, str] = {}
     designated_countries: list[str] = []
     basic_registration: str | None = None
     language: str | None = None
@@ -145,6 +146,20 @@ def parse(html_src: str) -> MadridRecord:
                 classes.append(c)
         if classes:
             rec.nice_classes = classes
+
+    # Per-class goods & services full text. The first "BASICGS" goods list is the
+    # basic registration; later <dl> blocks are subsequent-designation
+    # limitations and must not override it. Within the basic list each Nice class
+    # is a <dd nice="NN"> whose English term sits in <p class="…GSTERMEN" lang="EN">.
+    basic_gs = re.search(r"<dl[^>]*\bBASICGS\b[^>]*>(.*?)</dl>", html_src, re.S | re.I)
+    gs_scope = basic_gs.group(1) if basic_gs else html_src
+    for cls, body in re.findall(
+        r'<p[^>]*GSTERMEN[^>]*nice="(\d+)"[^>]*lang="EN"[^>]*>(.*?)</p>', gs_scope, re.S | re.I
+    ):
+        text = _WS.sub(" ", _html.unescape(re.sub(r"<[^>]+>", " ", body))).strip()
+        c = f"{int(cls):02d}"
+        if text and c not in rec.goods_services:
+            rec.goods_services[c] = text
 
     # Mark text from the page title line "1266721- Clalen".
     for ln in lines[:30]:

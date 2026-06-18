@@ -19,6 +19,15 @@ def test_parses_all_nice_classes_multiclass():
     assert r.nice_classes == ["21", "32", "33"]
 
 
+def test_parses_per_class_goods_services():
+    # Full per-class goods text comes from the basic (BASICGS) goods list; later
+    # blocks are subsequent-designation limitations and must not override it.
+    r = parse(MULTICLASS_FIXTURE.read_text(encoding="utf-8"))
+    assert set(r.goods_services) == {"21", "32", "33"}
+    assert r.goods_services["33"] == "Alcoholic beverages (except beers); alcoholic cocktails."
+    assert r.goods_services["21"].startswith("Utensils and containers for household")
+
+
 def test_parses_bibliographic_scalars():
     r = _rec()
     assert r.mark_text == "Clalen"

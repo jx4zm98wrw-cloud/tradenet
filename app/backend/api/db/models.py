@@ -304,6 +304,10 @@ class MadridRecord(Base):
     expiration_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
 
     nice_classes: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    # Per-class full goods & services text from WIPO, keyed by Nice class
+    # ({"33": "Alcoholic beverages …"}). The gazette only prints a bare class
+    # list for Madrid marks, so this is the only source of the full wording.
+    goods_services: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     designated_countries: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     basic_registration: Mapped[str | None] = mapped_column(Text, nullable=True)
     language: Mapped[str | None] = mapped_column(Text, nullable=True)
