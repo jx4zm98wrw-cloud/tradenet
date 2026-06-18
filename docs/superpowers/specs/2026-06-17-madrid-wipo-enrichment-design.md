@@ -221,15 +221,18 @@ implementation. Decisions locked from that review:
   - **"WIPO Madrid record" card** — holder/address/legal-nature/representative,
     registered, expiration (+ `renewed` badge), basic registration, language,
     and **designated jurisdictions** as flag chips (VN highlighted + GRANTED).
-  - **Two-pane card (Vietnam-scoped)**: **Prosecution timeline** — only events
-    where VN is a party (IR designation → VN provisional refusal → grant →
-    renewal), with each event label stripped of its trailing member-country list
-    so it reads as a clean VN action ‖ **Vietnam status** — a single VN row
-    showing our gazette-authoritative verdict as the badge, with any WIPO
-    divergence (e.g. a provisional refusal the gazette overrode) as a muted note.
-    (Tradenet is a Vietnam product; other jurisdictions are noise here. The
-    full designated-jurisdiction set still appears as flag chips above.)
-  - **Goods & services** (511, full text).
+  - **Prosecution timeline (Vietnam-scoped, full-width)** — only events where VN
+    is a party (IR designation → VN provisional refusal → grant → renewal), each
+    label stripped of its trailing member-country list so it reads as a clean VN
+    action. VN status itself is conveyed by the headline banner, so there is no
+    separate status card; a WIPO provisional refusal the gazette later overrode
+    is visible as its own timeline event. (Tradenet is a Vietnam product; other
+    jurisdictions are noise here — the full set still appears as flag chips above.)
+    The gazette "Procedural timeline" is hidden for Madrid marks (it has no
+    procedural dates; this WIPO timeline supersedes it) and shown for domestic marks.
+  - **Goods & services** (511, full per-class text from the WIPO fetch
+    `goods_services`, keyed by Nice class; falls back to the gazette (511) text
+    for VN-domestic files).
 - **Sidebar**: `Source` gains a `● enriched` indicator; a new **Renewal watch**
   widget (next renewal due = expiration 180, “≈ N years · last renewed YYYY”).
 - **Search**: a **"Designated jurisdiction"** filter (covers VN / covers country X)
