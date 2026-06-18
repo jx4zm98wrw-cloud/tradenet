@@ -95,7 +95,9 @@ export default function MarkDetailPage() {
   if (!detail) return <SkeletonShell />;
 
   const m = detail.mark;
-  const md = markDisplay(m);
+  // Prefer the WIPO-fetched mark name when the gazette had no 540 sample
+  // (e.g. Madrid 3-D/figurative marks like "Hennessy PARADIS").
+  const md = markDisplay(m, detail.enrichment?.mark_text);
   const mc = markCategoryMeta(m.mark_category, m.record_type);
   const idLabel = m.application_number || m.certificate_number || m.madrid_number || "—";
   const idKind = m.application_number ? "Application №" : m.certificate_number ? "Certificate №" : "Madrid №";
