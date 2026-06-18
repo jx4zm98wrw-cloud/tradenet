@@ -89,9 +89,13 @@ async def test_madrid_enrichment_invariants(authed_client: AsyncClient) -> None:
     assert d["vn_granted"] <= d["validated"]
     if d["unique_irns"]:
         assert abs(d["pct_complete"] - d["validated"] / d["unique_irns"]) < 1e-9
-    # by_category covers exactly the two Madrid categories and sums to unique.
+    # by_category covers exactly the two Madrid categories. A few lineage_keys
+    # carry both a registration and a renewal row, so the per-bucket distinct
+    # counts sum to >= unique_irns (which dedupes that cross-category overlap),
+    # while no single bucket can exceed unique_irns.
     assert set(d["by_category"]) == {"madrid_registration", "madrid_renewal"}
-    assert sum(d["by_category"].values()) == d["unique_irns"]
+    assert sum(d["by_category"].values()) >= d["unique_irns"]
+    assert max(d["by_category"].values()) <= d["unique_irns"]
     # Our seeded registration IRN + its madrid_record are reflected.
     assert d["unique_irns"] >= 1
     assert d["by_category"]["madrid_registration"] >= 1

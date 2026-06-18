@@ -62,11 +62,21 @@ async def madrid_enrichment(
     validated = madrid_records rows (the durable outcome, not the cache);
     remaining = unique − validated.
     """
-    # Per-category distinct lineage_keys. A lineage_key can legitimately carry
-    # both a registration and a (later) renewal row, so we count distinct keys
-    # WITHIN each category and define unique_irns as their sum — that keeps the
-    # by_category buckets and the total mutually consistent at every snapshot
-    # (a single global count(distinct) would dedupe cross-category and break it).
+    # unique_irns is the TRUE distinct lineage_key count across BOTH Madrid
+    # categories — identical to madrid_enrich.backfill.iter_madrid_irns(), so the
+    # panel's denominator equals the sweep's work-list (the whole point of the
+    # panel). Do NOT define it as sum(by_category): a handful of keys carry both
+    # a registration and a later renewal row, and those must be counted once.
+    unique_irns = (
+        await session.execute(
+            select(func.count(distinct(Trademark.lineage_key)))
+            .where(Trademark.mark_category.in_(_MADRID_CATEGORIES))
+            .where(Trademark.lineage_key.is_not(None))
+        )
+    ).scalar_one()
+    # Per-category distinct lineage_keys, for the registration/renewal breakdown.
+    # Cross-category overlap means sum(by_category) >= unique_irns (the overlap is
+    # deduped in unique_irns but counted in each bucket it appears in).
     cat_rows = (
         await session.execute(
             select(Trademark.mark_category, func.count(distinct(Trademark.lineage_key)))
@@ -78,7 +88,6 @@ async def madrid_enrichment(
     by_category = {c: n for c, n in cat_rows}
     for c in _MADRID_CATEGORIES:
         by_category.setdefault(c, 0)
-    unique_irns = sum(by_category.values())
     validated = (
         await session.execute(select(func.count()).select_from(MadridRecord))
     ).scalar_one()
