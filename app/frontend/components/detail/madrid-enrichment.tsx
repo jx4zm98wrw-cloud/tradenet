@@ -136,6 +136,8 @@ export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
           <dd className="font-mono">{e.irn}</dd>
           <dt className="text-mute">Holder</dt>
           <dd className="font-medium text-ink">{e.holder_name ?? "—"}</dd>
+          <dt className="text-mute">Address</dt>
+          <dd>{e.holder_address ?? "—"}</dd>
           <dt className="text-mute">Country</dt>
           <dd className="flex items-center gap-1.5">
             {e.holder_country ? (

@@ -106,14 +106,23 @@ def parse(html_src: str) -> MadridRecord:
         elif code == "180" and rec.expiration_date is None:
             rec.expiration_date = _ddmmyyyy(val)
         elif code == "732" and not rec.holder_name:
-            rec.holder_address = val
             # The holder NAME is the first value line; the following lines are the
             # street / postcode / city / country. The old "split at the first
             # digit" rule mashed the name together with the street (e.g.
             # "Société Jas Hennessy & Co. rue de la Richonne F-").
             first = summary[i + 2].strip() if i + 2 < len(summary) and not _INID.match(summary[i + 2]) else ""
             rec.holder_name = first.rstrip(",") or val
-        elif code == "811" and not rec.holder_country:
+            # Address = the value with the name line removed.
+            rest = val[len(first) :].strip() if first and val.startswith(first) else val
+            rec.holder_address = rest or None
+            # Holder country = the ISO code in the trailing "(CC)" of the address
+            # (always present); 811/812 below are fallbacks.
+            cc = re.search(r"\(([A-Za-z]{2})\)\s*$", val)
+            if cc:
+                rec.holder_country = cc.group(1).upper()
+        elif code in ("811", "812") and not rec.holder_country:
+            # 811 = holder nationality, 812 = country of establishment. Either is
+            # an acceptable holder country; some records carry only one.
             rec.holder_country = val[:2].upper() if val else None
         elif code == "842" and not rec.holder_legal_status:
             rec.holder_legal_status = val

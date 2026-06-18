@@ -19,6 +19,15 @@ def test_parses_all_nice_classes_multiclass():
     assert r.nice_classes == ["21", "32", "33"]
 
 
+def test_holder_country_from_812_and_address_tail():
+    # This holder carries no (811) nationality field — only (812) "FR" and the
+    # "(FR)" tail in the (732) address. Country must still resolve to FR, and the
+    # address must be just the postal lines (no holder name).
+    r = parse(MULTICLASS_FIXTURE.read_text(encoding="utf-8"))
+    assert r.holder_country == "FR"
+    assert r.holder_address == "rue de la Richonne F-16100 Cognac (FR)"
+
+
 def test_holder_name_is_clean_not_mashed_with_address():
     # The (732) block lists the holder name on the first line, then the address
     # on following lines. The name must be just the name — not name + street
