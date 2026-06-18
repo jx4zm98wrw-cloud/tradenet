@@ -23,6 +23,7 @@ import {
   MadridTimeline,
   MadridVnBanner,
 } from "@/components/detail/madrid-enrichment";
+import { ClampedText } from "@/components/detail/clamped-text";
 import { markCategoryMeta } from "@/components/badges";
 import {
   api, countryDisplay, NICE_LABELS,
@@ -235,10 +236,13 @@ export default function MarkDetailPage() {
                             <div>
                               <ClassChipFull n={c} />
                             </div>
-                            <p className="text-[13px] text-ink-2 leading-relaxed whitespace-pre-wrap">
-                              {goodsFor(c) ??
-                                `Nice class ${parseInt(c, 10)} (${NICE_LABELS[c] || "—"}) — no per-class text in source.`}
-                            </p>
+                            {goodsFor(c) ? (
+                              <ClampedText text={goodsFor(c)!} />
+                            ) : (
+                              <p className="text-[13px] text-ink-2 leading-relaxed">
+                                {`Nice class ${parseInt(c, 10)} (${NICE_LABELS[c] || "—"}) — no per-class text in source.`}
+                              </p>
+                            )}
                           </div>
                         ))
                       : (
