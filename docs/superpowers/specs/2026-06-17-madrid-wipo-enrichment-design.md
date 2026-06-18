@@ -169,6 +169,12 @@ backfill / worker
 - Re-runs skip unchanged records via `content_hash`.
 - Parser improvements re-run from cached raw HTML with **zero WIPO requests**
   (bump `parse_version`).
+- **Mark-name backfill**: `enrich_one` also writes the WIPO mark name into
+  `trademarks.mark_sample` **only when the gazette transcribed no field-540**
+  (common for Madrid 3-D/figurative marks, e.g. "Hennessy PARADIS"). It never
+  overwrites a real gazette wordmark. This is the one place enrichment touches
+  the `trademarks` table — it makes the real mark name show in search/detail
+  (and become searchable) instead of an applicant-derived placeholder.
 
 ## 6. Fetch politeness & refresh cadence (WIPO-friendly by design)
 

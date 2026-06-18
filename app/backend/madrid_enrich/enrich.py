@@ -5,7 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import requests
+from sqlalchemy import or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from api.db.models import Trademark
 
 from .client import fetch_raw
 from .derive import derive_vn
@@ -33,4 +36,20 @@ async def enrich_one(
     rec = parse(fetched.html)
     rec.irn = irn
     vn = derive_vn(rec, gazette_accepted=gazette_accepted)
-    return await upsert(session, rec, vn, fetched.html, fetched.source_url)
+    wrote = await upsert(session, rec, vn, fetched.html, fetched.source_url)
+
+    # Backfill the gazette mark sample from the WIPO mark name when the gazette
+    # transcribed no field-540 wordmark (common for Madrid 3-D/figurative marks,
+    # e.g. "Hennessy PARADIS"). Only fills NULL/empty samples — never overwrites
+    # a real gazette wordmark. Runs every call (idempotent) so it applies even
+    # when the WIPO record itself was unchanged.
+    if rec.mark_text:
+        await session.execute(
+            update(Trademark)
+            .where(
+                Trademark.lineage_key == irn,
+                or_(Trademark.mark_sample.is_(None), Trademark.mark_sample == ""),
+            )
+            .values(mark_sample=rec.mark_text)
+        )
+    return wrote
