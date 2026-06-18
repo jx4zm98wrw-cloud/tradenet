@@ -17,7 +17,11 @@ import { markDisplay } from "@/lib/mark-display";
 import { Icon } from "@/components/icons";
 import { Timeline } from "@/components/detail/timeline";
 import { OppositionBox } from "@/components/detail/opposition-box";
-import { MadridEnrichment, MadridTimeline } from "@/components/detail/madrid-enrichment";
+import {
+  MadridEnrichment,
+  MadridJurisdictions,
+  MadridTimeline,
+} from "@/components/detail/madrid-enrichment";
 import { markCategoryMeta } from "@/components/badges";
 import {
   api, countryDisplay, NICE_LABELS,
@@ -408,6 +412,9 @@ export default function MarkDetailPage() {
               </ul>
             )}
           </Card>
+
+          {/* Designated jurisdictions (Madrid marks) — sidebar, under Raw INID. */}
+          {detail.enrichment && <MadridJurisdictions e={detail.enrichment} />}
         </aside>
       </div>
     </div>
