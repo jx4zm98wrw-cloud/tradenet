@@ -56,7 +56,9 @@ claude_csvbuilder/
 │   │                               into this same app as a `(marketing)/`
 │   │                               Route Group — see
 │   │                               design_handoff_tradenet_marketing/IMPLEMENTATION_PLAN.md
-│   ├── docker-compose.yml          Local dev stack (postgres :5435, redis :6380)
+│   ├── docker-compose.yml          Local dev stack (postgres :5435, redis :6380,
+│   │                               + optional `worker` service running the RQ
+│   │                               worker: ingest + madrid-sweep queues)
 │   └── README.md                   Setup + dev workflow
 ├── design_handoff_trademark_gazette/   In-app design reference (already implemented)
 ├── design_handoff_tradenet_marketing/  Marketing site design reference (planned)

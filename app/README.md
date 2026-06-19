@@ -82,6 +82,18 @@ The worker serves two queues: `ingest` (gazette PDFs) and `madrid` (the WIPO
 enrichment sweep). The worker must be running for the `/admin/madrid` sweep
 controls (start / pause / resume / stop / tune) to take effect.
 
+Or run it as a **managed container** (survives reboots / session-end via
+`restart: unless-stopped`):
+
+```bash
+docker compose -f app/docker-compose.yml up -d --build worker
+```
+
+The containerized worker shares the host project root (bind-mounted at `/data`,
+`TM_DATA_DIR=/data`) so `madrid_cache/` and `image/` outputs are visible to the
+host API. Run *either* the host process *or* the container — not both, or they
+race the same queues.
+
 Backfill WIPO Madrid data: `cd app/backend && python -m scripts.enrich_madrid --limit 100`  (pilot; drop `--limit` for the full sweep).
 
 ### 3. Frontend

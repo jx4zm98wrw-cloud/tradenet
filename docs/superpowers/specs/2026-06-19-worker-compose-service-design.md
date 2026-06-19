@@ -1,6 +1,6 @@
 # RQ Worker as a Managed Compose Service (Design)
 
-**Status:** Approved for planning · 2026-06-19
+**Status:** Implemented · 2026-06-19 (surfaced + fixed a latent missing `requests` runtime dep)
 
 **Goal:** Run the RQ worker as a `docker-compose` service with `restart: unless-stopped`, so it survives machine reboots and session-end — replacing the hand-launched host process that currently dies when the session ends. This makes the `/admin/madrid` sweep controls (and gazette ingest) durable.
 

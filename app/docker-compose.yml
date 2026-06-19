@@ -32,5 +32,32 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # RQ worker — runs gazette ingest (`ingest` queue) and the Madrid enrichment
+  # sweep (`madrid` queue). Containerized so it survives reboots / session-end
+  # (the API still runs on the host in dev; only the worker lives here).
+  worker:
+    build:
+      context: ./backend
+    command: python -m worker.run_worker
+    environment:
+      # Internal compose network: reach postgres/redis by service name on their
+      # container ports (NOT the host-published 5435/6380).
+      TM_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tm}:${POSTGRES_PASSWORD:-tm}@postgres:5432/${POSTGRES_DB:-tm}
+      TM_DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-tm}:${POSTGRES_PASSWORD:-tm}@postgres:5432/${POSTGRES_DB:-tm}
+      TM_REDIS_URL: redis://redis:6379/0
+      TM_SECRET_KEY: ${TM_SECRET_KEY:-dev-only-not-for-prod}
+      # data_dir auto-resolves to "/" inside the image (code at /srv/backend), so
+      # set it explicitly. The bind-mount below makes it the host project root,
+      # so madrid_cache/ + image/ are shared with the host API.
+      TM_DATA_DIR: /data
+    volumes:
+      - ../:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   tm_pgdata:
