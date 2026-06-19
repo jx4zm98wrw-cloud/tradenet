@@ -20,9 +20,11 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import (
+    CheckConstraint,
     Computed,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -420,3 +422,36 @@ class TmNameIndex(Base):
     application_number: Mapped[str] = mapped_column(String(64), primary_key=True)
     submission_date: Mapped[date | None] = mapped_column(Date)
     mark_sample: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class MadridSweepControl(Base):
+    """Singleton (id=1) control + live state for the Madrid enrichment sweep.
+
+    Written by the RQ job (worker.madrid_sweep) and the admin control endpoints;
+    read by the /admin/madrid panel. Derived coverage counts stay on the
+    /madrid-enrichment endpoint — this row is process/control state only.
+    """
+
+    __tablename__ = "madrid_sweep_control"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('idle','running','paused','stopping')",
+            name="ck_madrid_sweep_status",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)  # always 1
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="idle")
+    cap: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    delay: Mapped[float] = mapped_column(Float, nullable=False, server_default="8.0")
+    jitter: Mapped[float] = mapped_column(Float, nullable=False, server_default="2.0")
+    chunk_size: Mapped[int] = mapped_column(Integer, nullable=False, server_default="25")
+    processed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    ok: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    failed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    current_irn: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
