@@ -13,13 +13,15 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from api.db import Gazette, GazetteStatus, GazetteType, RecordType, Trademark
-from api.db.models import MadridRecord
+from api.db.models import DomesticRecord, MadridRecord
 from api.settings import get_settings
 
 _GZ = uuid.UUID("e0000000-0000-4000-8000-0000000000a3")
 _MADRID_ID = uuid.UUID("e0000000-0000-4000-8000-0000000000a4")
 _DOMESTIC_ID = uuid.UUID("e0000000-0000-4000-8000-0000000000a5")
+_DOMESTIC_ENRICH_ID = uuid.UUID("e0000000-0000-4000-8000-0000000000a6")
 _IRN = "9000001"
+_DOMESTIC_APP_NO = "4-2099-99999"
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -28,6 +30,7 @@ async def seed() -> AsyncIterator[None]:
     Session = async_sessionmaker(engine, expire_on_commit=False)
     async with Session() as s:
         await s.execute(delete(MadridRecord).where(MadridRecord.irn == _IRN))
+        await s.execute(delete(DomesticRecord).where(DomesticRecord.application_number == _DOMESTIC_APP_NO))
         await s.execute(delete(Trademark).where(Trademark.gazette_id == _GZ))
         await s.execute(delete(Gazette).where(Gazette.id == _GZ))
         await s.commit()
@@ -67,6 +70,25 @@ async def seed() -> AsyncIterator[None]:
                 record_type=RecordType.B_domestic,
                 certificate_number="VN12345",
                 application_number="4-2099-00001",
+            )
+        )
+        # Domestic row WITH a matching DomesticRecord — enrichment must be present.
+        s.add(
+            Trademark(
+                id=_DOMESTIC_ENRICH_ID,
+                gazette_id=_GZ,
+                record_type=RecordType.A,
+                application_number=_DOMESTIC_APP_NO,
+                publication_date_441=date(2099, 2, 1),
+            )
+        )
+        s.add(
+            DomesticRecord(
+                application_number=_DOMESTIC_APP_NO,
+                mark_text="VTRAVEL",
+                nice_classes=["39"],
+                goods_services={"39": "Travel"},
+                status_code="1904",
             )
         )
         s.add(
@@ -136,3 +158,22 @@ async def test_facet_vn_status(client: AsyncClient) -> None:
     assert r.status_code == 200
     buckets = {b["key"]: b["count"] for b in r.json()}
     assert buckets.get("granted", 0) >= 1
+
+
+@pytest.mark.asyncio
+async def test_domestic_detail_includes_enrichment(client: AsyncClient) -> None:
+    r = await client.get(f"/api/v1/marks/{_DOMESTIC_ENRICH_ID}")
+    assert r.status_code == 200
+    dom = r.json()["domestic"]
+    assert dom is not None
+    assert dom["mark_text"] == "VTRAVEL"
+    assert dom["goods_services"]["39"] == "Travel"
+    assert dom["status_code"] == "1904"
+
+
+@pytest.mark.asyncio
+async def test_madrid_detail_has_null_domestic(client: AsyncClient) -> None:
+    # Madrid marks have no application_number → domestic must be None.
+    r = await client.get(f"/api/v1/marks/{_MADRID_ID}")
+    assert r.status_code == 200
+    assert r.json()["domestic"] is None

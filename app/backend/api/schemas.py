@@ -86,6 +86,34 @@ class TrademarkListOut(BaseModel):
     offset: int
 
 
+class DomesticEnrichmentOut(BaseModel):
+    """NOIP domestic trademark enrichment, joined from `domestic_records` on
+    `application_number`. Detail-only — never on TrademarkOut."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    application_number: str
+    mark_text: str | None = None
+    mark_type: str | None = None
+    applicant_name: str | None = None
+    applicant_address: str | None = None
+    representative: str | None = None
+    colors: str | None = None
+    nice_classes: list[str] | None = None
+    goods_services: dict[str, str] | None = None
+    vienna_codes: list[str] | None = None
+    status_code: str | None = None
+    filing_date: date | None = None
+    publication_no: str | None = None
+    publication_date: date | None = None
+    grant_date: date | None = None
+    expiry_date: date | None = None
+    logo_url: str | None = None
+    timeline: list | None = None
+    source_url: str | None = None
+    fetched_at: datetime | None = None
+
+
 class MadridEnrichmentOut(BaseModel):
     """WIPO Madrid Monitor enrichment for a Madrid mark, joined from
     `madrid_records` on `irn == trademarks.lineage_key`. Detail-only —
