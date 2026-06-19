@@ -450,6 +450,7 @@ class MadridSweepControl(Base):
     ok: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     failed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     current_irn: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_irn: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(

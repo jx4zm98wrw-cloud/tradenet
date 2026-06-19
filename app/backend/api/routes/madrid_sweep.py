@@ -31,6 +31,7 @@ class SweepControlOut(BaseModel):
     ok: int
     failed: int
     current_irn: str | None
+    next_irn: str | None
     last_error: str | None
     started_at: datetime | None
     updated_at: datetime

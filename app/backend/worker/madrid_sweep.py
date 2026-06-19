@@ -89,18 +89,25 @@ async def run_chunk(
     http = http_session or requests.Session()
     streak = 0
     did = 0
-    for irn in todo:
+    for idx, irn in enumerate(todo):
         ctl = await _ctl(session)
         if ctl["status"] != "running":
             break
+        # The IRN the worker will fetch after this one (None at the chunk/work tail).
+        nxt = todo[idx + 1] if idx + 1 < len(todo) else None
         if ctl["cap"] is not None and ctl["processed"] >= ctl["cap"]:
-            await _set(session, status="idle", current_irn=None)
+            await _set(session, status="idle", current_irn=None, next_irn=None)
             break
         try:
             await enrich_one(session, irn, cache, http_session=http, use_cache=True)
             await session.commit()
             await _set(
-                session, ok=ctl["ok"] + 1, processed=ctl["processed"] + 1, current_irn=irn, last_error=None
+                session,
+                ok=ctl["ok"] + 1,
+                processed=ctl["processed"] + 1,
+                current_irn=irn,
+                next_irn=nxt,
+                last_error=None,
             )
             streak = 0
         except Exception as e:
@@ -111,6 +118,7 @@ async def run_chunk(
                 failed=ctl["failed"] + 1,
                 processed=ctl["processed"] + 1,
                 current_irn=irn,
+                next_irn=nxt,
                 last_error=str(e)[:300],
             )
         did += 1
@@ -124,7 +132,7 @@ async def run_chunk(
     # Continuation decision.
     ctl = await _ctl(session)
     if ctl["status"] == "stopping":
-        await _set(session, status="idle", current_irn=None)
+        await _set(session, status="idle", current_irn=None, next_irn=None)
     elif ctl["status"] == "running":
         cached_now = {p.stem for p in cache.glob("*.html")}
         remaining = [i for i in all_irns if i not in cached_now]
@@ -132,7 +140,7 @@ async def run_chunk(
         if remaining and not cap_hit:
             enqueue_next()
         else:
-            await _set(session, status="idle", current_irn=None)
+            await _set(session, status="idle", current_irn=None, next_irn=None)
     return {"status": ctl["status"], "did": did}
 
 

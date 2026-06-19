@@ -39,6 +39,7 @@ export type MadridSweepControl = {
   ok: number;
   failed: number;
   current_irn: string | null;
+  next_irn: string | null;
   last_error: string | null;
   started_at: string | null;
   updated_at: string;

@@ -212,6 +212,7 @@ function SweepControlCard() {
           <span className="font-mono text-ok">{formatNumber(s.ok)}</span> ok ·{" "}
           <span className="font-mono text-rose-600">{formatNumber(s.failed)}</span> failed
           {s.current_irn ? <> · current <span className="font-mono text-ink">{s.current_irn}</span></> : null}
+          {s.next_irn ? <> · next <span className="font-mono text-ink">{s.next_irn}</span></> : null}
         </div>
         {s.last_error ? <div className="text-[12px] text-rose-600 truncate" title={s.last_error}>last error: {s.last_error}</div> : null}
         {err ? <div className="text-[12px] text-rose-600">{err}</div> : null}
