@@ -3,6 +3,44 @@
 # in compose files. The ${VAR:-default} syntax means env vars from a `.env`
 # file (or the shell) override the bundled defaults.
 
+# Shared base for the RQ workers. We run one worker per queue (worker-ingest /
+# worker-madrid / worker-domestic) so gazette ingest and the two enrichment
+# sweeps get isolated, parallel throughput — a heavy run on one queue can never
+# starve another. Scale a queue by running N copies of its service (RQ
+# load-balances within a queue). TM_WORKER_QUEUES picks each worker's queue set.
+x-worker-base: &worker-base
+  build:
+    context: ./backend
+  command: python -m worker.run_worker
+  environment: &worker-env
+    # Internal compose network: reach postgres/redis by service name on their
+    # container ports (NOT the host-published 5435/6380).
+    TM_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tm}:${POSTGRES_PASSWORD:-tm}@postgres:5432/${POSTGRES_DB:-tm}
+    TM_DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-tm}:${POSTGRES_PASSWORD:-tm}@postgres:5432/${POSTGRES_DB:-tm}
+    TM_REDIS_URL: redis://redis:6379/0
+    TM_SECRET_KEY: ${TM_SECRET_KEY:-dev-only-not-for-prod}
+    # data_dir auto-resolves to "/" inside the image (code at /srv/backend), so
+    # set it explicitly. The bind-mount below makes it the host project root,
+    # so madrid_cache/ + domestic_cache/ + image/ are shared with the host API.
+    TM_DATA_DIR: /data
+  volumes:
+    - ../:/data
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+  # The worker serves no HTTP, so it must NOT inherit the image's API
+  # healthcheck (curl :8000/health) — that always fails ("unhealthy"). Check
+  # the worker's real lifeline instead: connectivity to its Redis queue.
+  healthcheck:
+    test: ["CMD", "python", "-c", "import os; from redis import Redis; Redis.from_url(os.environ['TM_REDIS_URL']).ping()"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+    start_period: 10s
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -32,41 +70,28 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # RQ worker — runs gazette ingest (`ingest` queue) and the Madrid enrichment
-  # sweep (`madrid` queue). Containerized so it survives reboots / session-end
-  # (the API still runs on the host in dev; only the worker lives here).
-  worker:
-    build:
-      context: ./backend
-    command: python -m worker.run_worker
+  # RQ workers — one process per queue so each sweep has isolated, parallel
+  # throughput (see x-worker-base above). Containerized so they survive reboots /
+  # session-end (the API still runs on the host in dev). To collapse back to a
+  # single all-queues worker, keep one service and set
+  # `TM_WORKER_QUEUES: ingest,madrid,domestic` on it.
+  worker-ingest:
+    <<: *worker-base
     environment:
-      # Internal compose network: reach postgres/redis by service name on their
-      # container ports (NOT the host-published 5435/6380).
-      TM_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tm}:${POSTGRES_PASSWORD:-tm}@postgres:5432/${POSTGRES_DB:-tm}
-      TM_DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-tm}:${POSTGRES_PASSWORD:-tm}@postgres:5432/${POSTGRES_DB:-tm}
-      TM_REDIS_URL: redis://redis:6379/0
-      TM_SECRET_KEY: ${TM_SECRET_KEY:-dev-only-not-for-prod}
-      # data_dir auto-resolves to "/" inside the image (code at /srv/backend), so
-      # set it explicitly. The bind-mount below makes it the host project root,
-      # so madrid_cache/ + image/ are shared with the host API.
-      TM_DATA_DIR: /data
-    volumes:
-      - ../:/data
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    # The worker serves no HTTP, so it must NOT inherit the image's API
-    # healthcheck (curl :8000/health) — that always fails ("unhealthy"). Check
-    # the worker's real lifeline instead: connectivity to its Redis queue.
-    healthcheck:
-      test: ["CMD", "python", "-c", "import os; from redis import Redis; Redis.from_url(os.environ['TM_REDIS_URL']).ping()"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+      <<: *worker-env
+      TM_WORKER_QUEUES: ingest
+
+  worker-madrid:
+    <<: *worker-base
+    environment:
+      <<: *worker-env
+      TM_WORKER_QUEUES: madrid
+
+  worker-domestic:
+    <<: *worker-base
+    environment:
+      <<: *worker-env
+      TM_WORKER_QUEUES: domestic
 
 volumes:
   tm_pgdata:

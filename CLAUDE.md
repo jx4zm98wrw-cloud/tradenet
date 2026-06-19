@@ -77,8 +77,11 @@ claude_csvbuilder/
 │   │                               Route Group — see
 │   │                               design_handoff_tradenet_marketing/IMPLEMENTATION_PLAN.md
 │   ├── docker-compose.yml          Local dev stack (postgres :5435, redis :6380,
-│   │                               + optional `worker` service running the RQ
-│   │                               worker: ingest + madrid-sweep queues)
+│   │                               + dedicated RQ workers, one per queue:
+│   │                               `worker-ingest`/`worker-madrid`/`worker-domestic`
+│   │                               (isolated parallel throughput; share an
+│   │                               `x-worker-base` anchor). run_worker reads
+│   │                               `TM_WORKER_QUEUES` — unset = all queues)
 │   └── README.md                   Setup + dev workflow
 ├── design_handoff_trademark_gazette/   In-app design reference (already implemented)
 ├── design_handoff_tradenet_marketing/  Marketing site design reference (planned)
