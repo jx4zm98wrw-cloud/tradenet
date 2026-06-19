@@ -1,15 +1,15 @@
 import pytest
 
-from domestic_enrich.client import FetchResult, fetch_raw
+from domestic_enrich.client import FetchResult, NoipBlockedError, fetch_raw
 
 _GOOD = "<html><div class='product-form-label'>(541)</div>ok</html>"
 
 
 class _Resp:
-    def __init__(self, status_code, text):
+    def __init__(self, status_code, text, headers=None):
         self.status_code = status_code
         self.text = text
-        self.headers = {}
+        self.headers = headers or {}
 
 
 class _FlakyTransport:
@@ -48,3 +48,34 @@ def test_uses_cache_without_network(tmp_path):
     res = fetch_raw("VN4202600774", tmp_path, session=t, use_cache=True)
     assert res.from_cache is True
     assert t.calls == 0
+
+
+class _BlockTransport:
+    """Always returns a block/rate-limit status (403/429)."""
+
+    def __init__(self, status: int, headers=None):
+        self.status = status
+        self.headers = headers
+        self.calls = 0
+
+    def get(self, url, headers=None, timeout=None, verify=None):
+        self.calls += 1
+        return _Resp(self.status, "Forbidden", headers=self.headers)
+
+
+@pytest.mark.parametrize("status", [403, 429])
+def test_block_status_raises_immediately_without_retry(tmp_path, status):
+    # A block is NOT the retryable flaky-500: it must raise on the FIRST attempt
+    # so the sweep pauses instead of hammering 10x and escalating to a ban.
+    t = _BlockTransport(status)
+    with pytest.raises(NoipBlockedError) as ei:
+        fetch_raw("VN4202600774", tmp_path, session=t, use_cache=False, max_attempts=10, delay=0.0)
+    assert ei.value.status == status
+    assert t.calls == 1  # exactly one request — no retries
+
+
+def test_block_429_parses_retry_after(tmp_path):
+    t = _BlockTransport(429, headers={"Retry-After": "120"})
+    with pytest.raises(NoipBlockedError) as ei:
+        fetch_raw("VN4202600774", tmp_path, session=t, use_cache=False, delay=0.0)
+    assert ei.value.retry_after == 120.0

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.db.models import Trademark
 
+from .client import NoipBlockedError
 from .enrich import enrich_one  # module attr so tests can monkeypatch
 
 log = logging.getLogger("domestic.backfill")
@@ -105,6 +106,12 @@ async def run_backfill(
                 res.written += 1
             else:
                 res.skipped += 1
+        except NoipBlockedError as exc:  # block/rate-limit → stop now, don't hammer
+            await session.rollback()
+            res.failed += 1
+            res.circuit_broke = True
+            log.error("NOIP block (HTTP %s) — halting backfill: %s", exc.status, exc)
+            break
         except Exception as exc:  # one bad mark must not kill the batch
             await session.rollback()
             res.failed += 1
