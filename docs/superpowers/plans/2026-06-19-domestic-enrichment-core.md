@@ -162,26 +162,23 @@ The NOIP server presents the wrong intermediate, so we ship the correct one. The
 
 - [ ] **Step 1: Obtain + verify the Sectigo R36 intermediate PEM**
 
-The intermediate is public. Fetch it from the leaf certificate's AIA "CA Issuers" pointer and verify its subject before trusting it:
+The intermediate is public and served by Sectigo. The exact URL is the leaf's AIA "CA Issuers" pointer — already confirmed live to be the direct Sectigo distribution URL. Fetch it, convert DER→PEM, and verify the subject before trusting it:
 
 ```bash
 cd app/backend/domestic_enrich
-# 1. Read the leaf's AIA CA-Issuers URL (the .crt the server SHOULD have sent):
-AIA=$(echo | openssl s_client -connect wipopublish.ipvietnam.gov.vn:443 \
-        -servername wipopublish.ipvietnam.gov.vn 2>/dev/null \
-      | openssl x509 -noout -text \
-      | grep -A1 "CA Issuers" | grep -oE 'https?://[^ ]+')
-echo "AIA: $AIA"
-# 2. Download it and convert DER->PEM:
-curl -sSfL "$AIA" -o _intermediate.crt
+# Confirmed (2026-06-19) AIA CA-Issuers URL for the *.ipvietnam.gov.vn leaf:
+curl -sSfL "http://crt.sectigo.com/SectigoPublicServerAuthenticationCADVR36.crt" -o _intermediate.crt
+# It is DER; convert to PEM (fall back to copy if already PEM):
 openssl x509 -inform DER -in _intermediate.crt -out _intermediate.pem 2>/dev/null \
-  || cp _intermediate.crt _intermediate.pem   # already PEM
-# 3. VERIFY the subject is the expected Sectigo R36 intermediate:
-openssl x509 -in _intermediate.pem -noout -subject
-# Expected to contain: CN = Sectigo Public Server Authentication CA DV R36
+  || cp _intermediate.crt _intermediate.pem
+# VERIFY the subject + issuer before trusting:
+openssl x509 -in _intermediate.pem -noout -subject -issuer
+# Expected:
+#   subject= ... CN = Sectigo Public Server Authentication CA DV R36
+#   issuer=  ... CN = Sectigo Public Server Authentication Root R46   (this root IS in certifi)
 ```
 
-Expected output: the subject line contains `Sectigo Public Server Authentication CA DV R36`. **If it does not, STOP** — do not commit an unverified cert; report the actual subject.
+Expected output: subject contains `Sectigo Public Server Authentication CA DV R36`, issuer is the `Root R46`. **If the subject differs, STOP** — do not commit an unverified cert; report the actual subject. (If `crt.sectigo.com` is unreachable, re-derive the URL from the leaf's AIA: `openssl s_client -connect wipopublish.ipvietnam.gov.vn:443 -servername wipopublish.ipvietnam.gov.vn </dev/null 2>/dev/null | openssl x509 -noout -text | grep -A1 'CA Issuers' | grep -oE 'https?://[^ ]+\.crt'`.)
 
 - [ ] **Step 2: Build the committed bundle (certifi roots + intermediate)**
 
@@ -791,7 +788,9 @@ NOIP status codes (e.g. `1904`) map to human labels. Keep it pure, mirroring `ma
 - Create: `app/backend/domestic_enrich/derive.py`
 - Test: `app/backend/tests/domestic_enrich/test_derive.py`
 
-- [ ] **Step 1: Confirm the status codes present in fixtures**
+> **REVISED after Task 5:** the parser proved `status_code` is **polymorphic** — NOIP renders a numeric code (e.g. `1904`) for pending apps but Vietnamese *text* (`Cấp bằng` = "granted") for granted ones. `grant_date`/`expiry_date` are reliably present on granted marks. So "granted" is derived from `grant_date` + recognizable granted-text, NOT from an invented numeric code. `STATUS_LABELS` only maps the *numeric* codes (text statuses are already human-readable and pass through).
+
+- [ ] **Step 1: Confirm the status values present in fixtures**
 
 Run:
 ```bash
@@ -799,10 +798,11 @@ cd app/backend && python -c "
 from pathlib import Path
 from domestic_enrich.parser import parse
 for f in sorted(Path('tests/fixtures/domestic').glob('VN*.html')):
-    print(f.stem, parse(f.read_text(encoding='utf-8')).status_code)
+    r = parse(f.read_text(encoding='utf-8'))
+    print(f.stem, repr(r.status_code), 'grant=', r.grant_date)
 "
 ```
-Record the codes seen; map them in Step 3. (`1904` ≈ examination/published; confirm against the page's human label text next to the code.)
+Expected (confirmed): `VN4202600774` → `'1904'`, grant=None (pending); the other two → a Vietnamese granted phrase + a real grant date. Record the exact granted phrase for `_GRANTED_TEXT` below.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -812,28 +812,47 @@ Record the codes seen; map them in Step 3. (`1904` ≈ examination/published; co
 import datetime
 
 from domestic_enrich.derive import derive_status, DomesticStatus
-from domestic_enrich.parser import DomesticRecord
+from domestic_enrich.parser import DomesticRecord, parse
+from pathlib import Path
+
+FIX = Path(__file__).parent.parent / "fixtures" / "domestic"
 
 
-def test_known_code_maps_to_label():
+def test_numeric_code_maps_to_label():
     rec = DomesticRecord(status_code="1904", grant_date=None)
     st = derive_status(rec)
     assert isinstance(st, DomesticStatus)
     assert st.code == "1904"
     assert st.label  # non-empty human label
+    assert st.is_granted is False
 
 
 def test_granted_when_grant_date_present():
-    rec = DomesticRecord(status_code="2001", grant_date=datetime.date(2025, 1, 1))
+    rec = DomesticRecord(status_code="1904", grant_date=datetime.date(2025, 1, 1))
     st = derive_status(rec)
     assert st.is_granted is True
 
 
-def test_unknown_code_keeps_code_as_label():
+def test_granted_when_status_text_says_so():
+    # NOIP renders granted as Vietnamese text, not a numeric code.
+    rec = DomesticRecord(status_code="Cấp bằng", grant_date=None)
+    st = derive_status(rec)
+    assert st.is_granted is True
+    assert st.label == "Cấp bằng"  # already human-readable → passes through
+
+
+def test_unknown_numeric_code_keeps_code_as_label():
     rec = DomesticRecord(status_code="9999")
     st = derive_status(rec)
     assert st.code == "9999"
     assert st.label == "9999"  # fall back to the raw code
+
+
+def test_derive_on_real_granted_fixture():
+    # Both 416348 / 449975 are granted (carry a grant_date) per Task 5.
+    rec = parse((FIX / "VN4202416348.html").read_text(encoding="utf-8"))
+    st = derive_status(rec)
+    assert st.is_granted is True
 ```
 
 - [ ] **Step 3: Write the implementation**
@@ -841,12 +860,14 @@ def test_unknown_code_keeps_code_as_label():
 `app/backend/domestic_enrich/derive.py`:
 
 ```python
-"""Derive a human status from a parsed DomesticRecord's NOIP status code.
+"""Derive a human status from a parsed DomesticRecord's NOIP status field.
 
-NOIP encodes prosecution state as a numeric code (e.g. 1904). We map the codes
-we have observed to labels; unknown codes fall back to the raw code so the UI
-never shows a blank. `is_granted` is true when a grant date exists OR the code
-is in the granted set. Pure — no I/O. Extend STATUS_LABELS as new codes appear.
+NOIP's status field is polymorphic: a numeric code (e.g. 1904) for pending
+applications, or Vietnamese text ("Cấp bằng" = granted) once granted. Numeric
+codes get mapped to a label via STATUS_LABELS (extend as observed); text
+statuses are already human-readable and pass through unchanged. `is_granted`
+is true when a grant date exists OR the status text is a recognized granted
+phrase. Pure — no I/O.
 """
 
 from __future__ import annotations
@@ -855,13 +876,14 @@ from pydantic import BaseModel
 
 from .parser import DomesticRecord
 
-# Confirmed against fixtures + the page's human label text. Extend as needed.
+# NUMERIC NOIP codes -> English label. Text statuses are NOT listed (they pass
+# through as their own label). Extend as the sweep surfaces more numeric codes.
 STATUS_LABELS: dict[str, str] = {
     "1904": "Under examination",
-    "2001": "Granted",
-    # add observed codes from Task 7 Step 1 here
 }
-_GRANTED_CODES = {"2001"}
+# Substrings (lowercased) that indicate a granted mark when they appear in the
+# status text. "cấp bằng" = certificate granted. Confirm/extend from Task 7 Step 1.
+_GRANTED_TEXT = ("cấp bằng", "granted")
 
 
 class DomesticStatus(BaseModel):
@@ -873,7 +895,8 @@ class DomesticStatus(BaseModel):
 def derive_status(rec: DomesticRecord) -> DomesticStatus:
     code = rec.status_code
     label = STATUS_LABELS.get(code or "", code or "Unknown")
-    is_granted = rec.grant_date is not None or (code in _GRANTED_CODES)
+    norm = (code or "").strip().lower()
+    is_granted = rec.grant_date is not None or any(g in norm for g in _GRANTED_TEXT)
     return DomesticStatus(code=code, label=label, is_granted=is_granted)
 ```
 
