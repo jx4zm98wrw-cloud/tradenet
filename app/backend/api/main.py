@@ -24,6 +24,7 @@ from .rate_limit import limiter
 from .routes import (
     admin,
     compare,
+    domestic_sweep,
     facets,
     gazettes,
     madrid_sweep,
@@ -139,6 +140,7 @@ def create_app() -> FastAPI:
     app.include_router(watchlists.router)
     app.include_router(admin.router)
     app.include_router(madrid_sweep.router)
+    app.include_router(domestic_sweep.router)
 
     # ---- Static files (extracted trademark logos) ----
     # Served under /static/image/<year>/<pdf_stem>/<id>.png. Trademark rows
