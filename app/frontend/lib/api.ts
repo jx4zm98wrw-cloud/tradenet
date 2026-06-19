@@ -29,6 +29,23 @@ export type MadridEnrichmentStats = {
   by_category: Record<string, number>;
 };
 
+export type MadridSweepControl = {
+  status: "idle" | "running" | "paused" | "stopping";
+  cap: number | null;
+  delay: number;
+  jitter: number;
+  chunk_size: number;
+  processed: number;
+  ok: number;
+  failed: number;
+  current_irn: string | null;
+  last_error: string | null;
+  started_at: string | null;
+  updated_at: string;
+};
+
+export type SweepCadence = { cap?: number | null; delay?: number; jitter?: number; chunk_size?: number };
+
 export type Trademark = {
   id: string;
   gazette_id: string;
@@ -462,6 +479,18 @@ export const api = {
   pipelineStats: () => json<PipelineStats>(`/api/v1/stats/pipeline`),
   adminCheck: () => json<AdminCheck>(`/api/v1/admin/check`),
   adminMadridStats: () => json<MadridEnrichmentStats>(`/api/v1/admin/madrid-enrichment`),
+  madridSweepStatus: () => json<MadridSweepControl>(`/api/v1/admin/madrid-sweep`),
+  madridSweepStart: (body: SweepCadence) =>
+    json<MadridSweepControl>(`/api/v1/admin/madrid-sweep/start`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
+  madridSweepPause: () => json<MadridSweepControl>(`/api/v1/admin/madrid-sweep/pause`, { method: "POST" }),
+  madridSweepResume: () => json<MadridSweepControl>(`/api/v1/admin/madrid-sweep/resume`, { method: "POST" }),
+  madridSweepStop: () => json<MadridSweepControl>(`/api/v1/admin/madrid-sweep/stop`, { method: "POST" }),
+  madridSweepConfig: (body: SweepCadence) =>
+    json<MadridSweepControl>(`/api/v1/admin/madrid-sweep/config`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
   uploadGazette: (file: File): Promise<Gazette> => {
     const fd = new FormData();
     fd.append("file", file);
