@@ -9,6 +9,15 @@ import type { DomesticEnrichment as DomesticEnrichmentData } from "@/lib/api";
 import { Card, CardHead, Pill } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 
+// NOIP timeline dates are `dd.mm.yyyy` strings (not ISO like the structured
+// biblio dates), so `new Date("08.01.2026")` misreads them (→ "Aug 1" or
+// "Invalid Date"). Convert to ISO before formatting; pass through anything that
+// isn't dd.mm.yyyy rather than rendering "Invalid Date".
+function formatNoipDate(raw: string): string {
+  const m = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  return m ? formatDate(`${m[3]}-${m[2]}-${m[1]}`) : raw;
+}
+
 // Render a label/value row in the <dl> grid, skipping null/empty values.
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
@@ -65,7 +74,7 @@ export function DomesticTimeline({ e }: { e: DomesticEnrichmentData }) {
           return (
             <div key={i} className="border-l-2 border-ok pl-3">
               {date && (
-                <div className="text-xs text-mute">{formatDate(date)}</div>
+                <div className="text-xs text-mute">{formatNoipDate(date)}</div>
               )}
               {eventName && (
                 <div className="text-sm text-ink-2">{eventName}</div>
