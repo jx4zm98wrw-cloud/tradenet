@@ -380,6 +380,14 @@ class DomesticRecord(Base):
     content_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     parse_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
 
+    __table_args__ = (
+        Index(
+            "ix_domestic_records_vienna_codes",
+            "vienna_codes",
+            postgresql_using="gin",
+        ),
+    )
+
 
 class UserRole(enum.StrEnum):
     """RBAC roles. Sorted from most privileged to least.
