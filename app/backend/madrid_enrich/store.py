@@ -12,7 +12,7 @@ from api.db.models import MadridRecord
 from .derive import VnStatus
 from .parser import MadridRecord as ParsedRecord
 
-PARSE_VERSION = 9
+PARSE_VERSION = 10  # 10: extract goods_services in any language (was English-only)
 
 
 async def upsert(
