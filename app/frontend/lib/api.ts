@@ -164,7 +164,7 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
   // Lazy import to avoid pulling auth into the module-load graph for tests
   // that don't go through the API. Also dodges a potential circular-import
   // with auth.ts if it ever needs `api` for something.
-  const { getAccessToken, refresh } = await import("./auth");
+  const { getAccessToken, refresh, refreshInFlight } = await import("./auth");
 
   const withAuth = (): RequestInit => {
     const token = getAccessToken();
@@ -172,6 +172,14 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
     if (token) headers.set("Authorization", `Bearer ${token}`);
     return { ...init, headers, credentials: "include" };
   };
+
+  // If the access token isn't set yet but a refresh is already in flight (app
+  // boot, or another call just triggered one), wait for it — otherwise we'd fire
+  // a tokenless request that 401s and triggers a *second*, redundant refresh.
+  if (!getAccessToken() && !url.includes("/auth/")) {
+    const pending = refreshInFlight();
+    if (pending) await pending;
+  }
 
   let r = await fetch(url, withAuth());
   // 401 → try to refresh the access token once, then retry. If refresh fails
