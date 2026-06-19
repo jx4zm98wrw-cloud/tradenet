@@ -60,9 +60,19 @@ claude_csvbuilder/
 │   │   │                           `domestic` queue; admin start/pause/resume/
 │   │   │                           stop/tune at /api/v1/admin/domestic-sweep
 │   │   │                           (worker must be running).
-│   │   │                           Remaining piece: Plan C (frontend
-│   │   │                           /admin/domestic panel + detail-page
-│   │   │                           surfacing of domestic_records data).
+│   │   │                           Frontend surfacing COMPLETE (Plans A+B+C
+│   │   │                           done): /admin/domestic ops panel (coverage
+│   │   │                           stats + sweep start/pause/resume/stop/tune);
+│   │   │                           mark API returns `domestic` field joined from
+│   │   │                           `domestic_records`; `DomesticEnrichment`
+│   │   │                           block on the mark detail page shows NOIP-
+│   │   │                           authoritative applicant/address, goods &
+│   │   │                           services (per-class, fed into GoodsServices),
+│   │   │                           Vienna codes, colors, status, filing/
+│   │   │                           publication/grant/expiry dates, and a
+│   │   │                           `DomesticTimeline` prosecution timeline card.
+│   │   │                           Mark-name fallback chain extended to also use
+│   │   │                           `domestic.mark_text`. Domestic epic complete.
 │   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
 │   │   ├── alembic/                Migrations
 │   │   ├── scripts/                One-off scripts (smoke_ingest.py)
