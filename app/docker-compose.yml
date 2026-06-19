@@ -58,6 +58,15 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    # The worker serves no HTTP, so it must NOT inherit the image's API
+    # healthcheck (curl :8000/health) — that always fails ("unhealthy"). Check
+    # the worker's real lifeline instead: connectivity to its Redis queue.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; from redis import Redis; Redis.from_url(os.environ['TM_REDIS_URL']).ping()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   tm_pgdata:
