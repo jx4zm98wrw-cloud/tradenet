@@ -22,8 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import similarity as sim
 from ..db import RecordType, Trademark, Watchlist, get_session
-from ..db.models import MadridRecord
-from ..schemas import MadridEnrichmentOut, TrademarkOut
+from ..db.models import DomesticRecord, MadridRecord
+from ..schemas import DomesticEnrichmentOut, MadridEnrichmentOut, TrademarkOut
 from ..settings import get_settings
 from .today import DEMO_TODAY, _opp_close_date
 
@@ -50,6 +50,10 @@ class MarkDetailOut(BaseModel):
     # madrid_records row (joined on lineage_key). None for domestic marks
     # and for Madrid marks not yet enriched — never fabricated.
     enrichment: MadridEnrichmentOut | None = None
+    # NOIP domestic enrichment, present only for domestic marks that have a
+    # domestic_records row (joined on application_number). None for Madrid
+    # marks and for domestic marks not yet enriched — never fabricated.
+    domestic: DomesticEnrichmentOut | None = None
 
 
 @router.get("/{id}", response_model=MarkDetailOut)
@@ -62,10 +66,19 @@ async def get_mark(id: uuid.UUID, session: AsyncSession = Depends(get_session)) 
         rec = await session.get(MadridRecord, m.lineage_key)
         if rec is not None:
             enrichment = MadridEnrichmentOut.model_validate(rec)
-    return _build_detail(m, enrichment)
+    domestic = None
+    if m.application_number:
+        drec = await session.get(DomesticRecord, m.application_number)
+        if drec is not None:
+            domestic = DomesticEnrichmentOut.model_validate(drec)
+    return _build_detail(m, enrichment, domestic)
 
 
-def _build_detail(m: Trademark, enrichment: MadridEnrichmentOut | None = None) -> MarkDetailOut:
+def _build_detail(
+    m: Trademark,
+    enrichment: MadridEnrichmentOut | None = None,
+    domestic: DomesticEnrichmentOut | None = None,
+) -> MarkDetailOut:
     today = DEMO_TODAY
     opp_ends, opp_left, opp_open = None, None, False
     if m.record_type == RecordType.A and m.publication_date_441:
@@ -87,6 +100,7 @@ def _build_detail(m: Trademark, enrichment: MadridEnrichmentOut | None = None) -
         statusTone=status_tone,
         raw_511_text=m.raw_511_text,
         enrichment=enrichment,
+        domestic=domestic,
     )
 
 

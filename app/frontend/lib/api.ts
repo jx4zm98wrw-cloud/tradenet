@@ -300,6 +300,56 @@ export type ScoredSearchParams = SearchParams & {
   sort?: SortKey;
 };
 
+/** NOIP domestic enrichment for a domestic mark. Detail-only —
+ * never on the lean list/search Trademark shape. */
+export type DomesticEnrichment = {
+  application_number: string;
+  mark_text: string | null;
+  mark_type: string | null;
+  applicant_name: string | null;
+  applicant_address: string | null;
+  representative: string | null;
+  colors: string | null;
+  nice_classes: string[] | null;
+  goods_services: Record<string, string> | null;
+  vienna_codes: string[] | null;
+  status_code: string | null;
+  filing_date: string | null;
+  publication_no: string | null;
+  publication_date: string | null;
+  grant_date: string | null;
+  expiry_date: string | null;
+  logo_url: string | null;
+  timeline: Array<Record<string, unknown>> | null;
+  source_url: string | null;
+  fetched_at: string | null;
+};
+
+export type DomesticEnrichmentStats = {
+  unique_appnos: number;
+  validated: number;
+  remaining: number;
+  pct_complete: number; // 0..1
+  granted: number;
+  by_category: Record<string, number>;
+};
+
+export type DomesticSweepControl = {
+  status: "idle" | "running" | "paused" | "stopping";
+  cap: number | null;
+  delay: number;
+  jitter: number;
+  chunk_size: number;
+  processed: number;
+  ok: number;
+  failed: number;
+  current_appno: string | null;
+  next_appno: string | null;
+  last_error: string | null;
+  started_at: string | null;
+  updated_at: string;
+};
+
 /** WIPO Madrid Monitor enrichment for a Madrid mark, joined from
  * `madrid_records` on `irn == trademarks.lineage_key`. Detail-only —
  * never on the lean list/search Trademark shape. */
@@ -346,6 +396,8 @@ export type MarkDetail = {
   raw_511_text: string | null;
   /** WIPO Madrid enrichment — present only for enriched Madrid marks. */
   enrichment: MadridEnrichment | null;
+  /** NOIP domestic enrichment — present only for enriched domestic marks. */
+  domestic: DomesticEnrichment | null;
 };
 
 export type TimelineEvent = {
@@ -490,6 +542,19 @@ export const api = {
   madridSweepStop: () => json<MadridSweepControl>(`/api/v1/admin/madrid-sweep/stop`, { method: "POST" }),
   madridSweepConfig: (body: SweepCadence) =>
     json<MadridSweepControl>(`/api/v1/admin/madrid-sweep/config`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
+  adminDomesticStats: () => json<DomesticEnrichmentStats>(`/api/v1/admin/domestic-enrichment`),
+  domesticSweepStatus: () => json<DomesticSweepControl>(`/api/v1/admin/domestic-sweep`),
+  domesticSweepStart: (body: SweepCadence) =>
+    json<DomesticSweepControl>(`/api/v1/admin/domestic-sweep/start`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
+  domesticSweepPause: () => json<DomesticSweepControl>(`/api/v1/admin/domestic-sweep/pause`, { method: "POST" }),
+  domesticSweepResume: () => json<DomesticSweepControl>(`/api/v1/admin/domestic-sweep/resume`, { method: "POST" }),
+  domesticSweepStop: () => json<DomesticSweepControl>(`/api/v1/admin/domestic-sweep/stop`, { method: "POST" }),
+  domesticSweepConfig: (body: SweepCadence) =>
+    json<DomesticSweepControl>(`/api/v1/admin/domestic-sweep/config`, {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }),
   uploadGazette: (file: File): Promise<Gazette> => {

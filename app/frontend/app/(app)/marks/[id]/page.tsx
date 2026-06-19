@@ -23,6 +23,7 @@ import {
   MadridTimeline,
   MadridVnBanner,
 } from "@/components/detail/madrid-enrichment";
+import { DomesticEnrichment, DomesticTimeline } from "@/components/detail/domestic-enrichment";
 import { ClampedText } from "@/components/detail/clamped-text";
 import { markCategoryMeta } from "@/components/badges";
 import {
@@ -165,7 +166,7 @@ export default function MarkDetailPage() {
   const m = detail.mark;
   // Prefer the WIPO-fetched mark name when the gazette had no 540 sample
   // (e.g. Madrid 3-D/figurative marks like "Hennessy PARADIS").
-  const md = markDisplay(m, detail.enrichment?.mark_text);
+  const md = markDisplay(m, detail.enrichment?.mark_text ?? detail.domestic?.mark_text);
   const mc = markCategoryMeta(m.mark_category, m.record_type);
   const idLabel = m.application_number || m.certificate_number || m.madrid_number || "—";
   const idKind = m.application_number ? "Application №" : m.certificate_number ? "Certificate №" : "Madrid №";
@@ -251,10 +252,10 @@ export default function MarkDetailPage() {
             </div>
           </Card>
 
-          {/* Procedural timeline (gazette-derived). Madrid marks have no
-              procedural dates here; their WIPO "Prosecution timeline" (in the
-              enrichment section below) supersedes this, so hide it for them. */}
-          {!detail.enrichment && (
+          {/* Procedural timeline (gazette-derived). Madrid and domestic-enriched
+              marks have their own NOIP/WIPO prosecution timeline below, so hide
+              the gazette-derived one for them. */}
+          {!detail.enrichment && !detail.domestic && (
             <Card>
               <CardHead
                 title="Procedural timeline"
@@ -270,6 +271,9 @@ export default function MarkDetailPage() {
           {/* WIPO Prosecution timeline — above Goods & services. */}
           {detail.enrichment && <MadridTimeline e={detail.enrichment} />}
 
+          {/* NOIP domestic prosecution timeline — above Goods & services. */}
+          {detail.domestic && <DomesticTimeline e={detail.domestic} />}
+
           {/* Goods & services */}
           {m.nice_classes && m.nice_classes.length > 0 && (
             <Card>
@@ -283,7 +287,7 @@ export default function MarkDetailPage() {
               />
               <GoodsServices
                 classes={m.nice_classes!}
-                wipoGoods={detail.enrichment?.goods_services ?? null}
+                wipoGoods={detail.enrichment?.goods_services ?? detail.domestic?.goods_services ?? null}
                 raw511={detail.raw_511_text ?? null}
               />
             </Card>
@@ -291,6 +295,9 @@ export default function MarkDetailPage() {
 
           {/* WIPO Madrid enrichment — only for enriched Madrid marks */}
           {detail.enrichment && <MadridEnrichment e={detail.enrichment} />}
+
+          {/* NOIP domestic enrichment — only for enriched domestic marks */}
+          {detail.domestic && <DomesticEnrichment e={detail.domestic} />}
 
           {/* Similar marks */}
           {similar.length > 0 && (
