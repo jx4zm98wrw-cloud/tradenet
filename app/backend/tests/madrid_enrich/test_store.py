@@ -23,9 +23,7 @@ async def test_upsert_inserts_then_skips_unchanged(db_session):
     wrote = await upsert(db_session, rec, vn, html, url)
     assert wrote is True
 
-    row = (
-        await db_session.execute(select(MadridRecord).where(MadridRecord.irn == "1266721"))
-    ).scalar_one()
+    row = (await db_session.execute(select(MadridRecord).where(MadridRecord.irn == "1266721"))).scalar_one()
     assert row.holder_name == "Interojo Inc."
     assert row.vn_status == "granted"
     assert "VN" in row.designated_countries

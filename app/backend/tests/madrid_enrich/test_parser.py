@@ -94,8 +94,9 @@ def test_designation_status_per_country():
 
 
 def test_old_record_with_9sexies_designations_includes_vn():
-    from madrid_enrich.parser import parse
     from pathlib import Path
+
+    from madrid_enrich.parser import parse
 
     html = (Path(__file__).parent.parent / "fixtures" / "madrid" / "0183259.html").read_text(encoding="utf-8")
     r = parse(html)

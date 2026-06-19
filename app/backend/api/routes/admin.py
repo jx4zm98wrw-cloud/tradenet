@@ -60,7 +60,7 @@ async def madrid_enrichment(
 
     unique_irns = distinct Madrid lineage_keys (= the sweep's work-list);
     validated = madrid_records rows (the durable outcome, not the cache);
-    remaining = unique − validated.
+    remaining = unique - validated.
     """
     # unique_irns is the TRUE distinct lineage_key count across BOTH Madrid
     # categories — identical to madrid_enrich.backfill.iter_madrid_irns(), so the
@@ -88,9 +88,7 @@ async def madrid_enrichment(
     by_category = {c: n for c, n in cat_rows}
     for c in _MADRID_CATEGORIES:
         by_category.setdefault(c, 0)
-    validated = (
-        await session.execute(select(func.count()).select_from(MadridRecord))
-    ).scalar_one()
+    validated = (await session.execute(select(func.count()).select_from(MadridRecord))).scalar_one()
     vn_granted = (
         await session.execute(
             select(func.count()).select_from(MadridRecord).where(MadridRecord.vn_status == "granted")

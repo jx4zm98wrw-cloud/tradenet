@@ -11,9 +11,9 @@ from __future__ import annotations
 import asyncio
 import random
 import time
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
 
 import requests
 from redis import Redis
@@ -50,8 +50,14 @@ async def _ctl(session: AsyncSession) -> dict:
     row = (
         await session.execute(
             select(
-                C.status, C.cap, C.delay, C.jitter, C.chunk_size,
-                C.processed, C.ok, C.failed,
+                C.status,
+                C.cap,
+                C.delay,
+                C.jitter,
+                C.chunk_size,
+                C.processed,
+                C.ok,
+                C.failed,
             ).where(C.id == 1)
         )
     ).one()
@@ -59,7 +65,7 @@ async def _ctl(session: AsyncSession) -> dict:
 
 
 async def _set(session: AsyncSession, **vals) -> None:
-    vals["updated_at"] = datetime.now(timezone.utc)
+    vals["updated_at"] = datetime.now(UTC)
     await session.execute(update(C).where(C.id == 1).values(**vals))
     await session.commit()
 
@@ -93,18 +99,23 @@ async def run_chunk(
         try:
             await enrich_one(session, irn, cache, http_session=http, use_cache=True)
             await session.commit()
-            await _set(session, ok=ctl["ok"] + 1, processed=ctl["processed"] + 1,
-                       current_irn=irn, last_error=None)
+            await _set(
+                session, ok=ctl["ok"] + 1, processed=ctl["processed"] + 1, current_irn=irn, last_error=None
+            )
             streak = 0
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             await session.rollback()
             streak += 1
-            await _set(session, failed=ctl["failed"] + 1, processed=ctl["processed"] + 1,
-                       current_irn=irn, last_error=str(e)[:300])
+            await _set(
+                session,
+                failed=ctl["failed"] + 1,
+                processed=ctl["processed"] + 1,
+                current_irn=irn,
+                last_error=str(e)[:300],
+            )
         did += 1
         if streak >= _MAX_CONSECUTIVE:
-            await _set(session, status="paused",
-                       last_error=f"circuit breaker: {streak} consecutive failures")
+            await _set(session, status="paused", last_error=f"circuit breaker: {streak} consecutive failures")
             break
         if did >= ctl["chunk_size"]:
             break

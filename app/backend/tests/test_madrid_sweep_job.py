@@ -12,9 +12,9 @@ import pytest_asyncio
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+import worker.madrid_sweep as ms
 from api.db.models import MadridSweepControl
 from api.settings import get_settings
-import worker.madrid_sweep as ms
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -29,9 +29,17 @@ async def _restore_singleton():
         await s.execute(delete(MadridSweepControl))
         await s.execute(
             insert(MadridSweepControl).values(
-                id=1, status="idle", cap=None, delay=8.0, jitter=2.0,
-                chunk_size=25, processed=0, ok=0, failed=0,
-                current_irn=None, last_error=None,
+                id=1,
+                status="idle",
+                cap=None,
+                delay=8.0,
+                jitter=2.0,
+                chunk_size=25,
+                processed=0,
+                ok=0,
+                failed=0,
+                current_irn=None,
+                last_error=None,
             )
         )
         await s.commit()
@@ -51,8 +59,9 @@ class _EmptyCache:
 
 async def _reset(session, **vals) -> None:
     await session.execute(delete(MadridSweepControl))
-    base = dict(id=1, status="running", cap=None, delay=0.0, jitter=0.0,
-                chunk_size=2, processed=0, ok=0, failed=0)
+    base = dict(
+        id=1, status="running", cap=None, delay=0.0, jitter=0.0, chunk_size=2, processed=0, ok=0, failed=0
+    )
     base.update(vals)
     await session.execute(insert(MadridSweepControl).values(**base))
     await session.commit()
@@ -72,7 +81,9 @@ async def test_run_chunk_processes_chunk_and_reenqueues(db_session, monkeypatch)
     calls = []
     out = await ms.run_chunk(db_session, enqueue_next=lambda: calls.append(1))
 
-    row = (await db_session.execute(select(MadridSweepControl).where(MadridSweepControl.id == 1))).scalar_one()
+    row = (
+        await db_session.execute(select(MadridSweepControl).where(MadridSweepControl.id == 1))
+    ).scalar_one()
     assert out["did"] == 2
     assert row.ok == 2 and row.processed == 2
     assert calls == [1]
@@ -113,8 +124,10 @@ async def test_run_chunk_circuit_breaker_pauses(db_session, monkeypatch):
     monkeypatch.setattr(ms, "iter_madrid_irns", lambda s: _aslist([f"A{i}" for i in range(10)]))
     monkeypatch.setattr(ms, "_cache_dir", lambda: _EmptyCache())
 
-    out = await ms.run_chunk(db_session, enqueue_next=lambda: None)
-    row = (await db_session.execute(select(MadridSweepControl).where(MadridSweepControl.id == 1))).scalar_one()
+    await ms.run_chunk(db_session, enqueue_next=lambda: None)
+    row = (
+        await db_session.execute(select(MadridSweepControl).where(MadridSweepControl.id == 1))
+    ).scalar_one()
     assert row.status == "paused"
     assert row.failed >= 5
     assert "circuit breaker" in (row.last_error or "")

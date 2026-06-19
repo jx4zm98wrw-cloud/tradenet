@@ -7,7 +7,7 @@ _enqueue_chunk so it can be monkeypatched in tests (no redis/worker needed).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -50,8 +50,9 @@ def _enqueue_chunk() -> None:
     from redis import Redis
     from rq import Queue
 
-    from ..settings import get_settings
     from worker.madrid_sweep import JOB_TIMEOUT, QUEUE_NAME, run_sweep_chunk
+
+    from ..settings import get_settings
 
     Queue(QUEUE_NAME, connection=Redis.from_url(get_settings().redis_url)).enqueue(
         run_sweep_chunk, job_timeout=JOB_TIMEOUT
@@ -59,13 +60,11 @@ def _enqueue_chunk() -> None:
 
 
 async def _row(session: AsyncSession) -> MadridSweepControl:
-    return (
-        await session.execute(select(MadridSweepControl).where(MadridSweepControl.id == 1))
-    ).scalar_one()
+    return (await session.execute(select(MadridSweepControl).where(MadridSweepControl.id == 1))).scalar_one()
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @router.get("", response_model=SweepControlOut)
