@@ -8,10 +8,34 @@ the work-list deterministic.
 from __future__ import annotations
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import delete, insert, select, update
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from api.db.models import MadridSweepControl
+from api.settings import get_settings
 import worker.madrid_sweep as ms
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _restore_singleton():
+    """These tests mutate-and-commit the singleton control row (id=1). Restore it
+    to clean idle defaults on teardown so a full-suite run never leaves the
+    shared dev DB's live sweep state corrupted (e.g. paused on synthetic IRNs)."""
+    yield
+    engine = create_async_engine(get_settings().database_url)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    async with Session() as s:
+        await s.execute(delete(MadridSweepControl))
+        await s.execute(
+            insert(MadridSweepControl).values(
+                id=1, status="idle", cap=None, delay=8.0, jitter=2.0,
+                chunk_size=25, processed=0, ok=0, failed=0,
+                current_irn=None, last_error=None,
+            )
+        )
+        await s.commit()
+    await engine.dispose()
 
 
 async def _aslist(items):
