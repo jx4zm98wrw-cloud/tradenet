@@ -129,9 +129,20 @@ def _score(
         ql = q.lower()
         wordmark = (mark.mark_sample or "").lower()
         bag = wordmark + " " + (mark.applicant_name or "").lower()
-        if wordmark == ql:
+        # ID/number fields are matched by build_trademark_where too (application
+        # / certificate / madrid number). A query that hits one is an identifier
+        # lookup, not a fuzzy name match — score it as strong as a wordmark hit
+        # so the similarity threshold never filters an exact registration-number
+        # search out of the results (the row matched the WHERE but otherwise
+        # scored ~0.6 and got dropped, producing "1 match" + "No matches").
+        ids = [
+            (mark.application_number or "").lower(),
+            (mark.certificate_number or "").lower(),
+            (mark.madrid_number or "").lower(),
+        ]
+        if wordmark == ql or ql in ids:
             base = 0.98
-        elif ql in wordmark:
+        elif ql in wordmark or any(i and ql in i for i in ids):
             base = 0.92
         elif ql in bag:
             base = 0.78
