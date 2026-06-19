@@ -29,6 +29,7 @@ from api.db.models import DomesticSweepControl as C
 from api.db.session import async_session
 from api.settings import get_settings
 from domestic_enrich.backfill import iter_domestic_appnos
+from domestic_enrich.client import NoipBlockedError
 from domestic_enrich.enrich import enrich_one
 from domestic_enrich.idmap import appno_to_vnid
 
@@ -106,6 +107,20 @@ async def run_chunk(
                 last_error=None,
             )
             streak = 0
+        except NoipBlockedError as e:
+            # A block / rate-limit is not transient flakiness — stop NOW rather
+            # than work through the rest of the chunk and risk a hard ban. Pause
+            # the whole sweep so an operator can cool down and resume slower.
+            await session.rollback()
+            await _set(
+                session,
+                status="paused",
+                failed=ctl["failed"] + 1,
+                current_appno=appno,
+                next_appno=nxt,
+                last_error=f"NOIP block (HTTP {e.status}) — paused; cool down before resuming",
+            )
+            break
         except Exception as e:
             await session.rollback()
             streak += 1
