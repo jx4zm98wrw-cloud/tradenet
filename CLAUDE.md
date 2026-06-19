@@ -43,6 +43,16 @@ claude_csvbuilder/
 │   │   │                           `madrid` queue; admin start/pause/resume/
 │   │   │                           stop/tune at /api/v1/admin/madrid-sweep
 │   │   │                           (worker must be running).
+│   │   ├── domestic_enrich/        NOIP (IP Vietnam) domestic enrichment package
+│   │   │                           (idmap/client/parser/derive/store/enrich/backfill).
+│   │   │                           Populates `domestic_records` (keyed by
+│   │   │                           `application_number`, soft-joined to
+│   │   │                           `trademarks.application_number`) with
+│   │   │                           NOIP-fetched bibliographic data. Fetch client
+│   │   │                           ships a committed Sectigo R36 CA bundle to fix
+│   │   │                           NOIP's broken TLS chain and retries the flaky
+│   │   │                           cluster. Controllable sweep, admin panel, and
+│   │   │                           detail-page surfacing are pending (Plans B & C).
 │   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
 │   │   ├── alembic/                Migrations
 │   │   ├── scripts/                One-off scripts (smoke_ingest.py)
