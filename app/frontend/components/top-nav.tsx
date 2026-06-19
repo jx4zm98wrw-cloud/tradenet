@@ -17,6 +17,7 @@ const TABS = [
   { href: "/watchlists", label: "Watchlists", match: (p: string) => p.startsWith("/watchlists") },
   { href: "/admin/gazettes", label: "Gazettes", match: (p: string) => p.startsWith("/admin/gazettes") || p.startsWith("/gazettes") },
   { href: "/admin/madrid", label: "Madrid", match: (p: string) => p.startsWith("/admin/madrid") },
+  { href: "/admin/domestic", label: "Domestic", match: (p: string) => p.startsWith("/admin/domestic") },
 ];
 
 export function TopNav() {
