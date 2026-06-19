@@ -165,13 +165,24 @@ def parse(html_src: str) -> MadridRecord:
     # is a <dd nice="NN"> whose English term sits in <p class="…GSTERMEN" lang="EN">.
     basic_gs = re.search(r"<dl[^>]*\bBASICGS\b[^>]*>(.*?)</dl>", html_src, re.S | re.I)
     gs_scope = basic_gs.group(1) if basic_gs else html_src
-    for cls, body in re.findall(
-        r'<p[^>]*GSTERMEN[^>]*nice="(\d+)"[^>]*lang="EN"[^>]*>(.*?)</p>', gs_scope, re.S | re.I
+    # WIPO publishes each Nice class's goods term as <p class="…gsterm…GSTERM<LANG>…"
+    # nice="NN" lang="XX">. Collect every language, then prefer the English
+    # translation but fall back to whatever WIPO provides: French-origin marks
+    # (e.g. ROLEX's "ESPRIT D'ENTREPRISE") carry goods only as GSTERMFR/lang="FR".
+    # Matching only GSTERMEN/lang="EN" silently dropped per-class detail for every
+    # non-English-origin Madrid mark.
+    by_class: dict[str, dict[str, str]] = {}
+    for cls, lang, body in re.findall(
+        r'<p[^>]*\bgsterm\b[^>]*nice="(\d+)"[^>]*lang="([A-Za-z]{2})"[^>]*>(.*?)</p>',
+        gs_scope,
+        re.S | re.I,
     ):
         text = _WS.sub(" ", _html.unescape(re.sub(r"<[^>]+>", " ", body))).strip()
-        c = f"{int(cls):02d}"
-        if text and c not in rec.goods_services:
-            rec.goods_services[c] = text
+        if text:
+            by_class.setdefault(f"{int(cls):02d}", {})[lang.upper()] = text
+    for c, langs in by_class.items():
+        if c not in rec.goods_services:
+            rec.goods_services[c] = langs.get("EN") or next(iter(langs.values()))
 
     # Mark text from the page title line "1266721- Clalen".
     for ln in lines[:30]:
