@@ -41,7 +41,7 @@ def fetch_raw(
     vnid: str,
     cache_dir: Path,
     *,
-    session: requests.Session | object | None = None,
+    session: requests.Session | None = None,
     use_cache: bool = True,
     max_attempts: int = 10,
     delay: float = 1.5,
@@ -59,11 +59,11 @@ def fetch_raw(
         return FetchResult(vnid=vnid, html=path.read_text(encoding="utf-8"), source_url=url, from_cache=True)
 
     s = session if session is not None else requests.Session()
-    last_status = None
+    last_status: int | None = None
     for attempt in range(1, max_attempts + 1):
         resp = s.get(url, headers={"User-Agent": _UA}, timeout=30, verify=_CA_BUNDLE)
-        last_status = getattr(resp, "status_code", None)
-        body = getattr(resp, "text", "")
+        last_status = resp.status_code
+        body = resp.text
         if _is_valid(last_status, body):
             path.write_text(body, encoding="utf-8")
             if delay:
