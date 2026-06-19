@@ -39,6 +39,10 @@ claude_csvbuilder/
 │   │   │                           app/(app)/admin/madrid reports coverage
 │   │   │                           (unique IRNs vs validated vs remaining),
 │   │   │                           all derived live from the DB.
+│   │   │                           Sweep is a controllable RQ job on the
+│   │   │                           `madrid` queue; admin start/pause/resume/
+│   │   │                           stop/tune at /api/v1/admin/madrid-sweep
+│   │   │                           (worker must be running).
 │   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
 │   │   ├── alembic/                Migrations
 │   │   ├── scripts/                One-off scripts (smoke_ingest.py)

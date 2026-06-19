@@ -78,6 +78,10 @@ uvicorn api.main:app --reload --port 8000
 OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES python -m worker.run_worker
 ```
 
+The worker serves two queues: `ingest` (gazette PDFs) and `madrid` (the WIPO
+enrichment sweep). The worker must be running for the `/admin/madrid` sweep
+controls (start / pause / resume / stop / tune) to take effect.
+
 Backfill WIPO Madrid data: `cd app/backend && python -m scripts.enrich_madrid --limit 100`  (pilot; drop `--limit` for the full sweep).
 
 ### 3. Frontend

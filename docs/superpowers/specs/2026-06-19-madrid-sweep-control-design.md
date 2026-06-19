@@ -1,6 +1,6 @@
 # Madrid Sweep Control module (Design)
 
-**Status:** Approved for planning · 2026-06-19
+**Status:** Implemented · 2026-06-19
 
 **Goal:** Let an admin **start, pause, resume, stop, and tune** the Madrid (WIPO)
 enrichment sweep from the `/admin/madrid` page — replacing the hand-launched
