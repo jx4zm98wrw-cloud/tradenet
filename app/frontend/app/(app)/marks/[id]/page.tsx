@@ -52,6 +52,72 @@ function parseGoodsServices(raw: string | null): Map<string, string> {
   return out;
 }
 
+/** Per-class goods & services. Marks can carry up to 45 Nice classes (Madrid
+ * marks often do), so only the first 5 class blocks render by default with a
+ * "Show all N classes" toggle — otherwise the panel becomes a wall. The per-
+ * class text itself stays clamped to ~5 lines by <ClampedText>; this collapses
+ * the NUMBER of classes shown, independently of that. */
+function GoodsServices({
+  classes,
+  wipoGoods,
+  raw511,
+}: {
+  classes: string[];
+  wipoGoods: Record<string, string> | null;
+  raw511: string | null;
+}) {
+  const [showAll, setShowAll] = React.useState(false);
+  const perClass = parseGoodsServices(raw511);
+  const goodsFor = (c: string) => wipoGoods?.[c.padStart(2, "0")] ?? perClass.get(c) ?? null;
+  const hasPerClassText = !!wipoGoods || perClass.size > 0;
+
+  // VN-domestic / no per-class text: a chip row + the raw (511) blob, no collapse.
+  if (!hasPerClassText) {
+    return (
+      <div className="px-5 py-4 space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {classes.map((c) => (
+            <ClassChipFull key={c} n={c} />
+          ))}
+        </div>
+        {raw511 && (
+          <p className="text-[13px] text-ink-2 leading-relaxed whitespace-pre-wrap">{raw511}</p>
+        )}
+      </div>
+    );
+  }
+
+  const PREVIEW = 5;
+  const collapsible = classes.length > PREVIEW;
+  const visible = showAll ? classes : classes.slice(0, PREVIEW);
+  return (
+    <div className="px-5 py-4 space-y-3">
+      {visible.map((c) => (
+        <div key={c} className="grid gap-3" style={{ gridTemplateColumns: "200px 1fr" }}>
+          <div>
+            <ClassChipFull n={c} />
+          </div>
+          {goodsFor(c) ? (
+            <ClampedText text={goodsFor(c)!} />
+          ) : (
+            <p className="text-[13px] text-ink-2 leading-relaxed">
+              {`Nice class ${parseInt(c, 10)} (${NICE_LABELS[c] || "—"}) — no per-class text in source.`}
+            </p>
+          )}
+        </div>
+      ))}
+      {collapsible && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          className="text-[12.5px] font-medium text-stamp hover:text-stamp-deep"
+        >
+          {showAll ? "Show fewer" : `Show all ${classes.length} classes`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function MarkDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -215,53 +281,11 @@ export default function MarkDetailPage() {
                   </>
                 }
               />
-              {(() => {
-                // Prefer the full per-class goods text fetched from WIPO (Madrid
-                // marks — the gazette only prints a bare class list); fall back
-                // to the gazette's parsed (511) text for VN-domestic files.
-                const wipoGoods = detail.enrichment?.goods_services ?? null;
-                const perClass = parseGoodsServices(detail.raw_511_text);
-                const goodsFor = (c: string) =>
-                  wipoGoods?.[c.padStart(2, "0")] ?? perClass.get(c) ?? null;
-                const hasPerClassText = !!wipoGoods || perClass.size > 0;
-                return (
-                  <div className="px-5 py-4 space-y-3">
-                    {hasPerClassText
-                      ? m.nice_classes!.map((c) => (
-                          <div
-                            key={c}
-                            className="grid gap-3"
-                            style={{ gridTemplateColumns: "200px 1fr" }}
-                          >
-                            <div>
-                              <ClassChipFull n={c} />
-                            </div>
-                            {goodsFor(c) ? (
-                              <ClampedText text={goodsFor(c)!} />
-                            ) : (
-                              <p className="text-[13px] text-ink-2 leading-relaxed">
-                                {`Nice class ${parseInt(c, 10)} (${NICE_LABELS[c] || "—"}) — no per-class text in source.`}
-                              </p>
-                            )}
-                          </div>
-                        ))
-                      : (
-                        <>
-                          <div className="flex flex-wrap gap-2">
-                            {m.nice_classes!.map((c) => (
-                              <ClassChipFull key={c} n={c} />
-                            ))}
-                          </div>
-                          {detail.raw_511_text && (
-                            <p className="text-[13px] text-ink-2 leading-relaxed whitespace-pre-wrap">
-                              {detail.raw_511_text}
-                            </p>
-                          )}
-                        </>
-                      )}
-                  </div>
-                );
-              })()}
+              <GoodsServices
+                classes={m.nice_classes!}
+                wipoGoods={detail.enrichment?.goods_services ?? null}
+                raw511={detail.raw_511_text ?? null}
+              />
             </Card>
           )}
 
