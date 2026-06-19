@@ -61,8 +61,30 @@ export async function login(email: string, password: string): Promise<CurrentUse
   return data.user;
 }
 
-/** POST /auth/refresh. Used on app boot and proactively before token expiry. */
-export async function refresh(): Promise<CurrentUser | null> {
+// Shared in-flight refresh. Concurrent callers (e.g. several components mounting
+// at once, each hitting a 401, plus the proactive timer) must NOT each POST
+// /auth/refresh — that mints multiple tokens and races. They all await this one.
+let _refreshInflight: Promise<CurrentUser | null> | null = null;
+
+/** POST /auth/refresh. Used on app boot and proactively before token expiry.
+ * De-dups concurrent calls: while one refresh is in flight, every other caller
+ * receives the same promise instead of starting its own. */
+export function refresh(): Promise<CurrentUser | null> {
+  if (_refreshInflight) return _refreshInflight;
+  _refreshInflight = _doRefresh().finally(() => {
+    _refreshInflight = null;
+  });
+  return _refreshInflight;
+}
+
+/** The in-flight refresh promise, or null if none is running. Lets the fetch
+ * wrapper await an ongoing refresh (e.g. the app-boot refresh) before firing a
+ * tokenless request that would otherwise 401 and trigger a redundant refresh. */
+export function refreshInFlight(): Promise<CurrentUser | null> | null {
+  return _refreshInflight;
+}
+
+async function _doRefresh(): Promise<CurrentUser | null> {
   const r = await fetch("/api/v1/auth/refresh", {
     method: "POST",
     credentials: "include",
