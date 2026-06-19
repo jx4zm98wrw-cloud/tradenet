@@ -16,13 +16,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import User, require_admin, require_user
 from ..db import Trademark, get_session
-from ..db.models import MadridRecord, UserRole
+from ..db.models import DomesticRecord, MadridRecord, UserRole
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 # Madrid mark categories — must match madrid_enrich.backfill.iter_madrid_irns so
 # the panel's denominator equals the sweep's work-list.
 _MADRID_CATEGORIES = ("madrid_registration", "madrid_renewal")
+
+# Domestic mark categories — must match domestic_sweep's work-list.
+_DOMESTIC_CATEGORIES = ("domestic_application", "domestic_registration")
 
 
 class AdminCheck(BaseModel):
@@ -100,5 +103,58 @@ async def madrid_enrichment(
         remaining=max(unique_irns - validated, 0),
         pct_complete=(validated / unique_irns) if unique_irns else 0.0,
         vn_granted=vn_granted,
+        by_category=by_category,
+    )
+
+
+class DomesticEnrichmentStats(BaseModel):
+    unique_appnos: int
+    validated: int
+    remaining: int
+    pct_complete: float  # 0.0–1.0
+    granted: int
+    by_category: dict[str, int]
+
+
+@router.get("/domestic-enrichment", response_model=DomesticEnrichmentStats)
+async def domestic_enrichment(
+    _: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> DomesticEnrichmentStats:
+    """Live domestic-enrichment coverage, derived from the DB at request time.
+
+    unique_appnos = distinct domestic application_numbers (= the sweep work-list);
+    validated = domestic_records rows; remaining = unique - validated.
+    """
+    unique_appnos = (
+        await session.execute(
+            select(func.count(distinct(Trademark.application_number)))
+            .where(Trademark.mark_category.in_(_DOMESTIC_CATEGORIES))
+            .where(Trademark.application_number.is_not(None))
+        )
+    ).scalar_one()
+    cat_rows = (
+        await session.execute(
+            select(Trademark.mark_category, func.count(distinct(Trademark.application_number)))
+            .where(Trademark.mark_category.in_(_DOMESTIC_CATEGORIES))
+            .where(Trademark.application_number.is_not(None))
+            .group_by(Trademark.mark_category)
+        )
+    ).all()
+    by_category = {c: n for c, n in cat_rows}
+    for c in _DOMESTIC_CATEGORIES:
+        by_category.setdefault(c, 0)
+    validated = (await session.execute(select(func.count()).select_from(DomesticRecord))).scalar_one()
+    granted = (
+        await session.execute(
+            select(func.count()).select_from(DomesticRecord).where(DomesticRecord.grant_date.is_not(None))
+        )
+    ).scalar_one()
+    return DomesticEnrichmentStats(
+        unique_appnos=unique_appnos,
+        validated=validated,
+        remaining=max(unique_appnos - validated, 0),
+        pct_complete=(validated / unique_appnos) if unique_appnos else 0.0,
+        granted=granted,
         by_category=by_category,
     )

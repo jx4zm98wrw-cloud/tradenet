@@ -339,6 +339,56 @@ class MadridRecord(Base):
     )
 
 
+class DomesticRecord(Base):
+    """NOIP (IP Vietnam) domestic trademark detail, one row per application.
+
+    Soft-linked to trademarks via `application_number = trademarks.application_number`.
+    Hybrid storage: promoted scalar/array columns for display/filter, JSONB for
+    nested goods/timeline + the parsed `raw` payload (re-derive without re-fetch).
+    """
+
+    __tablename__ = "domestic_records"
+
+    application_number: Mapped[str] = mapped_column(Text, primary_key=True)
+
+    mark_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mark_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    applicant_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    applicant_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    representative: Mapped[str | None] = mapped_column(Text, nullable=True)
+    colors: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    nice_classes: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    goods_services: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    vienna_codes: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+
+    status_code: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    filing_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    publication_no: Mapped[str | None] = mapped_column(Text, nullable=True)
+    publication_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    grant_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+
+    logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timeline: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    raw: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    content_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parse_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+    __table_args__ = (
+        Index(
+            "ix_domestic_records_vienna_codes",
+            "vienna_codes",
+            postgresql_using="gin",
+        ),
+    )
+
+
 class UserRole(enum.StrEnum):
     """RBAC roles. Sorted from most privileged to least.
 
@@ -451,6 +501,40 @@ class MadridSweepControl(Base):
     failed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     current_irn: Mapped[str | None] = mapped_column(Text, nullable=True)
     next_irn: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class DomesticSweepControl(Base):
+    """Singleton (id=1) control + live state for the domestic enrichment sweep.
+
+    Written by the RQ job (worker.domestic_sweep) and the admin control
+    endpoints; read by the /admin/domestic panel. Derived coverage counts stay
+    on the /domestic-enrichment endpoint — this row is process/control state only.
+    """
+
+    __tablename__ = "domestic_sweep_control"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('idle','running','paused','stopping')",
+            name="ck_domestic_sweep_status",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)  # always 1
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="idle")
+    cap: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    delay: Mapped[float] = mapped_column(Float, nullable=False, server_default="5.0")
+    jitter: Mapped[float] = mapped_column(Float, nullable=False, server_default="2.0")
+    chunk_size: Mapped[int] = mapped_column(Integer, nullable=False, server_default="25")
+    processed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    ok: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    failed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    current_appno: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_appno: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
