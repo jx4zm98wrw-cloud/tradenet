@@ -29,6 +29,20 @@ claude_csvbuilder/
 │   │   │                           routes/gazettes.py and worker/ingest.py)
 │   │   ├── worker/                 RQ jobs (ingest pipeline lives here)
 │   │   ├── tm_extractor/           Vendored CSV parser (was TM_csv_builder.py)
+│   │   ├── madrid_enrich/          WIPO Madrid Monitor enrichment package
+│   │   │                           (client/parser/derive/store + enrich_one).
+│   │   │                           Populates `madrid_records` (keyed by IRN,
+│   │   │                           soft-joined to `trademarks.lineage_key`)
+│   │   │                           with WIPO-fetched Madrid bibliographic data.
+│   │   │                           Admin progress view: GET
+│   │   │                           /api/v1/admin/madrid-enrichment →
+│   │   │                           app/(app)/admin/madrid reports coverage
+│   │   │                           (unique IRNs vs validated vs remaining),
+│   │   │                           all derived live from the DB.
+│   │   │                           Sweep is a controllable RQ job on the
+│   │   │                           `madrid` queue; admin start/pause/resume/
+│   │   │                           stop/tune at /api/v1/admin/madrid-sweep
+│   │   │                           (worker must be running).
 │   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
 │   │   ├── alembic/                Migrations
 │   │   ├── scripts/                One-off scripts (smoke_ingest.py)
@@ -42,7 +56,9 @@ claude_csvbuilder/
 │   │                               into this same app as a `(marketing)/`
 │   │                               Route Group — see
 │   │                               design_handoff_tradenet_marketing/IMPLEMENTATION_PLAN.md
-│   ├── docker-compose.yml          Local dev stack (postgres :5435, redis :6380)
+│   ├── docker-compose.yml          Local dev stack (postgres :5435, redis :6380,
+│   │                               + optional `worker` service running the RQ
+│   │                               worker: ingest + madrid-sweep queues)
 │   └── README.md                   Setup + dev workflow
 ├── design_handoff_trademark_gazette/   In-app design reference (already implemented)
 ├── design_handoff_tradenet_marketing/  Marketing site design reference (planned)

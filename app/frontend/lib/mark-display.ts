@@ -85,7 +85,13 @@ export type MarkDisplay = {
   imageUrl?: string;
 };
 
-export function markDisplay(m: Pick<Trademark, "mark_sample" | "applicant_name" | "application_number" | "certificate_number" | "madrid_number" | "logo_path">): MarkDisplay {
+export function markDisplay(
+  m: Pick<Trademark, "mark_sample" | "applicant_name" | "application_number" | "certificate_number" | "madrid_number" | "logo_path">,
+  /** WIPO-fetched mark name (madrid_records.mark_text). Used as the wordmark
+   * when the gazette transcribed no field-540 sample — e.g. Madrid 3-D/
+   * figurative marks where 540 is null and the name lives only in the IR. */
+  markText?: string | null,
+): MarkDisplay {
   const id =
     m.application_number ??
     m.certificate_number ??
@@ -107,8 +113,9 @@ export function markDisplay(m: Pick<Trademark, "mark_sample" | "applicant_name" 
   if (m.logo_path) {
     const url = `/static/image/${m.logo_path}`;
     const sample = m.mark_sample?.trim();
+    const wipo = markText?.trim();
     const compacted = m.applicant_name ? compactApplicantName(m.applicant_name) : "";
-    const label = sample || compacted || id || "";
+    const label = sample || wipo || compacted || id || "";
     return { text: label, isPlaceholder: false, identifier: id, imageUrl: url };
   }
 
@@ -116,6 +123,14 @@ export function markDisplay(m: Pick<Trademark, "mark_sample" | "applicant_name" 
   if (m.mark_sample) {
     const t = m.mark_sample.trim();
     if (t.length >= 2 && t.length <= 24) {
+      return { text: t, isPlaceholder: false, identifier: id };
+    }
+  }
+
+  // 1b. WIPO-fetched mark name (Madrid marks whose gazette row carried no 540).
+  if (markText?.trim()) {
+    const t = markText.trim();
+    if (t.length >= 2) {
       return { text: t, isPlaceholder: false, identifier: id };
     }
   }

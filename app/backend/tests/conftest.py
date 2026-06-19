@@ -19,6 +19,8 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from api.db.models import UserRole
 
 os.environ.setdefault("TM_DATABASE_URL", "postgresql+asyncpg://tm:tm@localhost:5435/tm")
@@ -38,6 +40,20 @@ async def client() -> AsyncIterator[AsyncClient]:
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
+
+@pytest_asyncio.fixture
+async def db_session() -> AsyncIterator[AsyncSession]:
+    """A plain async DB session for unit tests that hit the DB directly
+    (e.g. the madrid_enrich store/enrich tests). Rolls back on teardown so
+    each test sees a clean slate and leaves no rows behind."""
+    from api.db.session import async_session
+
+    async with async_session() as session:
+        try:
+            yield session
+        finally:
+            await session.rollback()
 
 
 async def _make_role_client(role: UserRole) -> AsyncIterator[AsyncClient]:

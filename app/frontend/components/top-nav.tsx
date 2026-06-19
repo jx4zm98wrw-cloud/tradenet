@@ -15,7 +15,8 @@ const TABS = [
   { href: "/today", label: "Today", match: (p: string) => p === "/today" },
   { href: "/search", label: "Search", match: (p: string) => p.startsWith("/search") || p.startsWith("/marks") || p.startsWith("/compare") || p.startsWith("/trademarks") },
   { href: "/watchlists", label: "Watchlists", match: (p: string) => p.startsWith("/watchlists") },
-  { href: "/admin/gazettes", label: "Gazettes", match: (p: string) => p.startsWith("/admin") || p.startsWith("/gazettes") },
+  { href: "/admin/gazettes", label: "Gazettes", match: (p: string) => p.startsWith("/admin/gazettes") || p.startsWith("/gazettes") },
+  { href: "/admin/madrid", label: "Madrid", match: (p: string) => p.startsWith("/admin/madrid") },
 ];
 
 export function TopNav() {

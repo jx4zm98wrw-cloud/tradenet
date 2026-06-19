@@ -159,6 +159,8 @@ async def search_trademarks(
     month: int | None = Query(None, ge=1, le=12),
     gazette_id: uuid.UUID | None = None,
     ip_agency: str | None = Query(None),
+    designated_country: str | None = Query(None),
+    vn_status: str | None = Query(None),
     grant_date_from: date | None = Query(None),
     grant_date_to: date | None = Query(None),
     sort: Literal["similarity", "publication-desc", "applicant-asc", "class-count"] = "similarity",
@@ -195,6 +197,8 @@ async def search_trademarks(
         month=month,
         gazette_id=gazette_id,
         ip_agency=ip_agency,
+        designated_country=designated_country,
+        vn_status=vn_status,
         grant_date_from=grant_date_from,
         grant_date_to=grant_date_to,
     )

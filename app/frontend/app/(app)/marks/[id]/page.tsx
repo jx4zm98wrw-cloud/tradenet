@@ -17,6 +17,13 @@ import { markDisplay } from "@/lib/mark-display";
 import { Icon } from "@/components/icons";
 import { Timeline } from "@/components/detail/timeline";
 import { OppositionBox } from "@/components/detail/opposition-box";
+import {
+  MadridEnrichment,
+  MadridJurisdictions,
+  MadridTimeline,
+  MadridVnBanner,
+} from "@/components/detail/madrid-enrichment";
+import { ClampedText } from "@/components/detail/clamped-text";
 import { markCategoryMeta } from "@/components/badges";
 import {
   api, countryDisplay, NICE_LABELS,
@@ -56,7 +63,7 @@ export default function MarkDetailPage() {
   const [similar, setSimilar] = React.useState<SimilarMark[]>([]);
   const [stats, setStats] = React.useState<ApplicantStats | null>(null);
   const [inid, setInid] = React.useState<InidMarker[]>([]);
-  const [inidOpen, setInidOpen] = React.useState(false);
+  const [inidOpen, setInidOpen] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -90,7 +97,9 @@ export default function MarkDetailPage() {
   if (!detail) return <SkeletonShell />;
 
   const m = detail.mark;
-  const md = markDisplay(m);
+  // Prefer the WIPO-fetched mark name when the gazette had no 540 sample
+  // (e.g. Madrid 3-D/figurative marks like "Hennessy PARADIS").
+  const md = markDisplay(m, detail.enrichment?.mark_text);
   const mc = markCategoryMeta(m.mark_category, m.record_type);
   const idLabel = m.application_number || m.certificate_number || m.madrid_number || "—";
   const idKind = m.application_number ? "Application №" : m.certificate_number ? "Certificate №" : "Madrid №";
@@ -176,14 +185,24 @@ export default function MarkDetailPage() {
             </div>
           </Card>
 
-          {/* Timeline */}
-          <Card>
-            <CardHead
-              title="Procedural timeline"
-              sub="Reconstructed from gazette entries. Status flags surface deadlines automatically."
-            />
-            <Timeline events={timeline} />
-          </Card>
+          {/* Procedural timeline (gazette-derived). Madrid marks have no
+              procedural dates here; their WIPO "Prosecution timeline" (in the
+              enrichment section below) supersedes this, so hide it for them. */}
+          {!detail.enrichment && (
+            <Card>
+              <CardHead
+                title="Procedural timeline"
+                sub="Reconstructed from gazette entries. Status flags surface deadlines automatically."
+              />
+              <Timeline events={timeline} />
+            </Card>
+          )}
+
+          {/* VN protection banner leads the Madrid section, above the timeline. */}
+          {detail.enrichment && <MadridVnBanner e={detail.enrichment} />}
+
+          {/* WIPO Prosecution timeline — above Goods & services. */}
+          {detail.enrichment && <MadridTimeline e={detail.enrichment} />}
 
           {/* Goods & services */}
           {m.nice_classes && m.nice_classes.length > 0 && (
@@ -197,8 +216,14 @@ export default function MarkDetailPage() {
                 }
               />
               {(() => {
+                // Prefer the full per-class goods text fetched from WIPO (Madrid
+                // marks — the gazette only prints a bare class list); fall back
+                // to the gazette's parsed (511) text for VN-domestic files.
+                const wipoGoods = detail.enrichment?.goods_services ?? null;
                 const perClass = parseGoodsServices(detail.raw_511_text);
-                const hasPerClassText = perClass.size > 0;
+                const goodsFor = (c: string) =>
+                  wipoGoods?.[c.padStart(2, "0")] ?? perClass.get(c) ?? null;
+                const hasPerClassText = !!wipoGoods || perClass.size > 0;
                 return (
                   <div className="px-5 py-4 space-y-3">
                     {hasPerClassText
@@ -211,10 +236,13 @@ export default function MarkDetailPage() {
                             <div>
                               <ClassChipFull n={c} />
                             </div>
-                            <p className="text-[13px] text-ink-2 leading-relaxed whitespace-pre-wrap">
-                              {perClass.get(c) ??
-                                `Nice class ${parseInt(c, 10)} (${NICE_LABELS[c] || "—"}) — no per-class text in source.`}
-                            </p>
+                            {goodsFor(c) ? (
+                              <ClampedText text={goodsFor(c)!} />
+                            ) : (
+                              <p className="text-[13px] text-ink-2 leading-relaxed">
+                                {`Nice class ${parseInt(c, 10)} (${NICE_LABELS[c] || "—"}) — no per-class text in source.`}
+                              </p>
+                            )}
                           </div>
                         ))
                       : (
@@ -236,6 +264,9 @@ export default function MarkDetailPage() {
               })()}
             </Card>
           )}
+
+          {/* WIPO Madrid enrichment — only for enriched Madrid marks */}
+          {detail.enrichment && <MadridEnrichment e={detail.enrichment} />}
 
           {/* Similar marks */}
           {similar.length > 0 && (
@@ -391,6 +422,9 @@ export default function MarkDetailPage() {
               </ul>
             )}
           </Card>
+
+          {/* Designated jurisdictions (Madrid marks) — sidebar, under Raw INID. */}
+          {detail.enrichment && <MadridJurisdictions e={detail.enrichment} />}
         </aside>
       </div>
     </div>

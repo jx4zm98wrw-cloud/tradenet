@@ -19,6 +19,7 @@ app/
 │   │   └── routes/         Resource routers (one file per concept)
 │   ├── alembic/            DB migrations
 │   ├── tm_extractor/       PDF parser library (refactored from TM_csv_builder)
+│   ├── madrid_enrich/      WIPO Madrid Monitor enrichment (client/parser/derive/store)
 │   ├── worker/             RQ ingest job + section→row mapper
 │   ├── tests/              pytest suite (httpx AsyncClient against live ASGI)
 │   ├── pyproject.toml      Ruff + Mypy + pytest config
@@ -77,6 +78,24 @@ uvicorn api.main:app --reload --port 8000
 OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES python -m worker.run_worker
 ```
 
+The worker serves two queues: `ingest` (gazette PDFs) and `madrid` (the WIPO
+enrichment sweep). The worker must be running for the `/admin/madrid` sweep
+controls (start / pause / resume / stop / tune) to take effect.
+
+Or run it as a **managed container** (survives reboots / session-end via
+`restart: unless-stopped`):
+
+```bash
+docker compose -f app/docker-compose.yml up -d --build worker
+```
+
+The containerized worker shares the host project root (bind-mounted at `/data`,
+`TM_DATA_DIR=/data`) so `madrid_cache/` and `image/` outputs are visible to the
+host API. Run *either* the host process *or* the container — not both, or they
+race the same queues.
+
+Backfill WIPO Madrid data: `cd app/backend && python -m scripts.enrich_madrid --limit 100`  (pilot; drop `--limit` for the full sweep).
+
 ### 3. Frontend
 
 ```bash
@@ -106,9 +125,10 @@ wired):
 | `GET /api/v1/today/digest` | Dashboard headline stats |
 | `GET /api/v1/findings` | Watchlist matches in latest gazette |
 | `GET /api/v1/opposition-windows` | Open opposition windows |
-| `GET /api/v1/search/trademarks` | Scored search |
-| `GET /api/v1/facets/{country,nice-classes,applicants,ip-agencies,mark-categories}` | Cross-reactive facet counts (`mark-categories` buckets the derived classification: domestic application/registration, Madrid registration/renewal) |
-| `GET /api/v1/marks/{id}` | Mark detail with derived opposition + status |
+| `GET /api/v1/trademarks` | Filtered list. Madrid filters: `designated_country` (ISO-2 jurisdiction covered by the mark's Madrid designation) and `vn_status` (`granted`/`pending`/`refused`), both joined via `lineage_key` to `madrid_records` |
+| `GET /api/v1/search/trademarks` | Scored search (also accepts `designated_country` + `vn_status`) |
+| `GET /api/v1/facets/{country,nice-classes,applicants,ip-agencies,mark-categories,vn-status}` | Cross-reactive facet counts (`mark-categories` buckets the derived classification: domestic application/registration, Madrid registration/renewal; `vn-status` counts marks per VN protection status via the `lineage_key` join) |
+| `GET /api/v1/marks/{id}` | Mark detail with derived opposition + status; includes an `enrichment` object (WIPO Madrid bibliographic data) for Madrid marks, `null` otherwise |
 | `GET /api/v1/marks/{id}/{timeline,co-marks,similar,inid-fields,applicant-stats}` | Detail subresources |
 | `POST /api/v1/compare` | Side-by-side conflict scorecard |
 

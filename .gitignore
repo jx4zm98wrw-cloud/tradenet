@@ -11,6 +11,9 @@ image/
 image_link/
 modified/
 
+# WIPO Madrid enrichment raw-HTML cache (regenerable, thousands of files)
+madrid_cache/
+
 # Python
 __pycache__/
 *.pyc

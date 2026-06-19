@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button, SegmentedControl, type SegOption } from "@/components/ui";
 import { Icon } from "@/components/icons";
 import {
-  api, NICE_LABELS, MARK_CATEGORY_LABELS, countryDisplay,
+  api, NICE_LABELS, MARK_CATEGORY_LABELS, VN_STATUS_LABELS, countryDisplay,
   type CountBucket, type NiceMode, type SearchMode, type SearchParams as Params,
   type SearchResults, type SortKey,
 } from "@/lib/api";
@@ -43,6 +43,8 @@ function SearchPage() {
       nice_class: ncs.length ? ncs : undefined,
       record_type: sp.get("record_type") ?? undefined,
       mark_category: sp.get("mark_category") ?? undefined,
+      vn_status: sp.get("vn_status") ?? undefined,
+      designated_country: sp.get("designated_country") ?? undefined,
       applicant_type: sp.get("applicant_type") ?? undefined,
       applicant: sp.get("applicant") ?? undefined,
       year: sp.get("year") ? parseInt(sp.get("year")!, 10) : undefined,
@@ -73,6 +75,7 @@ function SearchPage() {
   const [applicants, setApplicants] = React.useState<CountBucket[]>([]);
   const [ipAgencies, setIpAgencies] = React.useState<CountBucket[]>([]);
   const [markCategories, setMarkCategories] = React.useState<CountBucket[]>([]);
+  const [vnStatuses, setVnStatuses] = React.useState<CountBucket[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
@@ -95,6 +98,7 @@ function SearchPage() {
     api.facetsApplicants(filters, 8, init).then(setApplicants).catch(silent);
     api.facetsIpAgencies(filters, 8, init).then(setIpAgencies).catch(silent);
     api.facetsMarkCategories(filters, init).then(setMarkCategories).catch(silent);
+    api.facetsVnStatus(filters, init).then(setVnStatuses).catch(silent);
     return () => controller.abort();
   }, [filters]);
 
@@ -205,6 +209,7 @@ function SearchPage() {
           applicants={applicants}
           ipAgencies={ipAgencies}
           markCategories={markCategories}
+          vnStatuses={vnStatuses}
         />
 
         <main className="min-w-0 space-y-4">
@@ -413,6 +418,26 @@ function buildChips(filters: Params, setFilter: (p: Partial<Params>) => void, ni
       onRemove: () => setFilter({ mark_category: undefined }),
     });
   }
+  if (filters.vn_status) {
+    chips.push({
+      key: "vn-status",
+      label: <>VN status: {VN_STATUS_LABELS[filters.vn_status] ?? filters.vn_status}</>,
+      onRemove: () => setFilter({ vn_status: undefined }),
+    });
+  }
+  if (filters.designated_country) {
+    chips.push({
+      key: "designated-country",
+      label: (
+        <>
+          {filters.designated_country === "VN"
+            ? "Protected in VN"
+            : `Covers ${filters.designated_country}`}
+        </>
+      ),
+      onRemove: () => setFilter({ designated_country: undefined }),
+    });
+  }
   // Back-compat: shared/bookmarked links may still carry ?record_type=. It still
   // filters server-side; surface a removable chip so the user can see + clear it.
   if (filters.record_type) {
@@ -472,6 +497,10 @@ function buildScopeLabel(filters: Params): string {
   }
   if (filters.year) parts.push(`Year ${filters.year}`);
   if (filters.mark_category) parts.push(MARK_CATEGORY_LABELS[filters.mark_category] ?? filters.mark_category);
+  if (filters.vn_status) parts.push(VN_STATUS_LABELS[filters.vn_status] ?? filters.vn_status);
+  if (filters.designated_country) {
+    parts.push(filters.designated_country === "VN" ? "Protected in VN" : `Covers ${filters.designated_country}`);
+  }
   if (filters.record_type) parts.push(filters.record_type);
   return parts.join(" · ");
 }
