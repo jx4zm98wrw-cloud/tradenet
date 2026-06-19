@@ -93,8 +93,8 @@ def _details_after_label(html_src: str, code: str) -> str | None:
     # their per-class / per-code lists without needing balanced-div matching.
     m = re.search(
         r"\(" + re.escape(code) + r"\)[^<]*</div>\s*"
-        r'<div[^>]*product-form-details[^>]*>(.*?)'
-        r'(?=<div[^>]*product-form-label|</div></div></div>|\Z)',
+        r"<div[^>]*product-form-details[^>]*>(.*?)"
+        r"(?=<div[^>]*product-form-label|</div></div></div>|\Z)",
         html_src,
         re.S | re.I,
     )
@@ -174,7 +174,7 @@ def parse(html_src: str) -> DomesticRecord:
                 continue
             c = f"{v:02d}"
             term = ""
-            gm = re.search(r'<div[^>]*col-md-10[^>]*>(.*?)</div>', body, re.S | re.I)
+            gm = re.search(r"<div[^>]*col-md-10[^>]*>(.*?)</div>", body, re.S | re.I)
             if gm:
                 term = _clean(gm.group(1))
             if c not in classes:
@@ -188,9 +188,7 @@ def parse(html_src: str) -> DomesticRecord:
     d531 = _details_after_label(html_src, "531")
     if d531:
         codes: list[str] = []
-        for span in re.findall(
-            r'<span[^>]*ext-link-text[^>]*>(.*?)</span>', d531, re.S | re.I
-        ):
+        for span in re.findall(r"<span[^>]*ext-link-text[^>]*>(.*?)</span>", d531, re.S | re.I):
             code = _clean(span)
             m = re.match(r"(\d{2}\.\d{2}\.\d{2})", code)
             if m and m.group(1) not in codes:
@@ -207,7 +205,7 @@ def parse(html_src: str) -> DomesticRecord:
     # of col-md-4 cells: [pub_no, pub_date, ...]. ---
     d400 = _details_after_label(html_src, "400")
     if d400:
-        cells = [_clean(c) for c in re.findall(r'<div[^>]*col-md-4[^>]*>(.*?)</div>', d400, re.S | re.I)]
+        cells = [_clean(c) for c in re.findall(r"<div[^>]*col-md-4[^>]*>(.*?)</div>", d400, re.S | re.I)]
         cells = [c for c in cells if c]
         if cells:
             rec.publication_no = cells[0] or None
@@ -230,7 +228,7 @@ def parse(html_src: str) -> DomesticRecord:
     # --- Status: the "Trạng thái" row value (numeric code e.g. 1904, or a
     # Vietnamese phrase e.g. "Cấp bằng"). Not an INID-coded field. ---
     status = re.search(
-        r'Tr[^<]*ng th[^<]*i</div>\s*<div[^>]*product-form-details[^>]*>(.*?)</div>',
+        r"Tr[^<]*ng th[^<]*i</div>\s*<div[^>]*product-form-details[^>]*>(.*?)</div>",
         html_src,
         re.S | re.I,
     )
@@ -254,7 +252,7 @@ def parse(html_src: str) -> DomesticRecord:
 
 def _parse_timeline(html_src: str) -> list[dict]:
     sec = re.search(
-        r'events-section(.*?)(?:description-section|claims-section|</body>)',
+        r"events-section(.*?)(?:description-section|claims-section|</body>)",
         html_src,
         re.S | re.I,
     )

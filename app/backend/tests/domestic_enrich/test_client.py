@@ -1,8 +1,6 @@
-from pathlib import Path
-
 import pytest
 
-from domestic_enrich.client import fetch_raw, FetchResult
+from domestic_enrich.client import FetchResult, fetch_raw
 
 _GOOD = "<html><div class='product-form-label'>(541)</div>ok</html>"
 
@@ -30,8 +28,7 @@ class _FlakyTransport:
 
 def test_retries_until_valid_body(tmp_path):
     t = _FlakyTransport(fails_before_ok=2)
-    res = fetch_raw("VN4202600774", tmp_path, session=t, use_cache=False,
-                    max_attempts=5, delay=0.0)
+    res = fetch_raw("VN4202600774", tmp_path, session=t, use_cache=False, max_attempts=5, delay=0.0)
     assert isinstance(res, FetchResult)
     assert res.from_cache is False
     assert "product-form-label" in res.html
@@ -41,8 +38,7 @@ def test_retries_until_valid_body(tmp_path):
 def test_gives_up_after_max_attempts(tmp_path):
     t = _FlakyTransport(fails_before_ok=99)
     with pytest.raises(RuntimeError):
-        fetch_raw("VN4202600774", tmp_path, session=t, use_cache=False,
-                  max_attempts=3, delay=0.0)
+        fetch_raw("VN4202600774", tmp_path, session=t, use_cache=False, max_attempts=3, delay=0.0)
     assert t.calls == 3
 
 

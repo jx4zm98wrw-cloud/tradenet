@@ -8,9 +8,9 @@ from domestic_enrich.idmap import appno_to_vnid
     [
         ("4-2026-18514", "VN4202618514"),
         ("4-2024-16348", "VN4202416348"),
-        ("VN-4-2026-18514", "VN4202618514"),   # already-prefixed, dashed
-        ("VN4202618514", "VN4202618514"),       # already canonical
-        ("  4-2026-18514  ", "VN4202618514"),   # surrounding whitespace
+        ("VN-4-2026-18514", "VN4202618514"),  # already-prefixed, dashed
+        ("VN4202618514", "VN4202618514"),  # already canonical
+        ("  4-2026-18514  ", "VN4202618514"),  # surrounding whitespace
     ],
 )
 def test_appno_to_vnid_maps_known_formats(appno, expected):

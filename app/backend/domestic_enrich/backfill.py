@@ -91,8 +91,7 @@ async def run_backfill(
     for appno in appnos:
         if cb.tripped:
             res.circuit_broke = True
-            log.warning("circuit breaker tripped after %d consecutive failures — halting",
-                        max_consecutive)
+            log.warning("circuit breaker tripped after %d consecutive failures — halting", max_consecutive)
             break
         if daily_cap is not None and res.attempted >= daily_cap:
             log.info("daily cap %d reached — stopping", daily_cap)
@@ -112,8 +111,13 @@ async def run_backfill(
             cb.record_failure()
             log.warning("enrich failed for %s: %s", appno, exc)
         if res.attempted % progress_every == 0:
-            log.info("progress: %d attempted (%d written, %d skipped, %d failed)",
-                     res.attempted, res.written, res.skipped, res.failed)
+            log.info(
+                "progress: %d attempted (%d written, %d skipped, %d failed)",
+                res.attempted,
+                res.written,
+                res.skipped,
+                res.failed,
+            )
         if delay:
             await asyncio.sleep(delay + random.uniform(0, jitter))  # jitter, not crypto
     return res

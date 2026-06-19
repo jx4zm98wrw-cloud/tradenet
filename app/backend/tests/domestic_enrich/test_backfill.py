@@ -6,7 +6,8 @@ from domestic_enrich.backfill import CircuitBreaker, run_backfill
 
 def test_circuit_breaker_trips_after_consecutive_failures():
     cb = CircuitBreaker(max_consecutive=3)
-    cb.record_failure(); cb.record_failure()
+    cb.record_failure()
+    cb.record_failure()
     assert cb.tripped is False
     cb.record_failure()
     assert cb.tripped is True

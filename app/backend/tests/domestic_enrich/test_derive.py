@@ -1,7 +1,7 @@
 import datetime
 from pathlib import Path
 
-from domestic_enrich.derive import derive_status, DomesticStatus
+from domestic_enrich.derive import DomesticStatus, derive_status
 from domestic_enrich.parser import DomesticRecord, parse
 
 FIX = Path(__file__).parent.parent / "fixtures" / "domestic"

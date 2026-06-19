@@ -25,9 +25,7 @@ async def upsert(
     digest = hashlib.sha256(raw_html.encode("utf-8")).hexdigest()
     existing = (
         await session.execute(
-            select(DomesticRecord).where(
-                DomesticRecord.application_number == rec.application_number
-            )
+            select(DomesticRecord).where(DomesticRecord.application_number == rec.application_number)
         )
     ).scalar_one_or_none()
 

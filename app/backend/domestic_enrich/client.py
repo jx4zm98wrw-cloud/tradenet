@@ -17,10 +17,7 @@ from pathlib import Path
 
 import requests
 
-URL_TEMPLATE = (
-    "https://wipopublish.ipvietnam.gov.vn/wopublish-search/public/"
-    "ajax/detail/trademarks?id={vnid}"
-)
+URL_TEMPLATE = "https://wipopublish.ipvietnam.gov.vn/wopublish-search/public/ajax/detail/trademarks?id={vnid}"
 _UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
 _VALID_MARKER = "product-form-label"
 _CA_BUNDLE = str(Path(__file__).with_name("noip_ca_bundle.pem"))
@@ -44,7 +41,7 @@ def fetch_raw(
     vnid: str,
     cache_dir: Path,
     *,
-    session: "requests.Session | object | None" = None,
+    session: requests.Session | object | None = None,
     use_cache: bool = True,
     max_attempts: int = 10,
     delay: float = 1.5,
@@ -59,8 +56,7 @@ def fetch_raw(
     url = URL_TEMPLATE.format(vnid=vnid)
 
     if use_cache and path.exists():
-        return FetchResult(vnid=vnid, html=path.read_text(encoding="utf-8"),
-                           source_url=url, from_cache=True)
+        return FetchResult(vnid=vnid, html=path.read_text(encoding="utf-8"), source_url=url, from_cache=True)
 
     s = session if session is not None else requests.Session()
     last_status = None
@@ -72,11 +68,9 @@ def fetch_raw(
             path.write_text(body, encoding="utf-8")
             if delay:
                 time.sleep(_MIN_DELAY_S)
-            return FetchResult(vnid=vnid, html=body, source_url=url,
-                               from_cache=False, attempts=attempt)
+            return FetchResult(vnid=vnid, html=body, source_url=url, from_cache=False, attempts=attempt)
         if delay and attempt < max_attempts:
             time.sleep(delay)
     raise RuntimeError(
-        f"NOIP fetch failed for {vnid}: no valid body in {max_attempts} attempts "
-        f"(last status {last_status})"
+        f"NOIP fetch failed for {vnid}: no valid body in {max_attempts} attempts (last status {last_status})"
     )
