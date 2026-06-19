@@ -29,6 +29,11 @@ from madrid_enrich.enrich import enrich_one
 
 QUEUE_NAME = "madrid"
 _MAX_CONSECUTIVE = 5
+# RQ's default job_timeout is 180s — far shorter than one chunk (chunk_size IRNs
+# × (delay + jitter) ≈ 250s at defaults). Without this, RQ kills each chunk
+# mid-run before it can re-enqueue the next, silently stalling the sweep. Keep
+# chunk_size × (delay + jitter) comfortably under this ceiling.
+JOB_TIMEOUT = 3600  # seconds (1 hour)
 
 
 def _cache_dir() -> Path:
@@ -37,7 +42,7 @@ def _cache_dir() -> Path:
 
 def _real_enqueue() -> None:
     redis = Redis.from_url(get_settings().redis_url)
-    Queue(QUEUE_NAME, connection=redis).enqueue(run_sweep_chunk)
+    Queue(QUEUE_NAME, connection=redis).enqueue(run_sweep_chunk, job_timeout=JOB_TIMEOUT)
 
 
 async def _ctl(session: AsyncSession) -> dict:

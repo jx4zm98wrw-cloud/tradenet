@@ -51,9 +51,11 @@ def _enqueue_chunk() -> None:
     from rq import Queue
 
     from ..settings import get_settings
-    from worker.madrid_sweep import QUEUE_NAME, run_sweep_chunk
+    from worker.madrid_sweep import JOB_TIMEOUT, QUEUE_NAME, run_sweep_chunk
 
-    Queue(QUEUE_NAME, connection=Redis.from_url(get_settings().redis_url)).enqueue(run_sweep_chunk)
+    Queue(QUEUE_NAME, connection=Redis.from_url(get_settings().redis_url)).enqueue(
+        run_sweep_chunk, job_timeout=JOB_TIMEOUT
+    )
 
 
 async def _row(session: AsyncSession) -> MadridSweepControl:
@@ -139,9 +141,11 @@ async def stop(
     row = await _row(session)
     if row.status not in ("running", "paused"):
         raise HTTPException(409, f"sweep is {row.status}; nothing to stop")
-    # Paused → no chunk in flight, go idle immediately. Running → 'stopping';
-    # the job converts it to 'idle' at its next per-IRN status check.
-    row.status = "idle" if row.status == "paused" else "stopping"
+    # Go straight to 'idle'. A running chunk re-reads status each IRN and breaks
+    # out as soon as it sees non-'running', so a direct idle is honored within
+    # ~1 IRN. (The old transient 'stopping' could wedge: if the in-flight job had
+    # already died, nothing was left to convert it back, disabling every button.)
+    row.status = "idle"
     row.current_irn = None
     row.updated_at = _now()
     await session.commit()
