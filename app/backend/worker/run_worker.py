@@ -1,4 +1,4 @@
-"""RQ worker entry point — listens on the `ingest` and `madrid` queues."""
+"""RQ worker entry point — listens on the `ingest`, `madrid` and `domestic` queues."""
 
 from __future__ import annotations
 
@@ -23,7 +23,11 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     settings = get_settings()
     redis = Redis.from_url(settings.redis_url)
-    queues = [Queue("ingest", connection=redis), Queue("madrid", connection=redis)]
+    queues = [
+        Queue("ingest", connection=redis),
+        Queue("madrid", connection=redis),
+        Queue("domestic", connection=redis),
+    ]
     worker = Worker(queues, connection=redis)
     worker.work(with_scheduler=False)
 
