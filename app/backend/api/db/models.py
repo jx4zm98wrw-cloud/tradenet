@@ -339,6 +339,48 @@ class MadridRecord(Base):
     )
 
 
+class DomesticRecord(Base):
+    """NOIP (IP Vietnam) domestic trademark detail, one row per application.
+
+    Soft-linked to trademarks via `application_number = trademarks.application_number`.
+    Hybrid storage: promoted scalar/array columns for display/filter, JSONB for
+    nested goods/timeline + the parsed `raw` payload (re-derive without re-fetch).
+    """
+
+    __tablename__ = "domestic_records"
+
+    application_number: Mapped[str] = mapped_column(Text, primary_key=True)
+
+    mark_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mark_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    applicant_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    applicant_address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    representative: Mapped[str | None] = mapped_column(Text, nullable=True)
+    colors: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    nice_classes: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    goods_services: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    vienna_codes: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+
+    status_code: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    filing_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    publication_no: Mapped[str | None] = mapped_column(Text, nullable=True)
+    publication_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    grant_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+
+    logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timeline: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    raw: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    content_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parse_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
 class UserRole(enum.StrEnum):
     """RBAC roles. Sorted from most privileged to least.
 
