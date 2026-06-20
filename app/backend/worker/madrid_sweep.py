@@ -52,11 +52,20 @@ def _pending_count() -> int:
 
 
 def _is_running() -> bool:
-    async def _check() -> bool:
-        async with async_session() as s:
-            return (await s.execute(select(C.status).where(C.id == 1))).scalar_one_or_none() == "running"
+    """Read the sweep status with a throwaway SYNC connection — see
+    worker.domestic_sweep._is_running. Opening an async connection in the worker
+    parent (boot resume) poisons the pool that RQ's forked chunk children inherit
+    ("Future attached to a different loop"); a sync NullPool query avoids it."""
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.pool import NullPool
 
-    return asyncio.run(_check())
+    eng = create_engine(get_settings().database_url_sync, poolclass=NullPool)
+    try:
+        with eng.connect() as conn:
+            status = conn.execute(text(f"SELECT status FROM {C.__tablename__} WHERE id = 1")).scalar()
+        return status == "running"
+    finally:
+        eng.dispose()
 
 
 def resume_if_running() -> bool:
