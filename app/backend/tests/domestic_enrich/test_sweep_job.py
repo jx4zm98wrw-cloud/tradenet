@@ -115,3 +115,32 @@ async def test_block_pauses_sweep_immediately(db_session, tmp_path, monkeypatch)
     row = (await db_session.execute(select(C).where(C.id == 1))).scalar_one()
     assert row.status == "paused"
     assert "block" in (row.last_error or "").lower()
+
+
+def test_resume_enqueues_when_running_and_queue_idle(monkeypatch):
+    # A restart-stalled sweep (running, empty queue) gets a fresh chunk on boot.
+    monkeypatch.setattr(ds, "_pending_count", lambda: 0)
+    monkeypatch.setattr(ds, "_is_running", lambda: True)
+    calls = []
+    monkeypatch.setattr(ds, "_real_enqueue", lambda: calls.append(1))
+    assert ds.resume_if_running() is True
+    assert calls == [1]
+
+
+def test_resume_skips_when_queue_busy(monkeypatch):
+    # A chunk is already queued (chain intact) — must NOT add a second chain.
+    monkeypatch.setattr(ds, "_pending_count", lambda: 1)
+    monkeypatch.setattr(ds, "_is_running", lambda: True)
+    calls = []
+    monkeypatch.setattr(ds, "_real_enqueue", lambda: calls.append(1))
+    assert ds.resume_if_running() is False
+    assert calls == []
+
+
+def test_resume_skips_when_not_running(monkeypatch):
+    monkeypatch.setattr(ds, "_pending_count", lambda: 0)
+    monkeypatch.setattr(ds, "_is_running", lambda: False)
+    calls = []
+    monkeypatch.setattr(ds, "_real_enqueue", lambda: calls.append(1))
+    assert ds.resume_if_running() is False
+    assert calls == []

@@ -45,6 +45,31 @@ def _real_enqueue() -> None:
     Queue(QUEUE_NAME, connection=redis).enqueue(run_sweep_chunk, job_timeout=JOB_TIMEOUT)
 
 
+def _pending_count() -> int:
+    """Jobs queued (not yet picked up) on this sweep's queue."""
+    redis = Redis.from_url(get_settings().redis_url)
+    return Queue(QUEUE_NAME, connection=redis).count
+
+
+def _is_running() -> bool:
+    async def _check() -> bool:
+        async with async_session() as s:
+            return (await s.execute(select(C.status).where(C.id == 1))).scalar_one_or_none() == "running"
+
+    return asyncio.run(_check())
+
+
+def resume_if_running() -> bool:
+    """Boot-time self-heal — see worker.domestic_sweep.resume_if_running. A
+    worker restart mid-chunk breaks the self-re-enqueue chain and stalls the
+    sweep; on boot we re-enqueue one chunk when the queue is idle, guarded
+    against spawning a second parallel chain. Returns True if it enqueued."""
+    if _pending_count() > 0 or not _is_running():
+        return False
+    _real_enqueue()
+    return True
+
+
 async def _ctl(session: AsyncSession) -> dict:
     """Snapshot the control row as a plain dict (no ORM identity to expire)."""
     row = (

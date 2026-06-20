@@ -32,3 +32,31 @@ def test_multiple_queues_with_whitespace(monkeypatch):
 def test_blank_entries_dropped(monkeypatch):
     monkeypatch.setenv("TM_WORKER_QUEUES", "ingest,,domestic,")
     assert rw._queue_names() == ["ingest", "domestic"]
+
+
+def test_resume_running_sweeps_invokes_handled_queue(monkeypatch):
+    import worker.domestic_sweep as ds
+
+    called = []
+    monkeypatch.setattr(ds, "resume_if_running", lambda: called.append("domestic") or True)
+    rw._resume_running_sweeps(["domestic"])
+    assert called == ["domestic"]
+
+
+def test_resume_running_sweeps_skips_unlisted_queue(monkeypatch):
+    import worker.domestic_sweep as ds
+
+    called = []
+    monkeypatch.setattr(ds, "resume_if_running", lambda: called.append("domestic") or True)
+    rw._resume_running_sweeps(["ingest"])  # this worker doesn't handle domestic
+    assert called == []
+
+
+def test_resume_running_sweeps_swallows_errors(monkeypatch):
+    import worker.domestic_sweep as ds
+
+    def _boom():
+        raise RuntimeError("redis down")
+
+    monkeypatch.setattr(ds, "resume_if_running", _boom)
+    rw._resume_running_sweeps(["domestic"])  # best-effort: must not raise
