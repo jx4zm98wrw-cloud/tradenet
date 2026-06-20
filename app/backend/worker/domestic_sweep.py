@@ -47,6 +47,35 @@ def _real_enqueue() -> None:
     Queue(QUEUE_NAME, connection=redis).enqueue(run_sweep_chunk, job_timeout=JOB_TIMEOUT)
 
 
+def _pending_count() -> int:
+    """Jobs queued (not yet picked up) on this sweep's queue."""
+    redis = Redis.from_url(get_settings().redis_url)
+    return Queue(QUEUE_NAME, connection=redis).count
+
+
+def _is_running() -> bool:
+    async def _check() -> bool:
+        async with async_session() as s:
+            return (await s.execute(select(C.status).where(C.id == 1))).scalar_one_or_none() == "running"
+
+    return asyncio.run(_check())
+
+
+def resume_if_running() -> bool:
+    """Boot-time self-heal. The sweep is a self-re-enqueuing chunk chain, so a
+    worker crash/restart/rebuild mid-chunk kills the in-flight job before it
+    enqueues the next one — the chain breaks and the sweep stalls with
+    status='running' but an empty queue. On worker boot we re-enqueue one chunk
+    to continue, but ONLY when the queue is idle (no pending job), so a normal
+    restart can't spawn a second parallel chain (which would double the request
+    rate against the same IP). Assumes one worker per sweep queue (the
+    recommended topology). Returns True if it enqueued a continuation chunk."""
+    if _pending_count() > 0 or not _is_running():
+        return False
+    _real_enqueue()
+    return True
+
+
 async def _ctl(session: AsyncSession) -> dict:
     row = (
         await session.execute(
