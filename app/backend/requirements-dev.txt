@@ -1,7 +1,7 @@
 # Dev-only dependencies — lint, test, type-check.
 -r requirements.txt
 
-ruff==0.15.14
+ruff==0.15.18
 mypy==2.1.0
 types-PyYAML==6.0.12.20260518   # type stubs for the lazy `import yaml` in worker.ingest
 pytest==9.1.1
