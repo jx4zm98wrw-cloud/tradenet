@@ -13,12 +13,21 @@
 
 ## Architecture
 
+**Dead mode is a self-contained package — `domestic_enrich/dead_mode/` — that the existing sweep merely *delegates* to.** The proven normal sweep stays as-is; its only awareness of dead mode is a single one-line branch.
+
 A `mode` field on `domestic_sweep_control` selects the chunk's execution path:
 
-- **`mode='normal'` (default):** the chunk runs exactly as today — sequential, one mark at a time, `delay`/`jitter`-paced. Unchanged behavior.
-- **`mode='dead'`:** the chunk runs an **adaptive concurrent fetcher** — a bounded thread pool whose active size is governed by an AIMD controller, with near-zero per-mark delay (concurrency *is* the throttle).
+- **`mode='normal'` (default):** `worker/domestic_sweep.run_chunk` runs exactly as today — sequential, one mark at a time, `delay`/`jitter`-paced. Unchanged behavior.
+- **`mode='dead'`:** after its status check, `run_chunk` delegates the entire chunk to `dead_mode.run_chunk(...)` — the package's **adaptive concurrent fetcher**: a bounded thread pool whose active size is governed by the AIMD controller, near-zero per-mark delay (concurrency *is* the throttle).
 
-Both paths share: the same work-list (`iter_domestic_appnos` minus cached), the same `enrich_one` (fetch → parse → store), the same per-item live control re-read (pause/stop/mode honored mid-chunk), the same self-re-enqueue chain, and the same `domestic` queue / single `worker-domestic`.
+### Module boundary (the "independent module" requirement)
+
+- **`domestic_enrich/dead_mode/`** owns everything dead-mode-specific: the AIMD controller, the concurrent runner, the safety valve, and its own tests. Public surface is a single entry point `dead_mode.run_chunk(session, *, enqueue_next, http_session=None) -> dict` (plus the `DEAD` mode constant).
+- **One-way dependency:** `worker/domestic_sweep.py` → `dead_mode` (via a lazy import inside the `if mode=='dead'` branch, to avoid any import cycle). `dead_mode` **never** imports from `worker.domestic_sweep`. It reuses the shared primitives *directly* — `iter_domestic_appnos` (backfill), `enrich_one`/`fetch_raw` (enrich/client), `appno_to_vnid` (idmap), `DomesticSweepControl` (models) — so there's no cycle and no duplication of the work-list/fetch machinery. It does its own control-row read/write (it needs to anyway: it writes `concurrency` and performs the auto-revert).
+- **Removability:** delete the `dead_mode/` package + the one delegation branch + the two schema columns ⇒ the normal sweep is byte-for-byte its old self.
+- **The PR-1 controller (`domestic_enrich/aimd.py`) relocates into the package** as `dead_mode/controller.py` (nothing imports it yet, so the `git mv` + test-import update is clean).
+
+Both paths still share: the same work-list (`iter_domestic_appnos` minus cached), the same `enrich_one` (fetch → parse → store), the same per-item live control re-read (pause/stop/mode honored mid-chunk), the same self-re-enqueue chain, and the same `domestic` queue / single `worker-domestic`.
 
 ## The AIMD controller (the heart)
 
@@ -66,12 +75,14 @@ Add to `domestic_sweep_control`:
 
 | File | Responsibility |
 |---|---|
-| `app/backend/domestic_enrich/aimd.py` (new) | Pure `next_concurrency()` controller + outcome classification + bounds/cooldown/giveup constants. |
-| `app/backend/worker/domestic_sweep.py` | Branch on `mode`; `_run_dead_chunk()` — bounded `ThreadPoolExecutor` around `enrich_one`/`fetch_raw`, feeding outcomes to the controller, honoring live `mode`/`status`, writing `concurrency`. |
-| `app/backend/api/db/models.py` + Alembic migration | `mode` + `concurrency` columns. |
+| `app/backend/domestic_enrich/dead_mode/__init__.py` (new) | Package public API: re-export `run_chunk` + the `DEAD` mode constant. |
+| `app/backend/domestic_enrich/dead_mode/controller.py` (moved from `aimd.py`) | Pure AIMD controller: `next_concurrency()` + `should_give_up()` + `Outcome`/`WindowStats`/`Decision` + constants. |
+| `app/backend/domestic_enrich/dead_mode/runner.py` (new) | `run_chunk(session, *, enqueue_next, http_session=None)` — bounded `ThreadPoolExecutor` around `enrich_one`/`fetch_raw`, feeds per-fetch `Outcome`s to the controller window, applies `Decision` (concurrency + cooldown), honors live `mode`/`status`, writes `concurrency`, and does the sustained-block auto-revert+pause. Imports shared primitives directly (no `worker.domestic_sweep` import). |
+| `app/backend/worker/domestic_sweep.py` | **One change only:** `if ctl["mode"] == "dead": return await dead_mode.run_chunk(...)` (lazy import). Normal path untouched. |
+| `app/backend/api/db/models.py` + Alembic migration | `mode` + `concurrency` columns on `domestic_sweep_control`. |
 | `app/backend/api/routes/domestic_sweep.py` | Accept/return `mode`; live mode flip. |
 | `app/frontend/app/(app)/admin/domestic/page.tsx` + `lib/api.ts` | Dead-mode toggle + live readouts. |
-| Tests | AIMD unit tests; dead-chunk concurrency test (stubbed transport); block→backoff→giveup; mode toggle endpoint; live `mode`/`status` honored mid-chunk. |
+| `app/backend/tests/domestic_enrich/dead_mode/` | Controller unit tests (moved); runner tests: concurrency ramp (stubbed transport), block→backoff→giveup→revert+pause, live `mode`/`status` honored mid-chunk. |
 
 ## Error handling
 
@@ -98,10 +109,10 @@ Add to `domestic_sweep_control`:
 
 ## Rollout / suggested PR sequence
 
-1. **AIMD controller** (`aimd.py`) + unit tests — pure, no integration.
-2. **Schema** (`mode`/`concurrency` columns + migration) + model.
-3. **Dead chunk** in `domestic_sweep.py` (thread pool + controller wiring + safety valve) + tests.
+1. **AIMD controller** — pure + unit tests. *(Shipped as `domestic_enrich/aimd.py`, PR #75.)*
+2. **`dead_mode/` package + schema** — create the package: `git mv aimd.py → dead_mode/controller.py` (+ update its test import), add `__init__.py`, and add the `mode`/`concurrency` columns + migration + model. No runtime behavior yet. (Package skeleton + schema land together so the runner PR has a home + the columns.)
+3. **Dead-chunk runner** (`dead_mode/runner.py`) — thread pool + controller wiring + safety valve + auto-revert; plus the **single delegation branch** in `worker/domestic_sweep.py`. + tests.
 4. **Control API** (`mode` in/out, live flip) + tests.
 5. **Frontend** toggle + live readouts.
 
-Each PR is independently green-able; 1–4 are backend, 5 is frontend.
+Each PR is independently green-able; 1–4 are backend, 5 is frontend. The one-way `domestic_sweep → dead_mode` dependency (lazy import) keeps the normal sweep removable-clean.
