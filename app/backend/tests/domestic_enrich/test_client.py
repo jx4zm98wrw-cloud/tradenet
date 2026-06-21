@@ -79,3 +79,15 @@ def test_block_429_parses_retry_after(tmp_path):
     with pytest.raises(NoipBlockedError) as ei:
         fetch_raw("VN4202600774", tmp_path, session=t, use_cache=False, delay=0.0)
     assert ei.value.retry_after == 120.0
+
+
+def test_backoff_grows_then_caps_low():
+    from domestic_enrich.client import _MAX_BACKOFF_S, _backoff_seconds
+
+    # Early retries grow (catch transient blips fast)...
+    assert _backoff_seconds(1, 1.5) == 1.5
+    assert _backoff_seconds(2, 1.5) == 3.0
+    assert _backoff_seconds(3, 1.5) == 6.0
+    # ...then cap LOW so a many-retry flaky mark can't burn minutes.
+    assert _backoff_seconds(10, 1.5) == _MAX_BACKOFF_S
+    assert _MAX_BACKOFF_S <= 10
