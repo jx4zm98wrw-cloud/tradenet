@@ -22,7 +22,15 @@ _CLOSERS = re.compile(r"(?is)</(tr|div|p|li|td|th|h\d|table|span)>")
 _TAG = re.compile(r"(?is)<[^>]+>")
 _WS = re.compile(r"\s+")
 _INID = re.compile(r"^\d{3}$")
-_EVENT_DATE = re.compile(r"^:?\s*(?P<d>\d{2}\.\d{2}\.\d{4}),\s*(?P<gaz>\d{4}/\d+)\s*Gaz")
+# Gazette-dated event line. The suffix is "Gaz" (modern WIPO Gazette) or "LMi"
+# (older "Les Marques internationales", pre-1996). Matching only "Gaz" silently
+# dropped every LMi-dated event — including old "International Registration, …, VN"
+# rows whose country list (and thus VN) only lives in those events.
+_EVENT_DATE = re.compile(r"^:?\s*(?P<d>\d{2}\.\d{2}\.\d{4}),\s*(?P<gaz>\d{4}/\d+)\s*(?:Gaz|LMi)")
+# Some events — notably IR-wide "global" changes (holder/representative/
+# correspondence address, ownership) — carry only a bare "dd.mm.yyyy" date with
+# no "yyyy/n Gaz" suffix. This matches both forms; `gaz` is None when absent.
+_EVENT_DATE_ANY = re.compile(r"^:?\s*(?P<d>\d{2}\.\d{2}\.\d{4})(?:,\s*(?P<gaz>\d{4}/\d+)\s*(?:Gaz|LMi))?")
 _DDMMYYYY = re.compile(r"(\d{2})\.(\d{2})\.(\d{4})")
 
 
@@ -269,26 +277,76 @@ def _parse_history(lines: list[str]) -> list[dict]:
             tail_ccs = re.findall(r"\b([A-Z]{2})\b", typ.split(",", 1)[1]) if "," in typ else []
             block_end = _next_event(lines, i + 1)
             block = lines[i:block_end]
+            # The TYPE string's trailing country list is the authoritative party
+            # set for every event that carries one: grant/refusal name the office
+            # there, and Renewal / International Registration / Subsequent
+            # designation list the full renewed/designated set there. The block's
+            # 833 "Interested Contracting Party(ies)" is, for those multi-country
+            # events, the holder's ORIGIN office (e.g. BX/Benelux) — using it as
+            # parties mis-attributed the event and dropped the real designations
+            # (e.g. VN from a "Renewal, …, VN" or old "International Registration,
+            # …, VN" row). Prefer the type list; fall back to 833 only when the
+            # type carries no trailing country list.
+            parties = tail_ccs or _field(block, "833")
             events.append(
                 {
                     "type": typ,
                     "date": _iso(dm.group("d")),
                     "gazette": dm.group("gaz"),
-                    "parties": _field(block, "833") or tail_ccs,
+                    "parties": parties,
                     "designations": _field(block, "832"),
                 }
             )
             i = block_end
         else:
-            i += 1
+            # GLOBAL (no-country) events: an IR-wide change has no party/country
+            # list, so it never carries a comma and was silently dropped above.
+            # It appears as "<type>" then ":" then a date line (which may lack the
+            # "yyyy/n Gaz" suffix). Capture date + type; parties/designations are
+            # legitimately empty — do NOT invent country tags for these.
+            gm = (
+                _EVENT_DATE_ANY.match(lines[i + 2])
+                if (
+                    i + 2 < len(lines)
+                    and "," not in head  # comma-bearing heads are country events, handled above
+                    and not _INID.match(head)
+                    and head not in (":", "Transaction History")
+                )
+                else None
+            )
+            if gm and lines[i + 1] == ":":
+                events.append(
+                    {
+                        "type": head.rstrip(" :"),
+                        "date": _iso(gm.group("d")),
+                        "gazette": gm.group("gaz"),
+                        "parties": [],
+                        "designations": [],
+                    }
+                )
+                i += 3
+            else:
+                i += 1
     return events
 
 
 def _next_event(lines: list[str], start: int) -> int:
     for j in range(start + 1, len(lines) - 1):
-        is_head = "," in lines[j] and not _INID.match(lines[j])
-        has_date = _EVENT_DATE.match(lines[j + 1]) or (j + 2 < len(lines) and _EVENT_DATE.match(lines[j + 2]))
-        if is_head and has_date:
+        head = lines[j]
+        if _INID.match(head):
+            continue
+        # Country-tagged event boundary: comma-bearing head, then a Gaz date.
+        if "," in head:
+            has_date = _EVENT_DATE.match(lines[j + 1]) or (
+                j + 2 < len(lines) and _EVENT_DATE.match(lines[j + 2])
+            )
+            if has_date:
+                return j
+        # Global (no-country) event boundary: "<type>" then ":" then a date line
+        # (with or without a Gaz suffix). Without recognizing this, a trailing
+        # run of global events would be swallowed into the preceding country
+        # block and never parsed.
+        elif lines[j + 1] == ":" and j + 2 < len(lines) and _EVENT_DATE_ANY.match(lines[j + 2]):
             return j
     return len(lines)
 
