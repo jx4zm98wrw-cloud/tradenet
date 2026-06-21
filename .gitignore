@@ -14,6 +14,9 @@ modified/
 # WIPO Madrid enrichment raw-HTML cache (regenerable, thousands of files)
 madrid_cache/
 
+# NOIP domestic enrichment raw-HTML cache (regenerable, thousands of files)
+domestic_cache/
+
 # Python
 __pycache__/
 *.pyc
