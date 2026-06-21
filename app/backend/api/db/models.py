@@ -522,6 +522,10 @@ class DomesticSweepControl(Base):
             "status IN ('idle','running','paused','stopping')",
             name="ck_domestic_sweep_status",
         ),
+        CheckConstraint(
+            "mode IN ('normal','dead')",
+            name="ck_domestic_sweep_mode",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)  # always 1
@@ -533,6 +537,8 @@ class DomesticSweepControl(Base):
     processed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     ok: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     failed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    mode: Mapped[str] = mapped_column(Text, nullable=False, server_default="normal")
+    concurrency: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     current_appno: Mapped[str | None] = mapped_column(Text, nullable=True)
     next_appno: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
