@@ -41,54 +41,55 @@ export function DomesticTimeline({ e }: { e: DomesticEnrichmentData }) {
   // We render all string values present, falling back gracefully.
   return (
     <Card>
-      <CardHead title="NOIP prosecution timeline" />
-      <div className="flex flex-col gap-2 px-4 py-4">
-        {timeline.map((ev, i) => {
-          const date =
-            typeof ev["date"] === "string"
-              ? ev["date"]
-              : typeof ev["event_date"] === "string"
-                ? ev["event_date"]
-                : null;
-          const eventName =
-            typeof ev["event"] === "string"
-              ? ev["event"]
-              : typeof ev["event_name"] === "string"
-                ? ev["event_name"]
-                : typeof ev["type"] === "string"
-                  ? ev["type"]
+      <CardHead title="Vietnam IP prosecution timeline" />
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-line text-left">
+            <th className="px-4 py-2 font-semibold text-mute">Event</th>
+            <th className="px-4 py-2 font-semibold text-mute">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {timeline.map((ev, i) => {
+            const date =
+              typeof ev["date"] === "string"
+                ? ev["date"]
+                : typeof ev["event_date"] === "string"
+                  ? ev["event_date"]
                   : null;
-          const status =
-            typeof ev["status"] === "string" ? ev["status"] : null;
-
-          return (
-            <div key={i} className="border-l-2 border-ok pl-3">
-              {date && (
-                <div className="text-xs text-mute">{formatNoipDate(date)}</div>
-              )}
-              {eventName && (
-                <div className="text-sm text-ink-2">{eventName}</div>
-              )}
-              {status && !eventName && (
-                <div className="text-sm text-ink-2">{status}</div>
-              )}
-              {!date && !eventName && !status && (
-                <div className="text-sm text-mute">
-                  {Object.values(ev)
+            const eventName =
+              typeof ev["event"] === "string"
+                ? ev["event"]
+                : typeof ev["event_name"] === "string"
+                  ? ev["event_name"]
+                  : typeof ev["type"] === "string"
+                    ? ev["type"]
+                    : null;
+            const fallback =
+              !eventName && !date
+                ? Object.values(ev)
                     .filter((v) => typeof v === "string")
-                    .join(" · ") || "—"}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                    .join(" · ") || "—"
+                : null;
+
+            return (
+              <tr key={i} className="border-b border-line/60 last:border-b-0">
+                <td className="px-4 py-2 text-ink-2">{eventName ?? fallback ?? "—"}</td>
+                <td className="px-4 py-2 text-mute whitespace-nowrap">
+                  {date ? formatNoipDate(date) : "—"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </Card>
   );
 }
 
-/** DomesticEnrichment — NOIP record card. Renders only non-null fields. */
-export function DomesticEnrichment({ e }: { e: DomesticEnrichmentData }) {
+/** DomesticEnrichment — NOIP record card. Renders only non-null fields.
+ * `isAdmin` gates the Fetched row and the source-database link (admin-only). */
+export function DomesticEnrichment({ e, isAdmin = false }: { e: DomesticEnrichmentData; isAdmin?: boolean }) {
   return (
     <div className="space-y-5">
       {/* NOIP domestic record card */}
@@ -96,9 +97,9 @@ export function DomesticEnrichment({ e }: { e: DomesticEnrichmentData }) {
         <CardHead>
           <div className="flex items-center gap-2">
             <h2 className="head-serif m-0 text-sm font-semibold text-ink leading-tight tracking-tight">
-              NOIP domestic record
+              Vietnam IP domestic record
             </h2>
-            <Pill tone="stamp" size="sm">NOIP</Pill>
+            <Pill tone="stamp" size="sm">VIETNAM IP</Pill>
           </div>
         </CardHead>
         <dl className="grid grid-cols-[140px_1fr] gap-y-2 px-4 py-4 text-sm">
@@ -122,7 +123,7 @@ export function DomesticEnrichment({ e }: { e: DomesticEnrichmentData }) {
               <dd className="break-words">{e.vienna_codes.join(" · ")}</dd>
             </>
           )}
-          {e.fetched_at && (
+          {isAdmin && e.fetched_at && (
             <>
               <dt className="text-mute">Fetched</dt>
               <dd className="text-mute text-xs">{formatDate(e.fetched_at)}</dd>
@@ -131,14 +132,14 @@ export function DomesticEnrichment({ e }: { e: DomesticEnrichmentData }) {
         </dl>
       </Card>
 
-      {e.source_url && (
+      {isAdmin && e.source_url && (
         <a
           href={e.source_url}
           target="_blank"
           rel="noreferrer"
           className="inline-block text-xs font-medium text-stamp hover:text-stamp-deep underline"
         >
-          View on NOIP trademark database ↗
+          View on Vietnam IP trademark database ↗
         </a>
       )}
     </div>

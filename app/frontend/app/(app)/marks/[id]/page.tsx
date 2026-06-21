@@ -132,6 +132,14 @@ export default function MarkDetailPage() {
   const [inid, setInid] = React.useState<InidMarker[]>([]);
   const [inidOpen, setInidOpen] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = React.useState(false);
+
+  React.useEffect(() => {
+    api
+      .adminCheck()
+      .then((c) => setIsAdmin(c.isAdmin))
+      .catch(() => setIsAdmin(false));
+  }, []);
 
   React.useEffect(() => {
     if (!id) return;
@@ -297,7 +305,7 @@ export default function MarkDetailPage() {
           {detail.enrichment && <MadridEnrichment e={detail.enrichment} />}
 
           {/* NOIP domestic enrichment — only for enriched domestic marks */}
-          {detail.domestic && <DomesticEnrichment e={detail.domestic} />}
+          {detail.domestic && <DomesticEnrichment e={detail.domestic} isAdmin={isAdmin} />}
 
           {/* Similar marks */}
           {similar.length > 0 && (
@@ -365,20 +373,6 @@ export default function MarkDetailPage() {
 
         {/* ===== SIDEBAR ===== */}
         <aside className="space-y-5 min-w-0">
-          <Card>
-            <CardHead title="Source" />
-            <dl className="px-5 py-4 space-y-2 text-sm">
-              <SideRow label="Gazette ID"><span className="font-mono text-[12px] break-all">{m.gazette_id}</span></SideRow>
-              <SideRow label="Section">{mc.section}</SideRow>
-              <Link
-                href={`/admin/gazettes`}
-                className="block text-center w-full mt-3 px-3 py-1.5 border border-line bg-surface rounded text-[12.5px] font-medium text-ink-2 hover:bg-paper-2"
-              >
-                Open in gazette →
-              </Link>
-            </dl>
-          </Card>
-
           {stats && (
             <Card>
               <CardHead title="Applicant's portfolio" />
@@ -553,15 +547,6 @@ function KV({ label, children }: { label: string; children: React.ReactNode }) {
     <div>
       <dt className="label-meta">{label}</dt>
       <dd className="text-[13px] text-ink mt-0.5">{children}</dd>
-    </div>
-  );
-}
-
-function SideRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-2">
-      <dt className="text-[12px] text-mute shrink-0">{label}</dt>
-      <dd className="text-[12.5px] text-ink-2 text-right min-w-0 truncate">{children}</dd>
     </div>
   );
 }
