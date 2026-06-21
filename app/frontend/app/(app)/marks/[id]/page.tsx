@@ -130,7 +130,7 @@ export default function MarkDetailPage() {
   const [similar, setSimilar] = React.useState<SimilarMark[]>([]);
   const [stats, setStats] = React.useState<ApplicantStats | null>(null);
   const [inid, setInid] = React.useState<InidMarker[]>([]);
-  const [inidOpen, setInidOpen] = React.useState(true);
+  const [inidOpen, setInidOpen] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
