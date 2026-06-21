@@ -12,7 +12,7 @@ from api.db.models import MadridRecord
 from .derive import VnStatus
 from .parser import MadridRecord as ParsedRecord
 
-PARSE_VERSION = 10  # 10: extract goods_services in any language (was English-only)
+PARSE_VERSION = 11  # 11: capture global (no-country) tx events + fix renewal parties
 
 
 async def upsert(

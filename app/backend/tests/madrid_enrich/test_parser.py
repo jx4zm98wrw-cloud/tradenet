@@ -5,6 +5,10 @@ from madrid_enrich.parser import parse
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "madrid" / "1266721.html"
 MULTICLASS_FIXTURE = Path(__file__).parent.parent / "fixtures" / "madrid" / "1248225.html"
+# IRN 0295028 (Johnson & Johnson). Its real WIPO transaction history carries both
+# the parser-gap cases: IR-wide "global" events with no country tag (representative
+# / holder / ownership changes) and multi-country Renewal events listing VN.
+GLOBAL_TX_FIXTURE = Path(__file__).parent.parent / "fixtures" / "madrid" / "0295028.html"
 
 
 def _rec():
@@ -91,6 +95,47 @@ def test_designation_status_per_country():
     # grant/refusal event of its own, so it is pending. (MA *does* have a grant
     # in this fixture, so the spec's example country was swapped for IR.)
     assert r.designation_status["IR"]["status"] == "pending"
+
+
+def test_transaction_history_captures_global_representative_events():
+    # GAP 1: IR-wide "global" events have no country/party list, so their type
+    # line carries no comma and the parser used to drop them. IRN 0295028's real
+    # history has representative-related global events (appointment/renunciation,
+    # name/address change) that must now appear in transaction_history. These
+    # events legitimately have empty parties/designations — we must NOT invent
+    # country tags for them.
+    r = parse(GLOBAL_TX_FIXTURE.read_text(encoding="utf-8"))
+    rep = [
+        e
+        for e in r.transaction_history
+        if "representative" in e["type"].lower()
+        and ("renunciation" in e["type"].lower() or "name or address" in e["type"].lower())
+    ]
+    assert rep, "expected a representative renunciation/change global event"
+    # The WIPO-documented appointment/renunciation of representative dates.
+    dates = {e["date"] for e in rep}
+    assert "2008-03-31" in dates
+    assert "2022-01-26" in dates
+    # Global events carry no party/designation country tags.
+    for e in rep:
+        assert e["parties"] == []
+        assert e["designations"] == []
+
+
+def test_renewal_parties_parsed_from_type_country_list():
+    # GAP 2: a Renewal event lists its renewed designations in the TYPE string's
+    # trailing country list ("Renewal, …, VN"); the block's 833 field is the
+    # holder's origin office (e.g. BX) and must not be used as parties. Every
+    # Renewal naming VN must therefore have VN in parties.
+    r = parse(GLOBAL_TX_FIXTURE.read_text(encoding="utf-8"))
+    renewals = [e for e in r.transaction_history if e["type"].startswith("Renewal")]
+    assert renewals
+    vn_renewals = [e for e in renewals if "VN" in e["type"]]
+    assert vn_renewals, "fixture should contain a 'Renewal, …, VN' event"
+    for e in vn_renewals:
+        assert "VN" in (e["parties"] or []), f"VN missing from renewal parties on {e['date']}"
+        # 'BX' (holder origin office) must not leak in as the sole party.
+        assert e["parties"] != ["BX"]
 
 
 def test_old_record_with_9sexies_designations_includes_vn():
