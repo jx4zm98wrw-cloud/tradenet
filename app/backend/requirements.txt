@@ -39,7 +39,7 @@ passlib[bcrypt]==1.7.4
 slowapi==0.1.9
 
 # === Worker ===
-redis==5.2.0
+redis==8.0.0
 rq==2.9.0
 requests==2.34.2             # WIPO Madrid Monitor HTTP client (madrid_enrich + sweep job).
                              # Was an undeclared runtime dep (present in the host venv but
