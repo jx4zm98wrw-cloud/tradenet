@@ -47,7 +47,7 @@ requests==2.34.2             # WIPO Madrid Monitor HTTP client (madrid_enrich + 
                              # import worker.madrid_sweep).
 
 # === Observability ===
-structlog==24.4.0
+structlog==26.1.0
 sentry-sdk[fastapi]==2.60.0
 prometheus-fastapi-instrumentator==8.0.0   # 8.x supports starlette>=1.0 (7.x capped <1.0)
 
