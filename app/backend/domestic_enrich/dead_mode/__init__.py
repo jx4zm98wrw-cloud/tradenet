@@ -14,6 +14,7 @@ from domestic_enrich.dead_mode.controller import (
     should_give_up,
     stats_from,
 )
+from domestic_enrich.dead_mode.runner import run_chunk
 
 DEAD = "dead"
 NORMAL = "normal"
@@ -25,6 +26,7 @@ __all__ = [
     "Outcome",
     "WindowStats",
     "next_concurrency",
+    "run_chunk",
     "should_give_up",
     "stats_from",
 ]
