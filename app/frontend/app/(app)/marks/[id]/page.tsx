@@ -20,7 +20,6 @@ import { OppositionBox } from "@/components/detail/opposition-box";
 import {
   MadridEnrichment,
   MadridJurisdictions,
-  MadridTimeline,
   MadridVnBanner,
   MadridVnTimeline,
 } from "@/components/detail/madrid-enrichment";
@@ -276,9 +275,6 @@ export default function MarkDetailPage() {
 
           {/* VN protection banner leads the Madrid section, above the timeline. */}
           {detail.enrichment && <MadridVnBanner e={detail.enrichment} />}
-
-          {/* WIPO Prosecution timeline — above Goods & services. */}
-          {detail.enrichment && <MadridTimeline e={detail.enrichment} />}
 
           {/* Vietnam IP prosecution timeline (Madrid) — 2-col Event|Date table,
               mirrors the domestic one. Above Goods & services. */}
