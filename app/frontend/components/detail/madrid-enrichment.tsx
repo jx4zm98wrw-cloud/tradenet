@@ -49,12 +49,18 @@ export function MadridTimeline({ e }: { e: MadridEnrichmentData }) {
 }
 
 // An event counts as VN-related if Vietnam is an explicit party OR the WIPO
-// event type names VN. The `parties` check alone misses Renewal events — WIPO
+// event type names VN OR it is a global IR-wide event with no country
+// attribution. The `parties` check alone misses Renewal events — WIPO
 // mis-attributes their `parties` to the holder's country — so the `\bVN\b` type
-// check is required to catch VN renewals. Use BOTH conditions (OR), do not drop
-// the type check.
+// check is required to catch VN renewals. Global events (representative/holder
+// changes, etc.) carry empty `parties` and don't name VN, yet they affect the
+// VN designation too — include them. Country-specific non-VN events keep a
+// non-empty `parties` (e.g. ["RU"]) and stay excluded. Use all three conditions
+// (OR), do not drop any.
 const isVnEvent = (e: { type?: string; parties?: string[] }) =>
-  (e.parties?.includes("VN") ?? false) || /\bVN\b/.test(e.type ?? "");
+  (e.parties?.includes("VN") ?? false) ||
+  /\bVN\b/.test(e.type ?? "") ||
+  (e.parties?.length ?? 0) === 0; // global IR-wide event (no country tag) — affects VN too
 
 // MadridVnTimeline — VN-scoped prosecution events as a 2-column (Event | Date)
 // table, mirroring DomesticTimeline so Madrid and domestic marks present an
@@ -169,6 +175,16 @@ export function MadridVnBanner({ e }: { e: MadridEnrichmentData }) {
 }
 
 export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
+  // WIPO label: "Appointment or renunciation of the representative". When the
+  // record has no current representative but such an event exists, surface the
+  // latest renunciation date instead of a bare em-dash.
+  const renounced = (e.transaction_history ?? [])
+    .filter((ev) => /renunciation of the representative/i.test(ev.type ?? ""))
+    .map((ev) => ev.date)
+    .filter(Boolean)
+    .sort()
+    .at(-1); // latest ISO date
+
   return (
     <div className="space-y-5">
       {/* WIPO Madrid record card */}
@@ -202,7 +218,13 @@ export function MadridEnrichment({ e }: { e: MadridEnrichmentData }) {
           <dt className="text-mute">Legal nature</dt>
           <dd>{e.holder_legal_status ?? "—"}</dd>
           <dt className="text-mute">Representative</dt>
-          <dd>{e.representative ?? "—"}</dd>
+          <dd>
+            {e.representative
+              ? e.representative
+              : renounced
+                ? `— (representative renounced, ${formatDate(renounced)})`
+                : "—"}
+          </dd>
           <dt className="text-mute">Registered</dt>
           <dd>{e.registration_date ? formatDate(e.registration_date) : "—"}</dd>
           <dt className="text-mute">Expiration</dt>
