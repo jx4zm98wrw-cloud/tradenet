@@ -4,7 +4,7 @@
 
 # === Library deps (preserved from monolithic extractor) ===
 pdfplumber==0.11.9         # was 0.11.4, bump pulls patched pdfminer.six (CVE-2025-64512 + 70559)
-pandas==2.2.3
+pandas==3.0.3
 numpy==2.4.6
 colorama==0.4.6
 tqdm==4.67.3
