@@ -89,9 +89,9 @@ def resume_if_running() -> bool:
 async def _ctl(session: AsyncSession) -> dict:
     row = (
         await session.execute(
-            select(C.status, C.cap, C.delay, C.jitter, C.chunk_size, C.processed, C.ok, C.failed).where(
-                C.id == 1
-            )
+            select(
+                C.status, C.mode, C.cap, C.delay, C.jitter, C.chunk_size, C.processed, C.ok, C.failed
+            ).where(C.id == 1)
         )
     ).one()
     return dict(row._mapping)
@@ -118,6 +118,13 @@ async def run_chunk(
     ctl = await _ctl(session)
     if ctl["status"] != "running":
         return {"status": ctl["status"], "did": 0}
+
+    if ctl["mode"] == "dead":
+        # Dead mode is a self-contained package; delegate the whole chunk. Lazy
+        # import keeps the dependency one-way (sweep -> dead_mode, no cycle).
+        from domestic_enrich.dead_mode import run_chunk as run_dead_chunk
+
+        return await run_dead_chunk(session, enqueue_next=enqueue_next, http_session=http_session)
 
     cache = _cache_dir()
     all_appnos = await iter_domestic_appnos(session)
