@@ -38,6 +38,8 @@ async def reset_and_stub(monkeypatch):
                 current_appno=None,
                 next_appno=None,
                 last_error=None,
+                mode="normal",
+                concurrency=0,
             )
         )
         await s.commit()
@@ -101,3 +103,44 @@ async def test_config_updates_cadence(authed_client: AsyncClient):
 async def test_requires_admin(viewer_client: AsyncClient):
     assert (await viewer_client.get("/api/v1/admin/domestic-sweep")).status_code == 403
     assert (await viewer_client.post("/api/v1/admin/domestic-sweep/start", json={})).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_get_status_includes_mode_and_concurrency(authed_client: AsyncClient):
+    r = await authed_client.get("/api/v1/admin/domestic-sweep")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["mode"] == "normal"
+    assert d["concurrency"] == 0
+
+
+@pytest.mark.asyncio
+async def test_start_in_dead_mode(authed_client: AsyncClient):
+    r = await authed_client.post("/api/v1/admin/domestic-sweep/start", json={"mode": "dead"})
+    assert r.status_code == 200
+    assert r.json()["mode"] == "dead"
+
+
+@pytest.mark.asyncio
+async def test_start_defaults_to_normal(authed_client: AsyncClient):
+    r = await authed_client.post("/api/v1/admin/domestic-sweep/start", json={})
+    assert r.status_code == 200
+    assert r.json()["mode"] == "normal"
+
+
+@pytest.mark.asyncio
+async def test_config_flips_mode_live(authed_client: AsyncClient):
+    await authed_client.post("/api/v1/admin/domestic-sweep/start", json={})
+    r = await authed_client.patch("/api/v1/admin/domestic-sweep/config", json={"mode": "dead"})
+    assert r.status_code == 200
+    assert r.json()["mode"] == "dead"
+    # flip back -> normal, concurrency reset
+    r2 = await authed_client.patch("/api/v1/admin/domestic-sweep/config", json={"mode": "normal"})
+    assert r2.json()["mode"] == "normal"
+    assert r2.json()["concurrency"] == 0
+
+
+@pytest.mark.asyncio
+async def test_invalid_mode_rejected(authed_client: AsyncClient):
+    r = await authed_client.post("/api/v1/admin/domestic-sweep/start", json={"mode": "turbo"})
+    assert r.status_code == 422
