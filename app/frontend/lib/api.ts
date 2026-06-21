@@ -45,7 +45,7 @@ export type MadridSweepControl = {
   updated_at: string;
 };
 
-export type SweepCadence = { cap?: number | null; delay?: number; jitter?: number; chunk_size?: number };
+export type SweepCadence = { cap?: number | null; delay?: number; jitter?: number; chunk_size?: number; mode?: "normal" | "dead" };
 
 export type Trademark = {
   id: string;
@@ -351,6 +351,8 @@ export type DomesticSweepControl = {
   processed: number;
   ok: number;
   failed: number;
+  mode: "normal" | "dead";
+  concurrency: number;
   current_appno: string | null;
   next_appno: string | null;
   last_error: string | null;

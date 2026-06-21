@@ -127,6 +127,8 @@ function SweepControlCard() {
   const [s, setS] = React.useState<DomesticSweepControl | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
+  const [rps, setRps] = React.useState<number | null>(null);
+  const sample = React.useRef<{ processed: number; t: number } | null>(null);
   const [form, setForm] = React.useState<{ cap: string; delay: string; jitter: string; chunk_size: string }>({
     cap: "", delay: "", jitter: "", chunk_size: "",
   });
@@ -135,6 +137,15 @@ function SweepControlCard() {
     try {
       const next = await api.domesticSweepStatus();
       setS(next);
+      const t = Date.now();
+      if (sample.current && next.processed >= sample.current.processed) {
+        const dp = next.processed - sample.current.processed;
+        const dt = (t - sample.current.t) / 1000;
+        if (dt > 0) setRps(dp / dt);
+      } else {
+        setRps(null); // counter reset (new run) — drop the stale rate
+      }
+      sample.current = { processed: next.processed, t };
       setErr(null);
       if (!silent) {
         setForm({
@@ -185,6 +196,7 @@ function SweepControlCard() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">Sweep control</span>
             <Pill tone={tone as "ok" | "warn" | "mute"} size="sm">{s.status}</Pill>
+            {s.mode === "dead" ? <Pill tone="warn" size="sm">Dead mode</Pill> : null}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="primary" disabled={!can(["idle"])} onClick={() => act(() => api.domesticSweepStart(cadence()))}>Start</Button>
@@ -206,6 +218,26 @@ function SweepControlCard() {
             </label>
           ))}
           <Button variant="ghost" disabled={busy} onClick={() => act(() => api.domesticSweepConfig(cadence()))}>Apply</Button>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 flex-wrap border-t border-line pt-3">
+          <div className="text-[11px] text-mute max-w-prose">
+            <span className="font-semibold text-ink">Dead mode</span> — max-throughput adaptive concurrency on
+            the single clean IP; auto-throttles and auto-reverts to normal + pauses on sustained NOIP blocks.
+          </div>
+          <Button
+            variant={s.mode === "dead" ? "primary" : "ghost"}
+            disabled={busy}
+            onClick={() => act(() => api.domesticSweepConfig({ mode: s.mode === "dead" ? "normal" : "dead" }))}
+          >
+            {s.mode === "dead" ? "Disable dead mode" : "Enable dead mode"}
+          </Button>
+        </div>
+
+        <div className="text-[12px] text-mute">
+          rate: <span className="font-mono text-ink">{s.processed > 0 ? `${Math.round((s.ok / s.processed) * 100)}%` : "—"}</span>
+          {s.mode === "dead" ? <> · concurrency <span className="font-mono text-ink">{s.concurrency}</span></> : null}
+          {rps !== null ? <> · <span className="font-mono text-ink">{rps.toFixed(1)}</span> req/s</> : null}
         </div>
 
         <div className="text-[12px] text-mute">
