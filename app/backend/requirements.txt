@@ -16,7 +16,7 @@ psutil==7.2.2
 pyyaml==6.0.3
 
 # === API + DB ===
-fastapi==0.136.3              # was 0.115.5
+fastapi==0.138.0              # was 0.115.5
 starlette==1.3.1              # explicit pin. fastapi requires >=0.46.0 (no upper cap);
                               # the real cap was prometheus-fastapi-instrumentator<1.0,
                               # lifted by bumping it to 8.0.0 below. 1.3.1 clears the
