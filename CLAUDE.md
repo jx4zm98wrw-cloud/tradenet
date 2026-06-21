@@ -73,6 +73,15 @@ claude_csvbuilder/
 │   │   │                           `DomesticTimeline` prosecution timeline card.
 │   │   │                           Mark-name fallback chain extended to also use
 │   │   │                           `domestic.mark_text`. Domestic epic complete.
+│   │   │                           "Dead mode" (self-contained `dead_mode/`
+│   │   │                           package: AIMD controller + threads-fetch/
+│   │   │                           coroutine-stores runner + safety valve) is a
+│   │   │                           max-throughput adaptive-concurrency sweep
+│   │   │                           path. The normal sweep delegates via one
+│   │   │                           `if mode=='dead'` branch; toggled live from
+│   │   │                           /admin/domestic (control row `mode`/
+│   │   │                           `concurrency` cols). Auto-reverts to normal +
+│   │   │                           pauses on sustained NOIP blocks.
 │   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
 │   │   ├── alembic/                Migrations
 │   │   ├── scripts/                One-off scripts (smoke_ingest.py)
