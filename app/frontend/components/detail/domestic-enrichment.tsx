@@ -29,16 +29,6 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   );
 }
 
-// Render a label/value row that is always shown (shows "—" when missing).
-function RowAlways({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <>
-      <dt className="text-mute">{label}</dt>
-      <dd className="font-medium text-ink">{value ?? "—"}</dd>
-    </>
-  );
-}
-
 /** DomesticTimeline — NOIP prosecution events. Rendered as its own card above
  * Goods & services, only when `e.timeline` is non-empty. Each row is a
  * `Record<string, unknown>` from the NOIP API; we render it defensively. */
@@ -112,16 +102,12 @@ export function DomesticEnrichment({ e }: { e: DomesticEnrichmentData }) {
           </div>
         </CardHead>
         <dl className="grid grid-cols-[140px_1fr] gap-y-2 px-4 py-4 text-sm">
-          <RowAlways label="Application №" value={e.application_number} />
           <Row label="Applicant" value={e.applicant_name} />
           <Row label="Address" value={e.applicant_address} />
-          <Row label="Representative" value={e.representative} />
           <Row label="Mark type" value={e.mark_type} />
           <Row label="Color claim" value={e.colors} />
           <Row label="Status" value={e.status_code} />
-          <Row label="Filed" value={e.filing_date ? formatDate(e.filing_date) : null} />
           <Row label="Publication №" value={e.publication_no} />
-          <Row label="Published" value={e.publication_date ? formatDate(e.publication_date) : null} />
           <Row label="Granted" value={e.grant_date ? formatDate(e.grant_date) : null} />
           <Row label="Expiry" value={e.expiry_date ? formatDate(e.expiry_date) : null} />
           {e.nice_classes && e.nice_classes.length > 0 && (
