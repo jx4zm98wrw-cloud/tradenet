@@ -28,7 +28,12 @@ _MIN_DELAY_S = 1.0
 # pauses immediately and a human decides when to resume. 5xx stays retryable
 # (the flaky-cluster case we built the retry loop for).
 _BLOCK_STATUSES = frozenset({403, 429})
-_MAX_BACKOFF_S = 60.0
+# Cap the flaky-5xx retry backoff LOW. NOIP's ~50% 500s are random cluster
+# flakiness, not rate-limiting, so waiting longer doesn't improve the next
+# attempt's odds — it just stalls the sweep (a 60s cap produced ~286s/mark
+# tails, ~doubling wall-clock). Genuine rate-limit signals are handled
+# separately and DO back off fully (Retry-After header; 403/429 → stop).
+_MAX_BACKOFF_S = 8.0
 
 
 class NoipBlockedError(RuntimeError):
@@ -53,6 +58,14 @@ class FetchResult:
 
 def _is_valid(status_code: int, body: str) -> bool:
     return status_code == 200 and _VALID_MARKER in body
+
+
+def _backoff_seconds(attempt: int, base: float) -> float:
+    """Exponential backoff for a retryable flaky 5xx, capped at _MAX_BACKOFF_S.
+    The cap is deliberately low: the 500s are random flakiness, not rate-limiting,
+    so a long wait is pure stall (genuine throttling comes via Retry-After/403/429
+    and is handled by the caller)."""
+    return min(base * (2 ** (attempt - 1)), _MAX_BACKOFF_S)
 
 
 def _retry_after_seconds(resp: object) -> float | None:
@@ -104,11 +117,11 @@ def fetch_raw(
         if last_status in _BLOCK_STATUSES:
             raise NoipBlockedError(vnid, last_status, _retry_after_seconds(resp))
         # Otherwise it's the flaky-cluster 5xx: back off (honor Retry-After if
-        # present, else exponential + capped) and retry.
+        # present, else a low-capped exponential) and retry.
         if delay and attempt < max_attempts:
             wait = _retry_after_seconds(resp)
             if wait is None:
-                wait = min(delay * (2 ** (attempt - 1)), _MAX_BACKOFF_S)
+                wait = _backoff_seconds(attempt, delay)
             time.sleep(wait)
     raise RuntimeError(
         f"NOIP fetch failed for {vnid}: no valid body in {max_attempts} attempts (last status {last_status})"
