@@ -48,6 +48,51 @@ export function MadridTimeline({ e }: { e: MadridEnrichmentData }) {
   );
 }
 
+// An event counts as VN-related if Vietnam is an explicit party OR the WIPO
+// event type names VN. The `parties` check alone misses Renewal events — WIPO
+// mis-attributes their `parties` to the holder's country — so the `\bVN\b` type
+// check is required to catch VN renewals. Use BOTH conditions (OR), do not drop
+// the type check.
+const isVnEvent = (e: { type?: string; parties?: string[] }) =>
+  (e.parties?.includes("VN") ?? false) || /\bVN\b/.test(e.type ?? "");
+
+// MadridVnTimeline — VN-scoped prosecution events as a 2-column (Event | Date)
+// table, mirroring DomesticTimeline so Madrid and domestic marks present an
+// identical "Vietnam IP prosecution timeline" card. Rendered only when there is
+// at least one VN-related event. Event types render verbatim (they can be long
+// and are allowed to wrap); ISO dates are formatted with the shared formatDate.
+export function MadridVnTimeline({ e }: { e: MadridEnrichmentData }) {
+  const vnEvents = (e.transaction_history ?? [])
+    .filter(isVnEvent)
+    .slice()
+    .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "")); // ISO dates sort lexically
+  if (vnEvents.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHead title="Vietnam IP prosecution timeline" />
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-line text-left">
+            <th className="px-4 py-2 font-semibold text-mute">Event</th>
+            <th className="px-4 py-2 font-semibold text-mute">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {vnEvents.map((ev, i) => (
+            <tr key={i} className="border-b border-line/60 last:border-b-0">
+              <td className="px-4 py-2 text-ink-2">{ev.type ?? "—"}</td>
+              <td className="px-4 py-2 text-mute whitespace-nowrap">
+                {ev.date ? formatDate(ev.date) : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
 // Designated-jurisdiction chips (~80). Rendered in the right sidebar (under Raw
 // INID markers) on the detail page. Shows the first 5 grid rows by default.
 export function MadridJurisdictions({ e }: { e: MadridEnrichmentData }) {

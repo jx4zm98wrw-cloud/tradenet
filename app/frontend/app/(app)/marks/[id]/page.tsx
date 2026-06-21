@@ -22,6 +22,7 @@ import {
   MadridJurisdictions,
   MadridTimeline,
   MadridVnBanner,
+  MadridVnTimeline,
 } from "@/components/detail/madrid-enrichment";
 import { DomesticEnrichment, DomesticTimeline } from "@/components/detail/domestic-enrichment";
 import { ClampedText } from "@/components/detail/clamped-text";
@@ -278,6 +279,10 @@ export default function MarkDetailPage() {
 
           {/* WIPO Prosecution timeline — above Goods & services. */}
           {detail.enrichment && <MadridTimeline e={detail.enrichment} />}
+
+          {/* Vietnam IP prosecution timeline (Madrid) — 2-col Event|Date table,
+              mirrors the domestic one. Above Goods & services. */}
+          {detail.enrichment && <MadridVnTimeline e={detail.enrichment} />}
 
           {/* NOIP domestic prosecution timeline — above Goods & services. */}
           {detail.domestic && <DomesticTimeline e={detail.domestic} />}
