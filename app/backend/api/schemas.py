@@ -106,12 +106,10 @@ class TopApplicants(BaseModel):
 
 
 class TopRepresentatives(BaseModel):
+    # Counts are exact: names come from the trusted WIPO/NOIP source joined by
+    # each mark's deterministic identifier, grouped by api._entity_norm.norm.
     domestic: list[NamedCount]
     madrid: list[NamedCount]
-    # Interim metric — names are only prefix-stripped / address-trimmed, not
-    # fully canonicalized (same firm still fragments into variants). Full
-    # canonicalization is tracked in task_057fcd61.
-    approximate: bool = True
 
 
 class GazetteOverviewOut(BaseModel):

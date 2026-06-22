@@ -1,8 +1,9 @@
 """Gazette routes — upload PDFs, list status, overview analytics."""
 
 import hashlib
-import re
 import uuid
+from collections import Counter
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Literal
 
@@ -10,10 +11,11 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Upl
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .._entity_norm import norm, strip_madrid_rep_address
 from .._filename import parse_filename_meta
 from ..auth import User, require_admin, require_role
 from ..db import Gazette, GazetteStatus, Trademark, get_session
-from ..db.models import MadridRecord, UserRole
+from ..db.models import DomesticRecord, MadridRecord, UserRole
 from ..rate_limit import limiter
 from ..schemas import (
     CountryCount,
@@ -44,35 +46,33 @@ _MADRID_CATEGORIES = ("madrid_registration", "madrid_renewal")
 _EXPECTED_ISSUES_PER_YEAR = 24
 _MAX_MISSING_LISTED = 50
 
-# Leading Vietnamese law-firm legal prefix, stripped before grouping domestic
-# representatives. INTERIM (see TODO below).
-_REP_PREFIX_RE = re.compile(r"^công ty (luật )?(tnhh|cổ phần) ")
-_WS_RE = re.compile(r"\s+")
-# First digit-run or comma — Madrid `representative` concatenates the firm name
-# with its postal address; we trim at that boundary. INTERIM.
-_MADRID_REP_TRIM_RE = re.compile(r"[,]|\d")
 
-
-def _normalize_rep(raw: str) -> str:
-    """INTERIM domestic-representative normalization: casefold, collapse
-    whitespace, strip a leading `Công ty (Luật) TNHH|Cổ phần` legal prefix.
-
-    TODO(task_057fcd61): full canonicalization — cluster near-duplicate firm
-    variants (punctuation/casing/whitespace drift) to a stored canonical key.
+def _top_entities(
+    raws: Iterable[str | None],
+    *,
+    pre: Callable[[str], str] | None = None,
+    limit: int = 6,
+) -> list[NamedCount]:
+    """Group trusted names by `norm` key, count occurrences (one per mark), and
+    return the top `limit` as NamedCount, displaying the most-common raw spelling
+    per key. `pre` (e.g. strip_madrid_rep_address) runs before norm + display.
+    Ordering is deterministic: by descending count, then norm key.
     """
-    s = _WS_RE.sub(" ", raw).strip().casefold()
-    s = _REP_PREFIX_RE.sub("", s)
-    return s.strip()
-
-
-def _trim_madrid_rep(raw: str) -> str:
-    """INTERIM Madrid-representative trim: take the firm name up to the first
-    digit-run / address token, casefolded + whitespace-collapsed.
-
-    TODO(task_057fcd61): full canonicalization.
-    """
-    head = _MADRID_REP_TRIM_RE.split(raw, maxsplit=1)[0]
-    return _WS_RE.sub(" ", head).strip().casefold()
+    counts: Counter[str] = Counter()
+    spellings: dict[str, Counter[str]] = {}
+    for raw in raws:
+        if not raw:
+            continue
+        display_src = (pre(raw) if pre else raw).strip()
+        if not display_src:
+            continue
+        key = norm(display_src)
+        if not key:
+            continue
+        counts[key] += 1
+        spellings.setdefault(key, Counter())[display_src] += 1
+    ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]
+    return [NamedCount(name=spellings[key].most_common(1)[0][0], n=n) for key, n in ordered]
 
 
 def _get_upload_limit() -> str:
@@ -422,76 +422,54 @@ async def gazette_overview(
     ).all()
     madrid_origin = [CountryCount(country=c, n=n) for c, n in origin_rows]
 
-    # --- Top applicants (domestic from trademarks; madrid from madrid_records)
-    dom_app_rows = (
-        await session.execute(
-            select(Trademark.applicant_name, func.count())
-            .where(Trademark.mark_category.in_(_DOMESTIC_CATEGORIES))
-            .where(Trademark.applicant_name.is_not(None))
-            .group_by(Trademark.applicant_name)
-            .order_by(func.count().desc())
-            .limit(6)
-        )
-    ).all()
-    mad_app_rows = (
-        await session.execute(
-            select(MadridRecord.holder_name, func.count())
-            .where(MadridRecord.holder_name.is_not(None))
-            .group_by(MadridRecord.holder_name)
-            .order_by(func.count().desc())
-            .limit(6)
-        )
-    ).all()
-    top_applicants = TopApplicants(
-        domestic=[NamedCount(name=n, n=c) for n, c in dom_app_rows],
-        madrid=[NamedCount(name=n, n=c) for n, c in mad_app_rows],
-    )
-
-    # --- Top representatives (INTERIM normalization — task_057fcd61) ----------
-    dom_rep_raw = (
+    # --- Top applicants -------------------------------------------------------
+    # Domestic: trusted NOIP applicant joined by application_number, gazette
+    # field as fallback for the un-enriched residual. One row per mark.
+    dom_app_raws = (
         (
             await session.execute(
-                select(Trademark.ip_agency_raw_740)
+                select(func.coalesce(DomesticRecord.applicant_name, Trademark.applicant_name))
+                .select_from(Trademark)
+                .outerjoin(
+                    DomesticRecord,
+                    DomesticRecord.application_number == Trademark.application_number,
+                )
                 .where(Trademark.mark_category.in_(_DOMESTIC_CATEGORIES))
-                .where(Trademark.ip_agency_raw_740.is_not(None))
             )
         )
         .scalars()
         .all()
     )
-    dom_rep_counts: dict[str, int] = {}
-    for raw in dom_rep_raw:
-        if raw is None:
-            continue
-        key = _normalize_rep(raw)
-        if key:
-            dom_rep_counts[key] = dom_rep_counts.get(key, 0) + 1
+    # Madrid: trusted WIPO holder (one row per IRN — the existing source).
+    mad_app_raws = (await session.execute(select(MadridRecord.holder_name))).scalars().all()
+    top_applicants = TopApplicants(
+        domestic=_top_entities(dom_app_raws),
+        madrid=_top_entities(mad_app_raws),
+    )
 
-    mad_rep_raw = (
+    # --- Top representatives (exact: trusted source + norm grouping) ----------
+    # Domestic: trusted NOIP representative joined by application_number, gazette
+    # (740) field as fallback. One row per mark.
+    dom_rep_raws = (
         (
             await session.execute(
-                select(MadridRecord.representative).where(MadridRecord.representative.is_not(None))
+                select(func.coalesce(DomesticRecord.representative, Trademark.ip_agency_raw_740))
+                .select_from(Trademark)
+                .outerjoin(
+                    DomesticRecord,
+                    DomesticRecord.application_number == Trademark.application_number,
+                )
+                .where(Trademark.mark_category.in_(_DOMESTIC_CATEGORIES))
             )
         )
         .scalars()
         .all()
     )
-    mad_rep_counts: dict[str, int] = {}
-    for raw in mad_rep_raw:
-        if raw is None:
-            continue
-        key = _trim_madrid_rep(raw)
-        if key:
-            mad_rep_counts[key] = mad_rep_counts.get(key, 0) + 1
-
-    def _top6(counts: dict[str, int]) -> list[NamedCount]:
-        ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:6]
-        return [NamedCount(name=name, n=n) for name, n in ordered]
-
+    # Madrid: trusted WIPO representative (strip the glued trailing address).
+    mad_rep_raws = (await session.execute(select(MadridRecord.representative))).scalars().all()
     top_representatives = TopRepresentatives(
-        domestic=_top6(dom_rep_counts),
-        madrid=_top6(mad_rep_counts),
-        approximate=True,
+        domestic=_top_entities(dom_rep_raws),
+        madrid=_top_entities(mad_rep_raws, pre=strip_madrid_rep_address),
     )
 
     return GazetteOverviewOut(

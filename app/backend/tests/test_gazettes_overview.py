@@ -29,7 +29,7 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from api.db import Gazette, GazetteStatus, GazetteType, RecordType, Trademark
-from api.db.models import MadridRecord
+from api.db.models import DomesticRecord, MadridRecord
 from api.settings import get_settings
 
 # Two synthetic gazettes in two future years that live data never uses.
@@ -48,6 +48,14 @@ _N_DOMREG_2099 = 2
 _N_MADREG_2099 = 2
 _N_MADRENEW_2099 = 1
 
+# Domestic representative seed: three case/whitespace variants of ONE firm
+# (norm → 1 key, 3 marks) plus a genuinely distinct firm (1 key, 2 marks).
+_REP_FIRM_A = "Công ty Luật TAGA"
+_REP_FIRM_B = "Distinct Firm XYZ"
+
+# mark_category values that count as "domestic" (mirrors routes/gazettes.py).
+_DOMESTIC_CATEGORIES = ("domestic_application", "domestic_registration")
+
 
 def _tm(gazette_id: uuid.UUID, **ids: str) -> Trademark:
     return Trademark(id=uuid.uuid4(), gazette_id=gazette_id, record_type=RecordType.A, **ids)
@@ -59,6 +67,11 @@ async def seed() -> AsyncIterator[None]:
     Session = async_sessionmaker(engine, expire_on_commit=False)
 
     async def _cleanup(s) -> None:
+        await s.execute(
+            delete(DomesticRecord).where(
+                DomesticRecord.application_number.in_(["OVWAPP0", "OVWAPP1", "OVWAPP2", "OVWREG0", "OVWREG1"])
+            )
+        )
         await s.execute(delete(MadridRecord).where(MadridRecord.irn.in_([_IRN1, _IRN2])))
         await s.execute(delete(Trademark).where(Trademark.gazette_id.in_([_GZ_A_2098, _GZ_B_2099])))
         await s.execute(delete(Gazette).where(Gazette.id.in_([_GZ_A_2098, _GZ_B_2099])))
@@ -128,6 +141,36 @@ async def seed() -> AsyncIterator[None]:
                 vn_status="granted",
                 vn_designated=True,
                 designated_countries=["VN"],
+            )
+        )
+        # Domestic enrichment rows joined by application_number. The three
+        # OVWAPP* reps are case/whitespace variants of ONE firm (norm → 1 key,
+        # 3 marks); the two OVWREG* reps are a second, distinct firm (2 marks).
+        s.add(
+            DomesticRecord(
+                application_number="OVWAPP0", applicant_name="TAGA Co", representative="Công ty Luật TAGA"
+            )
+        )
+        s.add(
+            DomesticRecord(
+                application_number="OVWAPP1", applicant_name="TAGA Co", representative="CÔNG TY LUẬT TAGA"
+            )
+        )
+        s.add(
+            DomesticRecord(
+                application_number="OVWAPP2",
+                applicant_name="TAGA Co",
+                representative="Công  ty   Luật   TAGA",
+            )
+        )
+        s.add(
+            DomesticRecord(
+                application_number="OVWREG0", applicant_name="XYZ Ltd", representative="Distinct Firm XYZ"
+            )
+        )
+        s.add(
+            DomesticRecord(
+                application_number="OVWREG1", applicant_name="XYZ Ltd", representative="Distinct Firm XYZ"
             )
         )
         await s.commit()
@@ -245,14 +288,21 @@ async def test_overview_madrid_origin_and_holders(authed_client: AsyncClient) ->
 
 
 @pytest.mark.asyncio
-async def test_overview_representatives_approximate_flag(authed_client: AsyncClient) -> None:
+async def test_overview_representatives_no_approximate_flag(authed_client: AsyncClient) -> None:
+    """Counts are now exact (trusted source + norm), so the `approximate` flag
+    is gone from the payload entirely."""
     r = await authed_client.get("/api/v1/gazettes/overview")
     d = r.json()
     reps = d["top_representatives"]
-    assert reps["approximate"] is True
+    assert "approximate" not in reps
     assert "domestic" in reps and "madrid" in reps
     assert isinstance(reps["domestic"], list)
     assert isinstance(reps["madrid"], list)
+    # Ranking contract: capped at 6, sorted by descending count.
+    for side in ("domestic", "madrid"):
+        ns = [row["n"] for row in reps[side]]
+        assert len(ns) <= 6
+        assert ns == sorted(ns, reverse=True)
 
 
 @pytest.mark.asyncio
@@ -326,3 +376,123 @@ async def test_list_default_behavior_unchanged(authed_client: AsyncClient) -> No
     d = r.json()
     assert "items" in d and "total" in d
     assert isinstance(d["items"], list)
+
+
+@pytest.mark.asyncio
+async def test_domestic_reps_merge_variants_and_keep_distinct_firms_distinct() -> None:
+    """The trusted-source join + norm grouping collapses case/whitespace variants
+    of ONE firm into a single key (3 marks) while keeping a genuinely different
+    firm separate (2 marks). Asserted on the seeded subset so it's immune to live
+    data — it exercises the exact query + norm the endpoint uses."""
+    from sqlalchemy import func, select
+
+    from api._entity_norm import norm
+
+    engine = create_async_engine(get_settings().database_url)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    appnos = ["OVWAPP0", "OVWAPP1", "OVWAPP2", "OVWREG0", "OVWREG1"]
+    async with Session() as s:
+        raws = (
+            (
+                await s.execute(
+                    select(func.coalesce(DomesticRecord.representative, Trademark.ip_agency_raw_740))
+                    .select_from(Trademark)
+                    .outerjoin(
+                        DomesticRecord,
+                        DomesticRecord.application_number == Trademark.application_number,
+                    )
+                    .where(Trademark.mark_category.in_(_DOMESTIC_CATEGORIES))
+                    .where(Trademark.application_number.in_(appnos))
+                )
+            )
+            .scalars()
+            .all()
+        )
+    await engine.dispose()
+
+    grouped: dict[str, int] = {}
+    for raw in raws:
+        grouped[norm(raw)] = grouped.get(norm(raw), 0) + 1
+
+    assert grouped[norm(_REP_FIRM_A)] == 3  # three variants merged
+    assert grouped[norm(_REP_FIRM_B)] == 2  # distinct firm kept separate
+    assert norm(_REP_FIRM_A) != norm(_REP_FIRM_B)
+    assert len(grouped) == 2
+
+
+@pytest.mark.asyncio
+async def test_domestic_reps_aggregator_equals_hand_computed_norm_grouping() -> None:
+    """The production aggregator that builds /overview's domestic representative
+    counts (`_top_entities`) equals a hand-computed
+    `GROUP BY norm(coalesce(domestic_records.representative, ip_agency_raw_740))`
+    over the same rows.
+
+    Both sides are computed over ONE DB snapshot (a single fetch), so this is
+    deterministic even while the live domestic sweep is writing rows — comparing
+    the endpoint's HTTP response against a separate recompute would race the
+    sweep across the request boundary (the table grows by ~1 row between the two
+    reads). We instead assert the exact code path the endpoint uses is a correct
+    norm-GROUP-BY. Compared by norm key so display tie-breaking can't spuriously
+    fail."""
+    from collections import Counter
+
+    from sqlalchemy import func, select
+
+    from api._entity_norm import norm
+    from api.routes.gazettes import _top_entities
+
+    engine = create_async_engine(get_settings().database_url)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    async with Session() as s:
+        raws = (
+            (
+                await s.execute(
+                    select(func.coalesce(DomesticRecord.representative, Trademark.ip_agency_raw_740))
+                    .select_from(Trademark)
+                    .outerjoin(
+                        DomesticRecord,
+                        DomesticRecord.application_number == Trademark.application_number,
+                    )
+                    .where(Trademark.mark_category.in_(_DOMESTIC_CATEGORIES))
+                )
+            )
+            .scalars()
+            .all()
+        )
+    await engine.dispose()
+
+    # Hand-computed GROUP BY norm over the SAME snapshot.
+    counts: Counter[str] = Counter()
+    for raw in raws:
+        if not raw or not raw.strip():
+            continue
+        key = norm(raw)
+        if key:
+            counts[key] += 1
+    expected = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:6]
+
+    # Production aggregator over the same snapshot; map display names back to
+    # norm keys for an apples-to-apples (key, count) comparison.
+    got = [(norm(nc.name), nc.n) for nc in _top_entities(raws)]
+    assert got == expected
+
+
+@pytest.mark.asyncio
+async def test_overview_domestic_reps_are_a_valid_norm_grouping(authed_client: AsyncClient) -> None:
+    """Live-endpoint invariant check: /overview's domestic representatives are a
+    proper norm-grouping — each displayed name collapses to a DISTINCT norm key
+    (no raw OCR fragments of one firm split across rows), capped at 6, sorted by
+    descending count. Counts themselves move under the live sweep, so they are
+    asserted exactly by the deterministic aggregator test above, not here."""
+    from api._entity_norm import norm
+
+    r = await authed_client.get("/api/v1/gazettes/overview")
+    assert r.status_code == 200
+    domestic = r.json()["top_representatives"]["domestic"]
+
+    assert len(domestic) <= 6
+    ns = [row["n"] for row in domestic]
+    assert ns == sorted(ns, reverse=True)
+    # Grouping happened: distinct rows must not share a norm key.
+    keys = [norm(row["name"]) for row in domestic]
+    assert len(keys) == len(set(keys))
