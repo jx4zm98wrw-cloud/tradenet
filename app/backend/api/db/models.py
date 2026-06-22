@@ -267,6 +267,16 @@ class Trademark(Base):
     # IP Agency
     ip_agency_raw_740: Mapped[str | None] = mapped_column(Text, nullable=True)
     ip_agency: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+
+    # Denormalized clean entity names (Phase 2 of entity canonicalization).
+    # Resolved by scripts/backfill_entity_clean.py from the trusted source by
+    # deterministic identifier (NOIP→WIPO→gazette). *_clean is the trusted
+    # display name; *_norm is norm(*_clean) — the dashboard's GROUP BY key,
+    # indexed so /overview groups at any DB size without a per-query join.
+    applicant_clean: Mapped[str | None] = mapped_column(Text, nullable=True)
+    applicant_norm: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
+    representative_clean: Mapped[str | None] = mapped_column(Text, nullable=True)
+    representative_norm: Mapped[str | None] = mapped_column(Text, nullable=True, index=True)
     ip_agency_status: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Misc passthrough of raw marker text — handy for audit, not for query.
