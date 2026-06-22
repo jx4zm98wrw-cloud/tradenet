@@ -33,6 +33,8 @@ Two pieces, smallest-first:
 
 ### Phase 1 — Dashboard reads the trusted source (no schema change)
 
+> **Status: implemented** (2026-06-22). `api/_entity_norm.py` (`norm()` + `strip_madrid_rep_address()`) added; the four `/overview` aggregations rewired to the trusted-source join + `norm` grouping; `approximate` flag removed from the schema, payload, and dashboard. No migration. Plan: [`docs/superpowers/plans/2026-06-22-entity-canonicalization-phase1.md`](../plans/2026-06-22-entity-canonicalization-phase1.md). Ships as branches `feat/entity-canon-phase1-backend` (backend) + `feat/entity-canon-phase1-frontend` (hint removal).
+
 Change the `/overview` applicant + representative aggregations (PR #91) to **join the enrichment tables** and group by the normalized trusted name:
 - Domestic applicant: `domestic_records.applicant_name` (joined by `application_number`).
 - Domestic representative: `domestic_records.representative`.
