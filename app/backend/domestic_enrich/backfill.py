@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.db.models import Trademark
 
 from .client import NoipBlockedError
-from .enrich import enrich_one  # module attr so tests can monkeypatch
+from .enrich import EnrichOutcome, enrich_one  # module attrs so tests can monkeypatch
 
 log = logging.getLogger("domestic.backfill")
 
@@ -64,6 +64,7 @@ class BackfillResult:
     attempted: int = 0
     written: int = 0
     skipped: int = 0
+    not_found: int = 0  # NOIP has no published detail yet (negative-cached)
     failed: int = 0
     circuit_broke: bool = False
 
@@ -99,12 +100,16 @@ async def run_backfill(
             break
         res.attempted += 1
         try:
-            wrote = await enrich_one(session, appno, cache_dir=cache_dir, use_cache=not force)
+            outcome = await enrich_one(session, appno, cache_dir=cache_dir, use_cache=not force)
             await session.commit()
+            # A not_found is a recorded definitive negative, not a failure — it
+            # resets the breaker like any non-erroring fetch.
             cb.record_success()
-            if wrote:
+            if outcome is EnrichOutcome.WROTE:
                 res.written += 1
-            else:
+            elif outcome is EnrichOutcome.NOT_FOUND:
+                res.not_found += 1
+            else:  # UNCHANGED / UNMAPPABLE
                 res.skipped += 1
         except NoipBlockedError as exc:  # block/rate-limit → stop now, don't hammer
             await session.rollback()

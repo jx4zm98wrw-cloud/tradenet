@@ -82,6 +82,33 @@ claude_csvbuilder/
 │   │   │                           /admin/domestic (control row `mode`/
 │   │   │                           `concurrency` cols). Auto-reverts to normal +
 │   │   │                           pauses on sustained NOIP blocks.
+│   │   │                           NOT-PUBLISHED handling: NOIP returns HTTP 200
+│   │   │                           + a ~2,178-byte skeleton (no `product-form-
+│   │   │                           label` marker) for app numbers it hasn't
+│   │   │                           published a detail for yet — a DEFINITIVE
+│   │   │                           negative, not flakiness. `client.fetch_raw`
+│   │   │                           classifies this as `outcome="not_found"`
+│   │   │                           (returns at once, no retry, not cached);
+│   │   │                           `enrich.enrich_one` returns
+│   │   │                           `EnrichOutcome.NOT_FOUND` and records the mark
+│   │   │                           in the `domestic_not_found` negative-cache
+│   │   │                           table (appno PK, vnid, first/last_checked_at,
+│   │   │                           check_count). The sweep work-list EXCLUDES
+│   │   │                           marks recorded not-published within a 30-day
+│   │   │                           backoff window (`_NOT_FOUND_BACKOFF`), so it
+│   │   │                           CONVERGES (records each empty mark once, then
+│   │   │                           skips it; re-checks after the window as NOIP
+│   │   │                           publishes). A not_found is NOT a failure — it
+│   │   │                           does not increment `failed` or the
+│   │   │                           consecutive-failure breaker streak (this
+│   │   │                           de-wedges the front-of-list deadlock that
+│   │   │                           froze the sweep at ~5,806 remaining); it bumps
+│   │   │                           a separate `not_found` counter. The
+│   │   │                           /domestic-enrichment endpoint splits
+│   │   │                           `remaining` into `pending_publication` (in
+│   │   │                           domestic_not_found, unvalidated) vs
+│   │   │                           `unresolved` (the real backlog), both shown on
+│   │   │                           /admin/domestic.
 │   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
 │   │   ├── alembic/                Migrations
 │   │   ├── scripts/                One-off scripts (smoke_ingest.py)

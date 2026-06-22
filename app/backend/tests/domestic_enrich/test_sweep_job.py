@@ -60,6 +60,39 @@ async def test_chunk_processes_uncached_and_stops_at_chunk_size(db_session, tmp_
 
 
 @pytest.mark.asyncio
+async def test_not_found_does_not_trip_circuit_breaker(db_session, tmp_path, monkeypatch):
+    # The wedge: NOIP not-published marks cluster at the stably-ordered front and
+    # were misread as failures, tripping the breaker at 5 consecutive. A not_found
+    # must NOT count as failed and must NOT advance the streak — so a run of them
+    # (well past _MAX_CONSECUTIVE) keeps the sweep RUNNING and advancing.
+    from domestic_enrich.enrich import EnrichOutcome
+
+    n = ds._MAX_CONSECUTIVE + 3
+    await _set_running(db_session, chunk_size=n + 5, delay=0.0, jitter=0.0)
+
+    appnos = [f"4-2026-{i:05d}" for i in range(n)]
+
+    async def fake_iter(session):
+        return appnos
+
+    async def fake_enrich(session, appno, cache, *, http_session=None, use_cache=True):
+        return EnrichOutcome.NOT_FOUND
+
+    monkeypatch.setattr(ds, "iter_domestic_appnos", fake_iter)
+    monkeypatch.setattr(ds, "enrich_one", fake_enrich)
+    monkeypatch.setattr(ds, "_cache_dir", lambda: tmp_path)
+
+    await ds.run_chunk(db_session, enqueue_next=lambda: None)
+
+    row = (await db_session.execute(select(C).where(C.id == 1))).scalar_one()
+    assert row.status == "running"  # NOT paused — the breaker never tripped
+    assert row.not_found == n
+    assert row.failed == 0
+    assert row.ok == 0
+    assert row.processed == n
+
+
+@pytest.mark.asyncio
 async def test_chunk_noop_when_not_running(db_session, tmp_path, monkeypatch):
     monkeypatch.setattr(ds, "_cache_dir", lambda: tmp_path)
     res = await ds.run_chunk(db_session, enqueue_next=lambda: None)

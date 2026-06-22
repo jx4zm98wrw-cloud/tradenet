@@ -16,7 +16,7 @@ import asyncio
 import random
 import time
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import requests
@@ -25,17 +25,23 @@ from rq import Queue
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.db.models import DomesticNotFound
 from api.db.models import DomesticSweepControl as C
 from api.db.session import async_session
 from api.settings import get_settings
 from domestic_enrich.backfill import iter_domestic_appnos
 from domestic_enrich.client import NoipBlockedError
-from domestic_enrich.enrich import enrich_one
+from domestic_enrich.enrich import EnrichOutcome, enrich_one
 from domestic_enrich.idmap import appno_to_vnid
 
 QUEUE_NAME = "domestic"
 _MAX_CONSECUTIVE = 5
 JOB_TIMEOUT = 3600  # seconds; chunk_size × (delay + jitter) must stay well under this
+# How long a not-published mark stays out of the work-list before the sweep
+# re-checks it. NOIP publishes detail weeks after filing, so a monthly re-check
+# converges the sweep (each empty mark is recorded once, then skipped) while
+# still picking marks up once they go live.
+_NOT_FOUND_BACKOFF = timedelta(days=30)
 
 
 def _cache_dir() -> Path:
@@ -90,7 +96,16 @@ async def _ctl(session: AsyncSession) -> dict:
     row = (
         await session.execute(
             select(
-                C.status, C.mode, C.cap, C.delay, C.jitter, C.chunk_size, C.processed, C.ok, C.failed
+                C.status,
+                C.mode,
+                C.cap,
+                C.delay,
+                C.jitter,
+                C.chunk_size,
+                C.processed,
+                C.ok,
+                C.failed,
+                C.not_found,
             ).where(C.id == 1)
         )
     ).one()
@@ -106,6 +121,29 @@ async def _set(session: AsyncSession, **vals) -> None:
 def _uncached(all_appnos: list[str], cache: Path) -> list[str]:
     cached_vnids = {p.stem for p in cache.glob("*.html")}
     return [a for a in all_appnos if appno_to_vnid(a) not in cached_vnids]
+
+
+async def _recent_not_found(session: AsyncSession) -> set[str]:
+    """Application numbers recorded not-published within the backoff window — the
+    sweep skips these so it can't re-retry the same unresolvable marks every
+    chunk (the front-of-list deadlock). They re-enter the work-list once the
+    window lapses, so the sweep picks them up if NOIP has since published them."""
+    cutoff = datetime.now(UTC) - _NOT_FOUND_BACKOFF
+    rows = (
+        (
+            await session.execute(
+                select(DomesticNotFound.application_number).where(DomesticNotFound.last_checked_at >= cutoff)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return set(rows)
+
+
+def _worklist(all_appnos: list[str], cache: Path, recent_not_found: set[str]) -> list[str]:
+    """Sweep work-list = uncached AND not recently recorded as not-published."""
+    return [a for a in _uncached(all_appnos, cache) if a not in recent_not_found]
 
 
 async def run_chunk(
@@ -128,7 +166,7 @@ async def run_chunk(
 
     cache = _cache_dir()
     all_appnos = await iter_domestic_appnos(session)
-    todo = _uncached(all_appnos, cache)
+    todo = _worklist(all_appnos, cache, await _recent_not_found(session))
 
     http = http_session or requests.Session()
     streak = 0
@@ -142,16 +180,30 @@ async def run_chunk(
             await _set(session, status="idle", current_appno=None, next_appno=None)
             break
         try:
-            await enrich_one(session, appno, cache, http_session=http, use_cache=True)
+            outcome = await enrich_one(session, appno, cache, http_session=http, use_cache=True)
             await session.commit()
-            await _set(
-                session,
-                ok=ctl["ok"] + 1,
-                processed=ctl["processed"] + 1,
-                current_appno=appno,
-                next_appno=nxt,
-                last_error=None,
-            )
+            if outcome is EnrichOutcome.NOT_FOUND:
+                # NOIP has no published detail yet — recorded in the negative
+                # cache, NOT a failure. Count it apart from ok/failed and reset
+                # the breaker streak so the not-published front of the work-list
+                # can no longer wedge the sweep.
+                await _set(
+                    session,
+                    not_found=ctl["not_found"] + 1,
+                    processed=ctl["processed"] + 1,
+                    current_appno=appno,
+                    next_appno=nxt,
+                    last_error=None,
+                )
+            else:
+                await _set(
+                    session,
+                    ok=ctl["ok"] + 1,
+                    processed=ctl["processed"] + 1,
+                    current_appno=appno,
+                    next_appno=nxt,
+                    last_error=None,
+                )
             streak = 0
         except NoipBlockedError as e:
             # A block / rate-limit is not transient flakiness — stop NOW rather
@@ -190,7 +242,7 @@ async def run_chunk(
     if ctl["status"] == "stopping":
         await _set(session, status="idle", current_appno=None, next_appno=None)
     elif ctl["status"] == "running":
-        remaining = _uncached(all_appnos, cache)
+        remaining = _worklist(all_appnos, cache, await _recent_not_found(session))
         cap_hit = ctl["cap"] is not None and ctl["processed"] >= ctl["cap"]
         if remaining and not cap_hit:
             enqueue_next()

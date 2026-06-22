@@ -401,6 +401,8 @@ export type DomesticEnrichmentStats = {
   unique_appnos: number;
   validated: number;
   remaining: number;
+  pending_publication: number; // remaining marks NOIP hasn't published yet
+  unresolved: number; // remaining genuinely-still-to-fetch (the real backlog)
   pct_complete: number; // 0..1
   granted: number;
   by_category: Record<string, number>;
@@ -415,6 +417,7 @@ export type DomesticSweepControl = {
   processed: number;
   ok: number;
   failed: number;
+  not_found: number;
   mode: "normal" | "dead";
   concurrency: number;
   current_appno: string | null;

@@ -14,6 +14,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import requests
 
@@ -54,6 +55,12 @@ class FetchResult:
     source_url: str
     from_cache: bool
     attempts: int = 0
+    # "ok"        — HTTP 200 with a real detail page (`product-form-label`).
+    # "not_found" — HTTP 200 but a skeleton page (marker absent): NOIP has no
+    #               published detail for this id yet. A definitive negative, not
+    #               flakiness, so the caller records + skips it instead of
+    #               retrying to exhaustion. The skeleton is NOT cached to disk.
+    outcome: Literal["ok", "not_found"] = "ok"
 
 
 def _is_valid(status_code: int, body: str) -> bool:
@@ -112,6 +119,20 @@ def fetch_raw(
             if delay:
                 time.sleep(_MIN_DELAY_S)
             return FetchResult(vnid=vnid, html=body, source_url=url, from_cache=False, attempts=attempt)
+        # HTTP 200 but no detail marker = NOIP has no published detail for this id
+        # yet (the ~2,178-byte skeleton page). This is a DEFINITIVE negative,
+        # stable across attempts — not the flaky-cluster 500. Return it at once so
+        # the caller records + skips it; do NOT retry (pointless) and do NOT write
+        # the skeleton to cache (it must re-check after the backoff window).
+        if last_status == 200:
+            return FetchResult(
+                vnid=vnid,
+                html=body,
+                source_url=url,
+                from_cache=False,
+                attempts=attempt,
+                outcome="not_found",
+            )
         # A block / rate-limit is NOT retryable — raise so the sweep pauses
         # immediately instead of hammering and escalating to a hard ban.
         if last_status in _BLOCK_STATUSES:
