@@ -118,15 +118,17 @@ test.describe("Visual regression", () => {
     });
   });
 
-  test("/admin/gazettes empty state", async ({ page }) => {
+  test("/admin/gazettes renders", async ({ page }) => {
+    // No longer a screenshot diff: the page is a live analytics dashboard
+    // (metric cards + Chart.js per-year chart) over real seeded data, so a
+    // pixel baseline would be perpetually flaky. Assert the page renders
+    // without crashing instead — the "Gazettes" heading plus a dashboard
+    // signal ("Marks ingested per year" chart title from
+    // components/admin/gazettes-dashboard.tsx).
     await page.goto("/admin/gazettes");
-    // Wait until either the table renders (with rows or empty-state)
-    // or the loading shimmer disappears.
     await page.waitForLoadState("networkidle");
-    await expect(page).toHaveScreenshot("admin-gazettes.png", {
-      fullPage: false,
-      maxDiffPixelRatio: 0.01,
-    });
+    await expect(page.getByRole("heading", { name: "Gazettes" })).toBeVisible();
+    await expect(page.getByText("Marks ingested per year")).toBeVisible();
   });
 
   test("/watchlists", async ({ page }) => {
