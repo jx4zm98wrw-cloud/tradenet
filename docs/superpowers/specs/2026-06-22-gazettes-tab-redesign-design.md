@@ -35,9 +35,10 @@ The tab stacks three parts (top to bottom):
 
 All values from aggregation queries over `gazettes` + `trademarks.mark_category` (no new data):
 
-- **Metric cards (4):** Total marks · Domestic (apps + regs) · Madrid (reg + renewal, with enrichment %) · Coverage % (issues present vs the expected ~24/year, with a missing-count).
-- **Marks ingested per year** — stacked bar, one bar per year (2008→2026), three series: **Applications · Domestic registrations · Madrid registrations** (Madrid = reg + renewal). Colors: Applications blue (`#378ADD`), Domestic regs purple (`#7F77DD`), Madrid teal (`#1D9E75`). (Chart.js via the CSP-allowed cdnjs.)
-- **Stream split** — three-way share bar (Applications / Domestic regs / Madrid).
+- **Four streams = the four `mark_category` values, kept distinct everywhere:** Applications · Domestic registrations · Madrid registrations · Madrid renewals. (Domestic = first two; Madrid = last two — available as roll-ups, but the charts never merge reg + renewal.)
+- **Metric cards:** Total marks · Domestic (apps + regs) · Madrid registrations · Madrid renewals · Coverage % (issues present vs the expected ~24/year, with a missing-count).
+- **Marks ingested per year** — stacked bar, one bar per year (2008→2026), **four series**: Applications, Domestic registrations, Madrid registrations, Madrid renewals. Colors: Applications blue (`#378ADD`), Domestic regs purple (`#7F77DD`), Madrid reg teal (`#1D9E75`), Madrid renewal coral (`#D85A30`). (Chart.js via the CSP-allowed cdnjs.)
+- **Stream split** — four-way share bar (Applications / Domestic regs / Madrid reg / Madrid renewal).
 - **Enrichment panel** — Madrid WIPO-validated % (from `madrid_records` vs Madrid IRNs) and Domestic NOIP-validated % (from `domestic_records` vs domestic appnos). Reuses the same coverage math as `/admin/madrid` and `/admin/domestic`.
 
 ### 3. Group-by-year list
