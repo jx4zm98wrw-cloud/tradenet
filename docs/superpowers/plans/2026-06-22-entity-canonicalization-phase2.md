@@ -17,6 +17,7 @@
 - **No per-row version column.** The spec's migration lists exactly 4 columns. Idempotency comes from comparing the computed `(clean, norm)` tuple against the stored values and only `UPDATE`-ing changed rows. `ENTITY_CLEAN_VERSION` (in `_entity_norm.py`) is the derivation's logical version, surfaced in the backfill log; bump it after changing the derivation and the next run rewrites affected rows.
 - **Tests must be sweep-safe.** The live `domestic`/`madrid` sweeps write rows continuously. Per the project memory `overview-tests-snapshot-not-endpoint-vs-recompute`, never compare an endpoint response against a *separately-recomputed* value across a request boundary — it races the sweep. All deterministic assertions here are scoped to synthetic FUTURE-year gazettes / explicit ids the sweep never touches.
 - **Standing constraint:** NEVER `git add` the rename trio (`README.md`, `app/.env.example`, `app/backend/api/settings.py`). Stage every commit by explicit path.
+- **Post-implementation corrections (Task 3).** The `bf_seed` fixture and `_flush` snippets below were corrected to match what was committed: seed `record_type` uses the regime-correct enum members (`RecordType.B_domestic` for the 4 domestic rows, `RecordType.B_madrid` for the 2 madrid rows — the enum has no `.B` member); and `_flush` targets the Core table (`update(Trademark.__table__)` / `Trademark.__table__.c.id`) because SQLAlchemy 2.0 rejects ORM bulk-UPDATE-by-PK with a non-`id` executemany param key (`b_id`).
 
 ## File Structure
 
@@ -532,8 +533,8 @@ async def backfill(session: AsyncSession, *, ids: Sequence[object] | None = None
 
 async def _flush(session: AsyncSession, rows: list[dict[str, object]]) -> None:
     stmt = (
-        update(Trademark)
-        .where(Trademark.id == bindparam("b_id"))
+        update(Trademark.__table__)
+        .where(Trademark.__table__.c.id == bindparam("b_id"))
         .values(
             applicant_clean=bindparam("applicant_clean"),
             applicant_norm=bindparam("applicant_norm"),
@@ -609,7 +610,7 @@ async def bf_seed() -> AsyncIterator[list[uuid.UUID]]:
                 Trademark(
                     id=_TM_IDS[i],
                     gazette_id=_GZ,
-                    record_type=RecordType.B,
+                    record_type=RecordType.B_domestic,
                     application_number=appno,
                     certificate_number=f"BFCERT{i}",
                 )
@@ -619,7 +620,7 @@ async def bf_seed() -> AsyncIterator[list[uuid.UUID]]:
             Trademark(
                 id=_TM_IDS[4],
                 gazette_id=_GZ,
-                record_type=RecordType.B,
+                record_type=RecordType.B_madrid,
                 certificate_number=_IRN_A,
             )
         )
@@ -629,7 +630,7 @@ async def bf_seed() -> AsyncIterator[list[uuid.UUID]]:
             Trademark(
                 id=_TM_IDS[5],
                 gazette_id=_GZ,
-                record_type=RecordType.B,
+                record_type=RecordType.B_madrid,
                 madrid_number=_IRN_B,
                 ip_agency_raw_740="Gazette Fallback Agency",
                 applicant_name="Gazette Fallback Holder",
