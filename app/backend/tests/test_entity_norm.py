@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import unicodedata
 
-from api._entity_norm import norm, strip_madrid_rep_address
+from api._entity_norm import (
+    ENTITY_CLEAN_VERSION,
+    norm,
+    resolve_applicant,
+    resolve_representative,
+    strip_madrid_rep_address,
+)
 
 
 def test_norm_collapses_case() -> None:
@@ -51,13 +57,6 @@ def test_madrid_rep_address_variants_group_together() -> None:
     a = norm(strip_madrid_rep_address("OVW REP ALPHA 123 Main St, Zürich"))
     b = norm(strip_madrid_rep_address("OVW REP ALPHA 456 Other Rd, Bern"))
     assert a == b
-
-
-from api._entity_norm import (
-    ENTITY_CLEAN_VERSION,
-    resolve_applicant,
-    resolve_representative,
-)
 
 
 def test_entity_clean_version_is_a_positive_int():
