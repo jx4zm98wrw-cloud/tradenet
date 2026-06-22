@@ -222,7 +222,11 @@ NOIP (`domestic_records`) → WIPO (`madrid_records`) → gazette fallback — b
 recompute-and-compare; `ENTITY_CLEAN_VERSION` in `api/_entity_norm.py`).
 `/overview` domestic applicant/representative panels `GROUP BY *_norm`;
 Madrid panels stay per-IRN over `madrid_records` (counts unchanged from
-Phase 1). See `docs/superpowers/specs/2026-06-22-entity-canonicalization-design.md`.
+Phase 1). The ingest worker does NOT populate these columns, so marks from
+gazettes ingested after the last backfill have `NULL *_norm` and are omitted
+from the domestic panels (which filter `*_norm IS NOT NULL`) until the
+backfill is re-run — re-run `scripts/backfill_entity_clean.py` after a fresh
+ingest. See `docs/superpowers/specs/2026-06-22-entity-canonicalization-design.md`.
 
 ## Data files
 
