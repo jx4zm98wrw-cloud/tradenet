@@ -149,6 +149,16 @@ class PDFProcessor:
                         for line in processed_text.split("\n"):
                             if line.strip():
                                 page_texts.append((page_num, line.strip()))
+                    # Release this page's cached object model before moving on.
+                    # pdfplumber caches every parsed page (chars/rects/lines +
+                    # the LRU text map) on the Page instance, and `pdf.pages`
+                    # keeps all Page objects alive for the whole `with` block, so
+                    # without this the cache grows ~linearly with page count and
+                    # OOM-kills the worker on large gazettes (1,900+ pages).
+                    # close() clears both the cached_properties and get_textmap's
+                    # LRU cache; it runs only after the page's text has already
+                    # been extracted, so extracted output is unchanged.
+                    page.close()
                 if not page_texts:
                     self.logger.warning(
                         f"{Fore.YELLOW}No text extracted from {pdf_path.name}{Style.RESET_ALL}"
