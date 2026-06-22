@@ -1,99 +1,87 @@
-# Entity Canonicalization — Clean-DB Parties Layer (Design)
+# Clean Entity Names via Trusted-Source Join (Design)
 
-**Status:** Approved for planning · 2026-06-22 · supersedes the representative-only task `task_057fcd61`
+**Status:** Approved for planning · 2026-06-22 (rev 2 — simplified) · supersedes the representative-only task `task_057fcd61`
 
-**Goal:** Make the database *clean* at the entity level — every applicant and representative across `trademarks`, `domestic_records`, and `madrid_records` resolves to a single **canonical party**, anchored to the trusted sources (NOIP / WIPO) as ground truth, with gazette-OCR names reconciled *to* that truth. The clean layer serves the dashboard, search, mark detail, and future per-entity / portfolio features.
+**Goal:** Make applicant + representative names *clean* by using the authoritative WIPO/NOIP values that are **already in the database**, linked to each mark by its deterministic identifier — no fuzzy matching, no guessing.
 
-## Problem
+## Key insight (why this is simple)
 
-Entity names exist in three places with three qualities:
-- **Gazette OCR** (`trademarks.applicant_name`, `trademarks.ip_agency_raw_740`) — messy: punctuation, casing, whitespace, legal-prefix variance. The same firm fragments into many "distinct" values.
-- **NOIP** (`domestic_records.applicant_name`, `.representative`) — authoritative, clean. Representatives: **558 distinct** (vs thousands of gazette variants); applicants authoritative.
-- **WIPO** (`madrid_records.holder_name`, `.representative`) — authoritative; holders ~3,142 distinct; representatives ~2,410 but with a **glued trailing address** that must be stripped.
+Every mark already carries a **deterministic key** to its trusted record, so we never have to *guess* which messy strings are the same firm:
 
-So any grouping/dedup/count on the raw fields is wrong. The current `/admin/gazettes` dashboard carries an `approximate` flag for exactly this reason.
+| `mark_category` | Identifier | Trusted record (already in DB) |
+|---|---|---|
+| `domestic_application` | `application_number` | `domestic_records` (NOIP) |
+| `domestic_registration` | `application_number` | `domestic_records` (NOIP) |
+| `madrid_registration` | `IRN` (`trademarks.lineage_key`) | `madrid_records` (WIPO) |
+| `madrid_renewal` | `IRN` (`trademarks.lineage_key`) | `madrid_records` (WIPO) |
 
-## Ground truth & precedence
+So the clean applicant/representative for a mark is **a join away** — `trademarks.application_number = domestic_records.application_number`, or `trademarks.lineage_key = madrid_records.irn`. We take the trusted field; the messy gazette fields (`applicant_name`, `ip_agency_raw_740`) are pure fallback for the small un-enriched residual.
 
-Per mark, the canonical name is taken from the **best available source**, in order:
-1. **NOIP** (`domestic_records`) for domestic marks.
-2. **WIPO** (`madrid_records`) for Madrid marks.
-3. **Gazette** fields only as fallback (un-enriched marks), reconciled to the reference vocabulary.
+**Explicitly rejected (and why):** a `parties` dimension table, a fuzzy `match()` engine, reference-snap matching, and an overrides file. Those only exist to solve "which OCR variants are the same entity?" — a problem the identifier **already answers deterministically**. Building them would add risk (wrongly merging two real firms) and a copy of data to keep in sync, for no benefit. We do **not** build a third reference table either — `domestic_records` / `madrid_records` already *are* the trusted reference.
 
-NOIP + WIPO distinct sets form the **reference vocabulary** that gazette/residual names snap to. They are not blindly clustered — matching against a known-good dictionary is the safe, supervised approach.
+## The one thing the join doesn't give for free: clean *counts*
 
-## Architecture — a `parties` dimension table (FK model)
+The join gives clean *names*, but the trusted sources still hold light spelling variants of the same entity — NOIP `CÔNG TY TNHH … TAGA` vs `Công ty TNHH … TAGA` (case), WIPO `L'OREAL` vs `L'Oréal`. For *grouping/counting* (the dashboard's "top entities"), apply a **trivial normalizer** to form a grouping key:
 
-Chosen over canonical text columns for scale: at ~1–2M+ trademark rows, an integer `party_id` FK (4–8 B) beats duplicating a ~50-byte Vietnamese name on every row — smaller tables/indexes, faster integer `GROUP BY`/joins, and a merge repoints one row instead of thousands.
+`norm(s) = NFC-normalize → casefold → collapse internal whitespace → trim`
+
+That's a one-liner (`api/_entity_norm.py`, ~10 lines), **not** a fuzzy engine. It collapses case/whitespace variants; it never merges distinct names. (WIPO representatives additionally have a trailing glued address — strip at the first digit-run/address token before norming; that's a deterministic cut, not fuzzy.)
+
+## Architecture
+
+Two pieces, smallest-first:
+
+### Phase 1 — Dashboard reads the trusted source (no schema change)
+
+Change the `/overview` applicant + representative aggregations (PR #91) to **join the enrichment tables** and group by the normalized trusted name:
+- Domestic applicant: `domestic_records.applicant_name` (joined by `application_number`).
+- Domestic representative: `domestic_records.representative`.
+- Madrid applicant: `madrid_records.holder_name` (already used).
+- Madrid representative: `madrid_records.representative` (already used) — apply the address-strip + norm.
+- Group by `norm(name)`, display the most-common raw form per key.
+
+Result: domestic counts become **exact** (558 real reps, not OCR fragments); the `approximate` flag is **removed**. No migration. This is most of the value.
+
+### Phase 2 — Denormalized clean columns (optional, for scale + reuse)
+
+A re-runnable, idempotent backfill (mirrors the domestic/Madrid re-derive pattern) that writes the resolved clean values onto `trademarks` so search / mark-detail / future "all marks by firm" read a clean column without joining every time:
 
 ```
-parties
-  id            bigint PK
-  kind          text   -- 'applicant' | 'representative'   (CHECK)
-  canonical_name text  -- chosen human-readable display form
-  match_key     text   -- normalized key used for matching/dedup
-  source        text   -- 'noip' | 'wipo' | 'gazette'  (provenance of canonical_name)
-  variant_count int    -- raw variants mapped here (audit)
-  UNIQUE (kind, match_key)
-  + indexes on (kind), (canonical_name)
-
-party_alias            -- audit trail: every raw value and where it mapped
-  id            bigint PK
-  party_id      bigint FK -> parties
-  raw_name      text
-  raw_source    text   -- 'noip'|'wipo'|'gazette'
-  method        text   -- 'exact'|'normalized'|'fuzzy'|'override'
-  UNIQUE (raw_source, raw_name)
-
 trademarks
-  + applicant_party_id        bigint FK -> parties  (indexed)
-  + representative_party_id   bigint FK -> parties  (indexed)
+  + applicant_clean        text   -- trusted display name (NOIP>WIPO>gazette fallback)
+  + applicant_norm         text   -- norm(applicant_clean), indexed (grouping/filter key)
+  + representative_clean    text
+  + representative_norm     text   -- indexed
 ```
 
-(Enrichment tables keep their authoritative text fields; the trademark FKs are the resolved canonical link. A later phase may add party_id to `domestic_records`/`madrid_records` if needed — out of scope for v1.)
+Backfill per mark: resolve best source by identifier (NOIP → WIPO → gazette fallback), set `*_clean` + `*_norm`. `entity_clean_version` bump re-derives when `norm` changes. The dashboard's Phase-1 join can then be swapped for a cheap `GROUP BY *_norm` over the indexed column (or a materialized summary) at any DB size.
 
-## The canonicalization engine — `canonicalize/` package
+## Residual handling
 
-A reusable, source-aware engine (no DB inside — pure functions + curated data):
-- `normalize(raw, *, kind, source) -> str` (the **match_key**): NFC + Vietnamese diacritic normalize, casefold, collapse whitespace/punctuation, and **source-specific pre-clean**:
-  - `wipo` + `representative`: strip the trailing glued address (cut at the first address token / digit run).
-  - `gazette`: strip the legal-entity affix (`công ty (luật )?(tnhh|cổ phần|…)`), reusing `company_suffixes.json`.
-  - `noip`: light normalize only (already near-canonical).
-- `display(raw, ...) -> str`: the cleaned human-readable canonical_name.
-- `match(key, kind, reference) -> party_id | None`: exact on `match_key`; else **conservative** fuzzy (token-set / trigram above a tuned threshold) — opt-in, logged, never silently merging below confidence.
-- **Curated overrides** in `entity_overrides.json` (same pattern as `cities_overrides.json`): `{ "representative": { "<raw or key>": "<canonical>" }, "applicant": {...} }` — manual merges that survive every re-derive.
+Marks with no enrichment record (un-enriched domestic — ~0% now; the small Madrid un-enriched slice): fall back to the normalized **gazette** value (or leave `*_clean` null). No fuzzy attempt.
 
-## Backfill / reconciliation pipeline (offline, idempotent)
+## Deferred (noted, not built)
 
-Mirrors the existing domestic/Madrid re-derive pattern — re-runnable, no re-fetch:
-1. **Seed `parties`** from the reference vocabulary: distinct NOIP names + WIPO names → `normalize` → upsert one party per `(kind, match_key)` with `source` = noip/wipo.
-2. **Resolve each trademark**: pick best-source name (NOIP→WIPO→gazette) → `normalize` → `match` to a party (exact/override first, fuzzy second). Gazette-only residue with no match creates a new `gazette`-source party. Set `applicant_party_id` / `representative_party_id`; write a `party_alias` row.
-3. **Audit report**: counts by `method`, new parties created, and a "low-confidence merges" list for review. Apply overrides → re-run.
-A `canon_version` bump (like `parse_version`) lets the whole thing re-derive when the engine changes.
+**Cross-source unification** — a firm that is both a domestic rep (NOIP spelling) and a Madrid rep (WIPO spelling) stays as two grouping keys. The dashboard splits Domestic | Madrid so it's invisible there; a *global* "all marks by this firm across both regimes" would need a manual cross-walk. Out of scope for v1.
 
-## Consumer migration (phased)
+## Decomposition
 
-- **Dashboard**: replace the interim normalization with `GROUP BY party_id` (drop the `approximate` flag). Top-N panels become a **materialized summary** (top parties per kind × stream) refreshed on ingest → O(1) reads at any DB size.
-- **Mark detail / search / portfolio** (later): use `party_id` for "all marks by this entity" — a cheap FK join.
-
-## Decomposition — this is an epic; build in phases (each independently shippable + testable)
-
-- **Phase 1 — Engine + schema + trusted-source backfill.** `canonicalize/` package + unit tests; `parties`/`party_alias` tables + migration + FK columns; seed parties from NOIP/WIPO and resolve the FK for enriched marks. Deliverable: parties populated from ground truth; enriched marks linked.
-- **Phase 2 — Residual reconciliation + overrides + audit.** Snap gazette-only/un-enriched names to the reference (conservative matching), `entity_overrides.json`, and the audit report. Deliverable: every mark has both FKs; merges are reviewable.
-- **Phase 3 — Consumer migration.** Dashboard materialized summaries on `party_id` (approximate flag removed); then search/detail/portfolio.
+- **Phase 1** (small, no migration): `_entity_norm.py` + rewire the four `/overview` applicant/representative aggregations to join the trusted tables and group by `norm`. Drop the `approximate` flag. Update the dashboard's "approximate" hint.
+- **Phase 2** (optional, one migration): `applicant_clean`/`norm` + `representative_clean`/`norm` columns + backfill + `entity_clean_version`; point consumers (dashboard, later search/detail) at the columns.
 
 ## Testing
 
-- Engine (pure): the "Kim Mã" variants collapse to one key; WIPO-rep address strip; gazette legal-prefix strip; distinct firms stay distinct; overrides win.
-- Backfill: NOIP/WIPO seed counts match distinct-source counts; precedence (NOIP>WIPO>gazette) honored; idempotent (second run is a no-op); a known variant set resolves to one party.
+- `norm()` (pure): case/whitespace/diacritic variants of one name collapse to one key; distinct names stay distinct; WIPO-rep address strip.
+- Phase 1: `/overview` domestic counts equal a hand-computed `GROUP BY norm(domestic_records.representative)`; precedence (trusted over gazette) honored; un-enriched falls back.
+- Phase 2: backfill is idempotent (second run no-op); `*_norm` indexed; a known variant set groups to one key.
 - Targeted pytest only (sweep tests reset the live `domestic_sweep_control` singleton).
 
-## Non-goals (v1)
+## Non-goals
 
-- No fuzzy clustering *without* a reference anchor (no unsupervised merging of OCR noise). No entity-merge UI (overrides JSON instead). No `party_id` on enrichment tables yet. No address/individual-person canonicalization (entities = company/firm names only). No change to extraction or `mark_category`.
+No fuzzy/similarity matching. No `parties` table. No new reference table (use existing enrichment). No entity-merge UI. No address or individual-person canonicalization. No change to extraction or `mark_category`. No cross-source unification (v1).
 
 ## Standing constraints
 
 - NEVER commit the rename trio (`README.md`, `app/.env.example`, `app/backend/api/settings.py`); `git add` explicit paths.
-- Backend CI: `ruff check . && ruff format --check . && mypy api worker && alembic check && pytest`. This epic ADDS a migration (parties tables + FK columns) — `alembic check` will require it.
-- Conservative + auditable: a wrong merge is worse than an honest duplicate. Default to *not* merging below confidence; log every decision to `party_alias`.
+- Backend CI: `ruff check . && ruff format --check . && mypy api worker && alembic check && pytest`. Phase 1 = no migration; Phase 2 adds one (`alembic check` will require it).
+- Trusted source wins over gazette, always. Grouping uses `norm`; never fuzzy-merge distinct names.
