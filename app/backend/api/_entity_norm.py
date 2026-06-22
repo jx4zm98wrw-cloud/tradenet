@@ -41,3 +41,65 @@ def strip_madrid_rep_address(s: str) -> str:
     firm spelling for display.
     """
     return _MADRID_ADDR_RE.split(s, maxsplit=1)[0]
+
+
+ENTITY_CLEAN_VERSION = 1
+"""Logical version of the clean-name derivation in resolve_applicant /
+resolve_representative. There is NO per-row version column — the backfill
+(scripts/backfill_entity_clean.py) is idempotent by recompute-and-compare —
+so this constant is a documentation/trigger marker: bump it after changing
+the derivation and the next backfill run rewrites the affected rows. Surfaced
+in the backfill log."""
+
+
+def _clean_and_norm(raw: str | None) -> tuple[str | None, str | None]:
+    """Trim `raw`, returning (clean_display, norm_key) or (None, None) when it
+    is blank or norms to empty. `clean` keeps the original spelling for display;
+    `norm_key` is the grouping key."""
+    if not raw:
+        return None, None
+    clean = raw.strip()
+    if not clean:
+        return None, None
+    key = norm(clean)
+    if not key:
+        return None, None
+    return clean, key
+
+
+def _first_nonblank(*vals: str | None) -> str | None:
+    """First value that is non-None and not whitespace-only."""
+    for v in vals:
+        if v and v.strip():
+            return v
+    return None
+
+
+def resolve_applicant(
+    domestic: str | None, madrid: str | None, gazette: str | None
+) -> tuple[str | None, str | None]:
+    """Trusted display name + grouping key for an applicant.
+
+    Precedence: NOIP (`domestic_records.applicant_name`) → WIPO
+    (`madrid_records.holder_name`) → gazette fallback
+    (`trademarks.applicant_name`). The callers gate `domestic`/`madrid` by
+    `mark_category`, so at most one is set per mark.
+    """
+    return _clean_and_norm(_first_nonblank(domestic, madrid, gazette))
+
+
+def resolve_representative(
+    domestic: str | None, madrid: str | None, gazette: str | None
+) -> tuple[str | None, str | None]:
+    """Trusted display name + grouping key for a representative.
+
+    Precedence NOIP (`domestic_records.representative`) → WIPO
+    (`madrid_records.representative`) → gazette fallback
+    (`trademarks.ip_agency_raw_740`). The WIPO value glues a trailing postal
+    address onto the firm name; strip it (deterministic cut) before clean/norm.
+    """
+    if domestic and domestic.strip():
+        return _clean_and_norm(domestic)
+    if madrid and madrid.strip():
+        return _clean_and_norm(strip_madrid_rep_address(madrid))
+    return _clean_and_norm(gazette)
