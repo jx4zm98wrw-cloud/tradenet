@@ -86,22 +86,28 @@ export function GazettesByYear({ refreshKey = 0 }: { refreshKey?: number }) {
     [gazetteType, status],
   );
 
-  // When the server-side filters change, drop the cache so open years refetch.
+  // When the server-side filters change, drop the cache + rows. Declared
+  // before the auto-load effect so on a filter change it runs first (effects
+  // fire in declaration order): cache is cleared, then the auto-load effect
+  // refetches the open years with the new filter exactly once.
   React.useEffect(() => {
     loadedKeys.current = new Set();
     setRows({});
-    for (const y of Object.keys(open)) {
-      if (open[Number(y)]) loadYear(Number(y));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gazetteType, status]);
 
+  // Auto-load any open-but-unloaded year. Covers the newest year, which is
+  // force-opened after gazetteYears() resolves (bypassing toggle()), as well
+  // as manual toggles and filter changes — loadYear's identity changes when
+  // gazetteType/status change, so this re-runs and refetches open years with
+  // the new filter. loadYear is idempotent (caches by year|type|status).
+  React.useEffect(() => {
+    for (const [y, isOpen] of Object.entries(open)) {
+      if (isOpen) loadYear(Number(y));
+    }
+  }, [open, loadYear]);
+
   function toggle(year: number) {
-    setOpen((p) => {
-      const next = { ...p, [year]: !p[year] };
-      if (next[year]) loadYear(year);
-      return next;
-    });
+    setOpen((p) => ({ ...p, [year]: !p[year] }));
   }
 
   // Client-side search filter over a year's loaded rows. Matches "T<n>",
