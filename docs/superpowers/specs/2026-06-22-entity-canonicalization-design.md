@@ -46,6 +46,8 @@ Result: domestic counts become **exact** (558 real reps, not OCR fragments); the
 
 ### Phase 2 — Denormalized clean columns (optional, for scale + reuse)
 
+> **Status: implemented** (2026-06-22). Migration `20260622_0023` adds the 4 columns + 2 btree indexes; `scripts/backfill_entity_clean.py` is the idempotent backfill (recompute-and-compare; `ENTITY_CLEAN_VERSION` in `api/_entity_norm.py`). `/overview` domestic applicant + representative panels now `GROUP BY *_norm` over the indexed columns (`mode() WITHIN GROUP` for display); Madrid panels stay per-IRN over `madrid_records` to keep their counts unchanged. Plan: [`docs/superpowers/plans/2026-06-22-entity-canonicalization-phase2.md`](../plans/2026-06-22-entity-canonicalization-phase2.md).
+
 A re-runnable, idempotent backfill (mirrors the domestic/Madrid re-derive pattern) that writes the resolved clean values onto `trademarks` so search / mark-detail / future "all marks by firm" read a clean column without joining every time:
 
 ```

@@ -57,8 +57,21 @@ _REP_FIRM_B = "Distinct Firm XYZ"
 _DOMESTIC_CATEGORIES = ("domestic_application", "domestic_registration")
 
 
-def _tm(gazette_id: uuid.UUID, **ids: str) -> Trademark:
-    return Trademark(id=uuid.uuid4(), gazette_id=gazette_id, record_type=RecordType.A, **ids)
+def _tm(gazette_id: uuid.UUID, *, rep: str | None = None, app: str | None = None, **ids: str) -> Trademark:
+    from api._entity_norm import resolve_applicant, resolve_representative
+
+    app_clean, app_norm = resolve_applicant(app, None, None)
+    rep_clean, rep_norm = resolve_representative(rep, None, None)
+    return Trademark(
+        id=uuid.uuid4(),
+        gazette_id=gazette_id,
+        record_type=RecordType.A,
+        applicant_clean=app_clean,
+        applicant_norm=app_norm,
+        representative_clean=rep_clean,
+        representative_norm=rep_norm,
+        **ids,
+    )
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -107,13 +120,23 @@ async def seed() -> AsyncIterator[None]:
             )
         )
 
-        # 2098 A-file: 3 domestic_application (application_number only)
+        # 2098 A-file: 3 domestic_application carrying the 3 rep variants of one
+        # firm (norm → 1 key) + applicant "TAGA Co".
+        _rep_variants = ["Công ty Luật TAGA", "CÔNG TY LUẬT TAGA", "Công  ty   Luật   TAGA"]
         for i in range(_N_APP_2098):
-            s.add(_tm(_GZ_A_2098, application_number=f"OVWAPP{i}"))
+            s.add(_tm(_GZ_A_2098, application_number=f"OVWAPP{i}", rep=_rep_variants[i], app="TAGA Co"))
 
-        # 2099 B-file: 2 domestic_registration (appno + cert)
+        # 2099 B-file: 2 domestic_registration carrying the distinct firm.
         for i in range(_N_DOMREG_2099):
-            s.add(_tm(_GZ_B_2099, application_number=f"OVWREG{i}", certificate_number=f"OVWREGC{i}"))
+            s.add(
+                _tm(
+                    _GZ_B_2099,
+                    application_number=f"OVWREG{i}",
+                    certificate_number=f"OVWREGC{i}",
+                    rep="Distinct Firm XYZ",
+                    app="XYZ Ltd",
+                )
+            )
         # 2 madrid_registration (cert only) — soft-join to madrid_records by IRN
         s.add(_tm(_GZ_B_2099, certificate_number=_IRN1))
         s.add(_tm(_GZ_B_2099, certificate_number=_IRN2))
@@ -496,3 +519,53 @@ async def test_overview_domestic_reps_are_a_valid_norm_grouping(authed_client: A
     # Grouping happened: distinct rows must not share a norm key.
     keys = [norm(row["name"]) for row in domestic]
     assert len(keys) == len(set(keys))
+
+
+@pytest.mark.asyncio
+async def test_domestic_panels_column_groupby_equals_phase1_join_over_seed() -> None:
+    """Phase-2 column GROUP BY equals the Phase-1 join grouping over the SAME
+    seeded subset — proving 'same results, faster path'. Scoped to the synthetic
+    OVW* marks so it is immune to the live sweep (no cross-read race)."""
+    from collections import Counter
+
+    from sqlalchemy import func, select
+
+    from api._entity_norm import norm
+
+    appnos = ["OVWAPP0", "OVWAPP1", "OVWAPP2", "OVWREG0", "OVWREG1"]
+    engine = create_async_engine(get_settings().database_url)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    async with Session() as s:
+        # Phase-1 path: coalesce(domestic_records.representative, 740) + Python norm.
+        phase1_raws = (
+            (
+                await s.execute(
+                    select(func.coalesce(DomesticRecord.representative, Trademark.ip_agency_raw_740))
+                    .select_from(Trademark)
+                    .outerjoin(
+                        DomesticRecord,
+                        DomesticRecord.application_number == Trademark.application_number,
+                    )
+                    .where(Trademark.application_number.in_(appnos))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        # Phase-2 path: GROUP BY the denormalized representative_norm column.
+        phase2 = (
+            await s.execute(
+                select(Trademark.representative_norm, func.count())
+                .where(Trademark.application_number.in_(appnos))
+                .where(Trademark.representative_norm.is_not(None))
+                .group_by(Trademark.representative_norm)
+            )
+        ).all()
+    await engine.dispose()
+
+    phase1_counts = Counter(norm(r) for r in phase1_raws if r and r.strip())
+    phase2_counts = {k: n for k, n in phase2}
+    assert phase2_counts == dict(phase1_counts)
+    # The 3 variants collapsed to one key (3 marks); the distinct firm kept (2).
+    assert phase2_counts[norm("Công ty Luật TAGA")] == 3
+    assert phase2_counts[norm("Distinct Firm XYZ")] == 2

@@ -15,7 +15,7 @@ from .._entity_norm import norm, strip_madrid_rep_address
 from .._filename import parse_filename_meta
 from ..auth import User, require_admin, require_role
 from ..db import Gazette, GazetteStatus, Trademark, get_session
-from ..db.models import DomesticRecord, MadridRecord, UserRole
+from ..db.models import MadridRecord, UserRole
 from ..rate_limit import limiter
 from ..schemas import (
     CountryCount,
@@ -73,6 +73,36 @@ def _top_entities(
         spellings.setdefault(key, Counter())[display_src] += 1
     ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]
     return [NamedCount(name=spellings[key].most_common(1)[0][0], n=n) for key, n in ordered]
+
+
+async def _top_entities_column(
+    session: AsyncSession,
+    norm_col,
+    clean_col,
+    *,
+    categories: tuple[str, ...] | None = None,
+    limit: int = 6,
+) -> list[NamedCount]:
+    """Top entities straight from the denormalized columns: GROUP BY the indexed
+    `norm_col`, display the most-common `clean_col` spelling per key (Postgres
+    `mode() WITHIN GROUP`), order by descending count then norm key. This is the
+    Phase-2 fast path — same grouping as `_top_entities`, done in SQL over an
+    indexed column instead of a per-request join.
+    """
+    stmt = (
+        select(
+            func.mode().within_group(clean_col).label("display"),
+            func.count().label("n"),
+        )
+        .where(norm_col.is_not(None))
+        .group_by(norm_col)
+        .order_by(func.count().desc(), norm_col)
+        .limit(limit)
+    )
+    if categories is not None:
+        stmt = stmt.where(Trademark.mark_category.in_(categories))
+    rows = (await session.execute(stmt)).all()
+    return [NamedCount(name=row.display, n=row.n) for row in rows]
 
 
 def _get_upload_limit() -> str:
@@ -423,52 +453,31 @@ async def gazette_overview(
     madrid_origin = [CountryCount(country=c, n=n) for c, n in origin_rows]
 
     # --- Top applicants -------------------------------------------------------
-    # Domestic: trusted NOIP applicant joined by application_number, gazette
-    # field as fallback for the un-enriched residual. One row per mark.
-    dom_app_raws = (
-        (
-            await session.execute(
-                select(func.coalesce(DomesticRecord.applicant_name, Trademark.applicant_name))
-                .select_from(Trademark)
-                .outerjoin(
-                    DomesticRecord,
-                    DomesticRecord.application_number == Trademark.application_number,
-                )
-                .where(Trademark.mark_category.in_(_DOMESTIC_CATEGORIES))
-            )
-        )
-        .scalars()
-        .all()
-    )
-    # Madrid: trusted WIPO holder (one row per IRN — the existing source).
+    # Domestic: GROUP BY the denormalized applicant_norm column (backfilled from
+    # the trusted NOIP name → indexed, no per-request join). Same per-mark
+    # counts as Phase 1's join path. Madrid stays per-IRN over madrid_records.
     mad_app_raws = (await session.execute(select(MadridRecord.holder_name))).scalars().all()
     top_applicants = TopApplicants(
-        domestic=_top_entities(dom_app_raws),
+        domestic=await _top_entities_column(
+            session,
+            Trademark.applicant_norm,
+            Trademark.applicant_clean,
+            categories=_DOMESTIC_CATEGORIES,
+        ),
         madrid=_top_entities(mad_app_raws),
     )
 
-    # --- Top representatives (exact: trusted source + norm grouping) ----------
-    # Domestic: trusted NOIP representative joined by application_number, gazette
-    # (740) field as fallback. One row per mark.
-    dom_rep_raws = (
-        (
-            await session.execute(
-                select(func.coalesce(DomesticRecord.representative, Trademark.ip_agency_raw_740))
-                .select_from(Trademark)
-                .outerjoin(
-                    DomesticRecord,
-                    DomesticRecord.application_number == Trademark.application_number,
-                )
-                .where(Trademark.mark_category.in_(_DOMESTIC_CATEGORIES))
-            )
-        )
-        .scalars()
-        .all()
-    )
-    # Madrid: trusted WIPO representative (strip the glued trailing address).
+    # --- Top representatives --------------------------------------------------
+    # Domestic: GROUP BY representative_norm (backfilled trusted NOIP rep).
+    # Madrid: trusted WIPO representative per-IRN (strip the glued address).
     mad_rep_raws = (await session.execute(select(MadridRecord.representative))).scalars().all()
     top_representatives = TopRepresentatives(
-        domestic=_top_entities(dom_rep_raws),
+        domestic=await _top_entities_column(
+            session,
+            Trademark.representative_norm,
+            Trademark.representative_clean,
+            categories=_DOMESTIC_CATEGORIES,
+        ),
         madrid=_top_entities(mad_rep_raws, pre=strip_madrid_rep_address),
     )
 

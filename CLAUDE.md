@@ -212,6 +212,22 @@ Inputs and outputs live at the project root (alongside the legacy script, since 
 
 All backend imports resolve through the editable install — there are no `sys.path.insert` calls in production code. FastAPI mounts `data_dir/image` at `/static/image/`; Next.js proxies `/static/*` to the backend. `markDisplay()` on the frontend prepends `/static/image/` to `logo_path` and feeds it to every `MarkSpecimen` call site.
 
+### Entity canonicalization (Phase 2)
+
+`trademarks` carries denormalized `applicant_clean`/`applicant_norm` +
+`representative_clean`/`representative_norm` (migration `20260622_0023`;
+`*_norm` btree-indexed). Resolved per mark by deterministic identifier —
+NOIP (`domestic_records`) → WIPO (`madrid_records`) → gazette fallback — by
+`scripts/backfill_entity_clean.py` (re-runnable, idempotent via
+recompute-and-compare; `ENTITY_CLEAN_VERSION` in `api/_entity_norm.py`).
+`/overview` domestic applicant/representative panels `GROUP BY *_norm`;
+Madrid panels stay per-IRN over `madrid_records` (counts unchanged from
+Phase 1). The ingest worker does NOT populate these columns, so marks from
+gazettes ingested after the last backfill have `NULL *_norm` and are omitted
+from the domestic panels (which filter `*_norm IS NOT NULL`) until the
+backfill is re-run — re-run `scripts/backfill_entity_clean.py` after a fresh
+ingest. See `docs/superpowers/specs/2026-06-22-entity-canonicalization-design.md`.
+
 ## Data files
 
 ### `cities_by_country.json`
