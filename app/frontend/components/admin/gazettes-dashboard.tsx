@@ -26,7 +26,7 @@ import {
   Legend,
   type ChartDataset,
 } from "chart.js";
-import { Card, Pill, SegmentedControl } from "@/components/ui";
+import { Card, SegmentedControl } from "@/components/ui";
 import {
   api,
   countryDisplay,
@@ -161,7 +161,6 @@ export function GazettesDashboard() {
           title="Top representatives"
           domestic={data.top_representatives.domestic}
           madrid={data.top_representatives.madrid}
-          approximate={data.top_representatives.approximate}
         />
       </div>
     </div>
@@ -361,12 +360,10 @@ function TopPanel({
   title,
   domestic,
   madrid,
-  approximate,
 }: {
   title: string;
   domestic: NamedCount[];
   madrid: NamedCount[];
-  approximate?: boolean;
 }) {
   const [tab, setTab] = React.useState<"domestic" | "madrid">("domestic");
   const rows = tab === "domestic" ? domestic : madrid;
@@ -388,14 +385,6 @@ function TopPanel({
             ]}
           />
         </div>
-        {approximate && (
-          <p className="text-[10.5px] text-mute mb-2">
-            <Pill tone="mute" size="sm">
-              approximate
-            </Pill>{" "}
-            names not yet fully canonicalized
-          </p>
-        )}
         {rows.length === 0 ? (
           <p className="text-xs text-mute">No data.</p>
         ) : (
