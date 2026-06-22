@@ -105,6 +105,65 @@ export type TrademarkListResponse = {
 
 export type GazetteListResponse = { items: Gazette[]; total: number };
 
+// --- Overview dashboard (GET /api/v1/gazettes/overview) ----------------------
+// Mirrors backend api/schemas.py:GazetteOverviewOut exactly. The four streams
+// are the four mark_category values, kept distinct everywhere (never merged
+// into record_type). Named/country counts use `n`, not `count`.
+
+export type PerYearStreams = {
+  year: number;
+  applications: number;
+  domestic_registrations: number;
+  madrid_registrations: number;
+  madrid_renewals: number;
+};
+
+export type StreamTotals = {
+  applications: number;
+  domestic_registrations: number;
+  madrid_registrations: number;
+  madrid_renewals: number;
+  total: number;
+};
+
+export type StatusBreakdown = {
+  completed: number;
+  processing: number;
+  failed: number;
+  uploaded: number;
+  /** Gazettes needing review. Structurally 0 until a real review pipeline lands
+   *  (GazetteOut.needs_review is hardcoded false). Surfaced for shape stability. */
+  flagged: number;
+};
+
+export type MissingIssue = { year: number; issue_number: number; gazette_type: string | null };
+
+export type Coverage = { present: number; expected: number; missing: MissingIssue[] };
+
+export type NamedCount = { name: string; n: number };
+export type CountryCount = { country: string; n: number };
+
+export type TopApplicants = { domestic: NamedCount[]; madrid: NamedCount[] };
+
+export type TopRepresentatives = {
+  domestic: NamedCount[];
+  madrid: NamedCount[];
+  /** Interim — names are only prefix-stripped / address-trimmed, not fully
+   *  canonicalized (same firm still fragments). Full canonicalization is
+   *  tracked in task_057fcd61. */
+  approximate: boolean;
+};
+
+export type GazetteOverview = {
+  per_year: PerYearStreams[];
+  totals: StreamTotals;
+  status_breakdown: StatusBreakdown;
+  coverage: Coverage;
+  madrid_origin: CountryCount[];
+  top_applicants: TopApplicants;
+  top_representatives: TopRepresentatives;
+};
+
 export type SearchParams = {
   q?: string;
   country?: string;
@@ -490,6 +549,7 @@ export const api = {
   scoredSearch: (p: ScoredSearchParams) => json<SearchResults>(`/api/v1/search/trademarks?${qs(p)}`),
   getTrademark: (id: string) => json<Trademark>(`/api/v1/trademarks/${id}`),
   listGazettes: () => json<GazetteListResponse>(`/api/v1/gazettes`),
+  gazettesOverview: () => json<GazetteOverview>(`/api/v1/gazettes/overview`),
   getGazette: (id: string) => json<Gazette>(`/api/v1/gazettes/${id}`),
   statsOverview: () => json<StatsOverview>(`/api/v1/stats/overview`),
   statsCountries: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/countries?limit=${limit}`),

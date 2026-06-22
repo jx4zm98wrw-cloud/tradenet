@@ -16,6 +16,7 @@ import {
   Card, Button, IconButton, Pill, PulseDot,
 } from "@/components/ui";
 import { Icon } from "@/components/icons";
+import { GazettesDashboard } from "@/components/admin/gazettes-dashboard";
 import { api, type Gazette } from "@/lib/api";
 import { errorMessage, formatBytes, formatNumber, relativeTime } from "@/lib/format";
 
@@ -171,6 +172,11 @@ export default function AdminGazettesPage() {
           </div>
         </Card>
       )}
+
+      {/* Overview dashboard (PR 2) — sits between the upload area and the
+          gazette table. PR 3 replaces the flat table below with a
+          group-by-year list. */}
+      <GazettesDashboard />
 
       <Card>
         <table className="w-full">
