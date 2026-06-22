@@ -105,6 +105,14 @@ export type TrademarkListResponse = {
 
 export type GazetteListResponse = { items: Gazette[]; total: number };
 
+/** Per-year accordion header row (GET /api/v1/gazettes?summary=years).
+ * Mirrors backend api/schemas.py:GazetteYearSummaryRow. */
+export type GazetteYearSummary = { year: number; issue_count: number; marks: number; flagged: number };
+
+/** Optional filters for the gazette list. All passed through as query params;
+ * omit any to keep the prior behavior (no filter). */
+export type GazetteListFilters = { year?: number; gazette_type?: "A" | "B"; status?: string };
+
 // --- Overview dashboard (GET /api/v1/gazettes/overview) ----------------------
 // Mirrors backend api/schemas.py:GazetteOverviewOut exactly. The four streams
 // are the four mark_category values, kept distinct everywhere (never merged
@@ -548,7 +556,9 @@ export const api = {
     json<TrademarkListResponse>(`/api/v1/trademarks?${qs(p)}`, init),
   scoredSearch: (p: ScoredSearchParams) => json<SearchResults>(`/api/v1/search/trademarks?${qs(p)}`),
   getTrademark: (id: string) => json<Trademark>(`/api/v1/trademarks/${id}`),
-  listGazettes: () => json<GazetteListResponse>(`/api/v1/gazettes`),
+  listGazettes: (filters: GazetteListFilters = {}) =>
+    json<GazetteListResponse>(`/api/v1/gazettes?${qs(filters)}`),
+  gazetteYears: () => json<GazetteYearSummary[]>(`/api/v1/gazettes?summary=years`),
   gazettesOverview: () => json<GazetteOverview>(`/api/v1/gazettes/overview`),
   getGazette: (id: string) => json<Gazette>(`/api/v1/gazettes/${id}`),
   statsOverview: () => json<StatsOverview>(`/api/v1/stats/overview`),
