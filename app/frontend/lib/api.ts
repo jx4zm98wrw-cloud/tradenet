@@ -154,12 +154,9 @@ export type CountryCount = { country: string; n: number };
 export type TopApplicants = { domestic: NamedCount[]; madrid: NamedCount[] };
 
 export type TopRepresentatives = {
+  // Counts are exact — trusted WIPO/NOIP source grouped by a normalized key.
   domestic: NamedCount[];
   madrid: NamedCount[];
-  /** Interim — names are only prefix-stripped / address-trimmed, not fully
-   *  canonicalized (same firm still fragments). Full canonicalization is
-   *  tracked in task_057fcd61. */
-  approximate: boolean;
 };
 
 export type GazetteOverview = {
