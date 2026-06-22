@@ -39,7 +39,11 @@ All values from aggregation queries over `gazettes` + `trademarks.mark_category`
 - **Metric cards:** Total marks · Domestic (apps + regs) · Madrid registrations · Madrid renewals · Coverage % (issues present vs the expected ~24/year, with a missing-count).
 - **Marks ingested per year** — stacked bar, one bar per year (2008→2026), **four series**: Applications, Domestic registrations, Madrid registrations, Madrid renewals. Colors: Applications blue (`#378ADD`), Domestic regs purple (`#7F77DD`), Madrid reg teal (`#1D9E75`), Madrid renewal coral (`#D85A30`). (Chart.js via the CSP-allowed cdnjs.)
 - **Stream split** — four-way share bar (Applications / Domestic regs / Madrid reg / Madrid renewal).
-- **Madrid origin panel** — top holder countries of Madrid registrations designating Vietnam, a ranked bar list from `madrid_records.holder_country` (e.g. CN, US, JP, DE, FR). Answers "where do the foreign brands come from?" — a genuinely Madrid-specific signal. (Replaces an enrichment-coverage panel; `vn_status` is ~100% `granted` by construction so it carries no signal.)
+- **Enrichment panel** — Madrid WIPO-validated % (`madrid_records` vs Madrid IRNs) + Domestic NOIP-validated % (`domestic_records` vs domestic appnos). Same coverage math as `/admin/madrid` and `/admin/domestic`.
+- **Madrid origin panel** — top holder countries of Madrid registrations designating Vietnam, a ranked bar list from `madrid_records.holder_country` (e.g. CN, US, JP, DE, FR). Answers "where do the foreign brands come from?"
+- **Top applicants panel** — most active applicants by mark count, ranked bar list from `trademarks.applicant_name` (e.g. CÔNG TY CỔ PHẦN BMC VIỆT NAM, SKYLIFE GROUP, PHÚ NÔNG).
+- **Top representatives panel** — most active IP agents / law firms by mark count, from `trademarks.ip_agency_raw_740` (69% of marks carry one). **Requires name normalization**: strip the legal-entity prefix (`Công ty (Luật) TNHH …`) before grouping, otherwise the ranking collapses to the generic "Công ty TNHH" prefix rather than the firm name.
+- Note: `vn_status` is intentionally NOT a metric — it is ~100% `granted` by construction (every IRN is harvested from VN's gazette), so it carries no signal.
 
 ### 3. Group-by-year list
 
