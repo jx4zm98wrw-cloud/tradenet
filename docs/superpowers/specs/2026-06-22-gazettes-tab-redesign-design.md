@@ -47,6 +47,7 @@ All values from aggregation queries over `gazettes` + `trademarks.mark_category`
 - **Top representatives panel — split Domestic | Madrid** (segmented toggle):
   - *Domestic* = `trademarks.ip_agency_raw_740` over domestic rows (69% present). **Requires name normalization** — strip the `Công ty (Luật) TNHH …` legal prefix before grouping, else the ranking collapses to the generic prefix.
   - *Madrid* = `madrid_records.representative` (89% present). **Trim the trailing concatenated address** off the name before grouping (e.g. Manev & Partners, Chofn IP, Unitalen).
+  - **Prerequisite (tracked separately):** beyond prefix-strip / address-trim, the same firm fragments into many variants from input errors — inconsistent punctuation, capitalization, whitespace — so it "looks" different (e.g. "CÔNG TY LUẬT TNHH KIM MÃ" vs "Công ty Luật TNHH Kim Mã" vs "Kim Mã,"). The representative metric is only trustworthy once a full representative-name **canonicalization** lands (normalize + cluster near-duplicates to a canonical key, ideally a stored `representative_canonical` column). This must precede or accompany the representative panel.
 - Note: `vn_status` is intentionally NOT a metric — it is ~100% `granted` by construction (every IRN is harvested from VN's gazette), so it carries no signal.
 
 ### 3. Group-by-year list
