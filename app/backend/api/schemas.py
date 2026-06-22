@@ -35,6 +35,95 @@ class GazetteListOut(BaseModel):
     total: int
 
 
+class GazetteYearSummaryRow(BaseModel):
+    """One row of the `?summary=years` mode — feeds the accordion headers."""
+
+    year: int
+    issue_count: int
+    marks: int
+    flagged: int
+
+
+# --- Overview dashboard (GET /api/v1/gazettes/overview) -----------------------
+
+
+class PerYearStreams(BaseModel):
+    """Mark counts for one issue_year, split across the four `mark_category`
+    streams. Domestic = applications + domestic_registrations; Madrid =
+    madrid_registrations + madrid_renewals."""
+
+    year: int
+    applications: int
+    domestic_registrations: int
+    madrid_registrations: int
+    madrid_renewals: int
+
+
+class StreamTotals(BaseModel):
+    applications: int
+    domestic_registrations: int
+    madrid_registrations: int
+    madrid_renewals: int
+    total: int
+
+
+class StatusBreakdown(BaseModel):
+    completed: int
+    processing: int
+    failed: int
+    uploaded: int
+    # `flagged` = gazettes needing review. There is no real OCR pipeline yet
+    # (GazetteOut.needs_review is hardcoded False), so this is structurally 0
+    # until that column lands. Surfaced now so the frontend shape is stable.
+    flagged: int
+
+
+class MissingIssue(BaseModel):
+    year: int
+    issue_number: int
+    gazette_type: str | None = None
+
+
+class Coverage(BaseModel):
+    present: int
+    expected: int
+    missing: list[MissingIssue]
+
+
+class NamedCount(BaseModel):
+    name: str
+    n: int
+
+
+class CountryCount(BaseModel):
+    country: str
+    n: int
+
+
+class TopApplicants(BaseModel):
+    domestic: list[NamedCount]
+    madrid: list[NamedCount]
+
+
+class TopRepresentatives(BaseModel):
+    domestic: list[NamedCount]
+    madrid: list[NamedCount]
+    # Interim metric — names are only prefix-stripped / address-trimmed, not
+    # fully canonicalized (same firm still fragments into variants). Full
+    # canonicalization is tracked in task_057fcd61.
+    approximate: bool = True
+
+
+class GazetteOverviewOut(BaseModel):
+    per_year: list[PerYearStreams]
+    totals: StreamTotals
+    status_breakdown: StatusBreakdown
+    coverage: Coverage
+    madrid_origin: list[CountryCount]
+    top_applicants: TopApplicants
+    top_representatives: TopRepresentatives
+
+
 class TrademarkOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
