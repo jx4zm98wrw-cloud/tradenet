@@ -38,6 +38,8 @@ export type MadridSweepControl = {
   processed: number;
   ok: number;
   failed: number;
+  mode: "normal" | "fast";
+  concurrency: number;
   current_irn: string | null;
   next_irn: string | null;
   last_error: string | null;
@@ -45,7 +47,7 @@ export type MadridSweepControl = {
   updated_at: string;
 };
 
-export type SweepCadence = { cap?: number | null; delay?: number; jitter?: number; chunk_size?: number; mode?: "normal" | "dead" };
+export type SweepCadence = { cap?: number | null; delay?: number; jitter?: number; chunk_size?: number; mode?: "normal" | "dead" | "fast" };
 
 export type Trademark = {
   id: string;
