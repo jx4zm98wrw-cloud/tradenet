@@ -146,6 +146,17 @@ class Trademark(Base):
     # applicant_name + mark_sample (requires the pg_trgm extension; see
     # migration 20260527_0009).
     __table_args__ = (
+        # Speeds /admin/domestic-enrichment's COUNT(DISTINCT application_number)
+        # per mark_category: pre-sorted (mark_category, application_number) lets
+        # the GroupAggregate stream instead of seq-scan + disk-sort (~850ms ->
+        # ~tens of ms at 219k domestic rows). Partial: matches the endpoint's
+        # `application_number IS NOT NULL` filter.
+        Index(
+            "ix_trademarks_markcat_appno",
+            "mark_category",
+            "application_number",
+            postgresql_where=text("application_number IS NOT NULL"),
+        ),
         Index(
             "ix_trademarks_nice_classes_gin",
             "nice_classes",
