@@ -7,17 +7,17 @@ _enqueue_chunk so it can be monkeypatched in tests (no redis/worker needed).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Literal
+from datetime import UTC, datetime, timedelta
+from typing import Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import User, require_admin
 from ..db import get_session
-from ..db.models import DomesticSweepControl
+from ..db.models import DomesticNotFound, DomesticRecord, DomesticSweepControl
 
 router = APIRouter(prefix="/api/v1/admin/domestic-sweep", tags=["admin"])
 
@@ -156,6 +156,47 @@ async def stop(
     row.updated_at = _now()
     await session.commit()
     return row
+
+
+@router.post("/recheck-pending")
+async def recheck_pending(
+    _: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, int]:
+    """Reset the not_found backoff on all unvalidated marks so the sweep re-probes
+    them now instead of waiting out the 30-day window. Preserves check_count /
+    first_seen_at (timestamp reset, not row delete). If the sweep is idle, kick one
+    chunk so the re-check runs without a separate Start; a running sweep picks them
+    up on its next pass."""
+    from worker.domestic_sweep import _NOT_FOUND_BACKOFF
+
+    new_ts = _now() - (_NOT_FOUND_BACKOFF + timedelta(days=1))
+    res = cast(
+        "CursorResult[None]",
+        await session.execute(
+            update(DomesticNotFound)
+            .where(DomesticNotFound.application_number.not_in(select(DomesticRecord.application_number)))
+            .values(last_checked_at=new_ts)
+        ),
+    )
+    reset = res.rowcount or 0
+    row = await _row(session)
+    kicked = row.status == "idle"
+    if kicked:
+        row.status = "running"
+        row.processed = row.ok = row.failed = row.not_found = 0
+        row.current_appno = None
+        row.next_appno = None
+        row.last_error = None
+        row.started_at = _now()
+        # re-check always runs at normal pace; operator can toggle dead mode live
+        row.mode = "normal"
+        row.concurrency = 0
+        row.updated_at = _now()
+    await session.commit()
+    if kicked:
+        _enqueue_chunk()
+    return {"reset": reset}
 
 
 @router.patch("/config", response_model=SweepControlOut)
