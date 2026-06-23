@@ -106,7 +106,7 @@ class TopApplicants(BaseModel):
 
 
 class TopRepresentatives(BaseModel):
-    # Counts are exact: names come from the trusted WIPO/NOIP source joined by
+    # Counts are exact: names come from the trusted WIPO/IP VIETNAM source joined by
     # each mark's deterministic identifier, grouped by api._entity_norm.norm.
     domestic: list[NamedCount]
     madrid: list[NamedCount]
@@ -174,7 +174,7 @@ class TrademarkListOut(BaseModel):
 
 
 class DomesticEnrichmentOut(BaseModel):
-    """NOIP domestic trademark enrichment, joined from `domestic_records` on
+    """IP VIETNAM domestic trademark enrichment, joined from `domestic_records` on
     `application_number`. Detail-only — never on TrademarkOut."""
 
     model_config = ConfigDict(from_attributes=True)

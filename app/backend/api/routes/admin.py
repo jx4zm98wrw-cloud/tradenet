@@ -113,8 +113,8 @@ class DomesticEnrichmentStats(BaseModel):
     remaining: int
     # remaining splits into two operationally-distinct buckets so 90.4% no longer
     # reads as a coverage failure:
-    #   pending_publication — NOIP has no published detail yet (recorded in
-    #       domestic_not_found); not resolvable until NOIP publishes, then the
+    #   pending_publication — IP VIETNAM has no published detail yet (recorded in
+    #       domestic_not_found); not resolvable until IP VIETNAM publishes, then the
     #       sweep picks it up after the backoff window. Expected, not a gap.
     #   unresolved — remaining and NOT yet recorded not-published: genuinely
     #       still-to-fetch (uncached) or flaky-but-real marks the sweep works
@@ -162,7 +162,7 @@ async def domestic_enrichment(
     ).scalar_one()
     # pending_publication = marks recorded not-published (domestic_not_found) that
     # are NOT yet validated. The anti-join to domestic_records drops any stale
-    # negative-cache row for a mark NOIP has since published and the sweep stored,
+    # negative-cache row for a mark IP VIETNAM has since published and the sweep stored,
     # so pending never double-counts a validated mark.
     pending_publication = (
         await session.execute(

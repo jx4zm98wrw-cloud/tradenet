@@ -1,15 +1,15 @@
 "use client";
 
-/** DomesticEnrichment — NOIP-authoritative detail card for domestic marks.
+/** DomesticEnrichment — IP VIETNAM-authoritative detail card for domestic marks.
  * Rendered on the mark detail page when `detail.domestic` is non-null (i.e.
- * the domestic enrichment sweep has fetched NOIP data for this application).
+ * the domestic enrichment sweep has fetched IP VIETNAM data for this application).
  * Mirrors the structure of madrid-enrichment.tsx. */
 
 import type { DomesticEnrichment as DomesticEnrichmentData } from "@/lib/api";
 import { Card, CardHead, Pill } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 
-// NOIP timeline dates are `dd.mm.yyyy` strings (not ISO like the structured
+// IP VIETNAM timeline dates are `dd.mm.yyyy` strings (not ISO like the structured
 // biblio dates), so `new Date("08.01.2026")` misreads them (→ "Aug 1" or
 // "Invalid Date"). Convert to ISO before formatting; pass through anything that
 // isn't dd.mm.yyyy rather than rendering "Invalid Date".
@@ -29,19 +29,19 @@ function Row({ label, value }: { label: string; value: string | null | undefined
   );
 }
 
-/** DomesticTimeline — NOIP prosecution events. Rendered as its own card above
+/** DomesticTimeline — IP VIETNAM prosecution events. Rendered as its own card above
  * Goods & services, only when `e.timeline` is non-empty. Each row is a
- * `Record<string, unknown>` from the NOIP API; we render it defensively. */
+ * `Record<string, unknown>` from the IP VIETNAM API; we render it defensively. */
 export function DomesticTimeline({ e }: { e: DomesticEnrichmentData }) {
   const timeline = e.timeline ?? [];
   if (timeline.length === 0) return null;
 
-  // NOIP timeline rows use snake_case keys; common observed shapes:
+  // IP VIETNAM timeline rows use snake_case keys; common observed shapes:
   // { event: "…", date: "YYYY-MM-DD", status: "…" }
   // We render all string values present, falling back gracefully.
   return (
     <Card>
-      <CardHead title="Vietnam IP prosecution timeline" />
+      <CardHead title="IP VIETNAM prosecution timeline" />
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-line text-left">
@@ -87,19 +87,19 @@ export function DomesticTimeline({ e }: { e: DomesticEnrichmentData }) {
   );
 }
 
-/** DomesticEnrichment — NOIP record card. Renders only non-null fields.
+/** DomesticEnrichment — IP VIETNAM record card. Renders only non-null fields.
  * `isAdmin` gates the Fetched row and the source-database link (admin-only). */
 export function DomesticEnrichment({ e, isAdmin = false }: { e: DomesticEnrichmentData; isAdmin?: boolean }) {
   return (
     <div className="space-y-5">
-      {/* NOIP domestic record card */}
+      {/* IP VIETNAM domestic record card */}
       <Card>
         <CardHead>
           <div className="flex items-center gap-2">
             <h2 className="head-serif m-0 text-sm font-semibold text-ink leading-tight tracking-tight">
-              Vietnam IP domestic record
+              IP VIETNAM domestic record
             </h2>
-            <Pill tone="stamp" size="sm">VIETNAM IP</Pill>
+            <Pill tone="stamp" size="sm">IP VIETNAM</Pill>
           </div>
         </CardHead>
         <dl className="grid grid-cols-[140px_1fr] gap-y-2 px-4 py-4 text-sm">
@@ -139,7 +139,7 @@ export function DomesticEnrichment({ e, isAdmin = false }: { e: DomesticEnrichme
           rel="noreferrer"
           className="inline-block text-xs font-medium text-stamp hover:text-stamp-deep underline"
         >
-          View on Vietnam IP trademark database ↗
+          View on IP VIETNAM trademark database ↗
         </a>
       )}
     </div>

@@ -79,7 +79,7 @@ _TM_IDS = [uuid.UUID(f"e2000000-0000-4000-8000-00000000{i:04d}") for i in range(
 
 @pytest_asyncio.fixture
 async def bf_seed() -> AsyncIterator[list[uuid.UUID]]:
-    """Seed: 4 domestic marks (3 NOIP-rep variants of one firm + 1 distinct),
+    """Seed: 4 domestic marks (3 IP VIETNAM-rep variants of one firm + 1 distinct),
     1 madrid mark with a WIPO record (glued-address rep), 1 un-enriched madrid
     mark (gazette fallback only)."""
     engine = create_async_engine(get_settings().database_url)
@@ -138,7 +138,7 @@ async def bf_seed() -> AsyncIterator[list[uuid.UUID]]:
                 applicant_name="Gazette Fallback Holder",
             )
         )
-        # NOIP records: 3 case/whitespace variants of one rep firm + 1 distinct.
+        # IP VIETNAM records: 3 case/whitespace variants of one rep firm + 1 distinct.
         s.add(
             DomesticRecord(
                 application_number="BFAPP0", applicant_name="Acme Co", representative="Công ty Luật TAGA"
@@ -203,7 +203,7 @@ async def test_backfill_resolves_precedence_and_collapses_variants(bf_seed) -> N
     await engine.dispose()
 
     by_appno = {r.application_number: r for r in rows if r.application_number}
-    # NOIP applicant + rep used for domestic marks.
+    # IP VIETNAM applicant + rep used for domestic marks.
     assert by_appno["BFAPP0"].applicant_clean == "Acme Co"
     # The 3 rep variants collapse to ONE norm key; the 4th stays distinct.
     rep_norms = {by_appno[a].representative_norm for a in ("BFAPP0", "BFAPP1", "BFAPP2")}

@@ -1,6 +1,6 @@
 """AIMD concurrency controller for the domestic sweep's "Dead mode".
 
-Pure, no I/O. Models TCP congestion control: additive-increase while NOIP is
+Pure, no I/O. Models TCP congestion control: additive-increase while IP VIETNAM is
 healthy (probe for more headroom), multiplicative-decrease the instant it pushes
 back (a 403/429 block), and a mild decrease when the flaky-500 rate spikes
 (treat congestion as a reason to ease off). The dead-chunk runtime (worker side)
@@ -69,7 +69,7 @@ class Decision:
 
 def stats_from(outcomes: Iterable[Outcome]) -> WindowStats:
     """Tally a sequence of Outcomes into a WindowStats. A NOT_FOUND is a clean
-    HTTP 200 (NOIP is healthy, just hasn't published the detail), so it counts as
+    HTTP 200 (IP VIETNAM is healthy, just hasn't published the detail), so it counts as
     a success for congestion control — it must not look like flakiness/blocking
     and force concurrency down."""
     success = flaky = block = 0

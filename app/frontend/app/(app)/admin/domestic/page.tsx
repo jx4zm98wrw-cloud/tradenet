@@ -1,9 +1,9 @@
 "use client";
 
-/** /admin/domestic — Domestic (NOIP) enrichment progress.
+/** /admin/domestic — Domestic (IP VIETNAM) enrichment progress.
  *
  * Read-only ops view: how many unique domestic application numbers the system
- * holds, how many have been validated against the NOIP endpoint, and how many
+ * holds, how many have been validated against the IP VIETNAM endpoint, and how many
  * remain. Every number is derived from the DB at request time (no stored
  * counter), so it cannot drift. Admin-gated like /admin/gazettes: client-side
  * redirect for non-admins + backend require_admin on the endpoint (defense in
@@ -68,7 +68,7 @@ export default function AdminDomesticPage() {
             <Pill tone="mute" size="sm">Admin</Pill>
           </div>
           <p className="text-sm text-mute mt-1 max-w-prose">
-            NOIP validation coverage across all domestic trademark applications and registrations.
+            IP VIETNAM validation coverage across all domestic trademark applications and registrations.
             Derived live from the database.
           </p>
         </div>
@@ -98,7 +98,7 @@ export default function AdminDomesticPage() {
             {stats.remaining > 0 ? (
               <>
                 {" "}· <span className="text-ink">{formatNumber(stats.unresolved)}</span> still to fetch
-                {" "}· <span className="text-ink">{formatNumber(stats.pending_publication)}</span> awaiting NOIP publication
+                {" "}· <span className="text-ink">{formatNumber(stats.pending_publication)}</span> awaiting IP VIETNAM publication
               </>
             ) : " · complete"}
           </p>
@@ -230,7 +230,7 @@ function SweepControlCard() {
         <div className="flex items-center justify-between gap-2 flex-wrap border-t border-line pt-3">
           <div className="text-[11px] text-mute max-w-prose">
             <span className="font-semibold text-ink">Dead mode</span> — max-throughput adaptive concurrency on
-            the single clean IP; auto-throttles and auto-reverts to normal + pauses on sustained NOIP blocks.
+            the single clean IP; auto-throttles and auto-reverts to normal + pauses on sustained IP VIETNAM blocks.
           </div>
           <Button
             variant={s.mode === "dead" ? "primary" : "ghost"}

@@ -2,7 +2,7 @@
 
 Per trademark, resolves the trusted display name + grouping key for the
 applicant and representative by deterministic identifier:
-  NOIP   domestic_records  (joined by application_number)
+  IP VIETNAM   domestic_records  (joined by application_number)
   WIPO   madrid_records    (joined by lineage_key = irn)
   gazette fallback         (trademarks.applicant_name / ip_agency_raw_740)
 Candidates are gated by mark_category so each mark draws only from its own

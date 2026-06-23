@@ -50,7 +50,7 @@ class MarkDetailOut(BaseModel):
     # madrid_records row (joined on lineage_key). None for domestic marks
     # and for Madrid marks not yet enriched — never fabricated.
     enrichment: MadridEnrichmentOut | None = None
-    # NOIP domestic enrichment, present only for domestic marks that have a
+    # IP VIETNAM domestic enrichment, present only for domestic marks that have a
     # domestic_records row (joined on application_number). None for Madrid
     # marks and for domestic marks not yet enriched — never fabricated.
     domestic: DomesticEnrichmentOut | None = None
@@ -138,7 +138,7 @@ async def get_timeline(id: uuid.UUID, session: AsyncSession = Depends(get_sessio
                 done=True,
                 label="Application filed",
                 body=(
-                    f"Filed at NOIP · App № {m.application_number or '—'}"
+                    f"Filed at IP VIETNAM · App № {m.application_number or '—'}"
                     if filed_observed
                     else "Filing date estimated from publication (8 months prior)."
                 ),

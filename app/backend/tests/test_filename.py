@@ -1,4 +1,4 @@
-"""Tests for NOIP gazette filename parsing (api._filename)."""
+"""Tests for IP VIETNAM gazette filename parsing (api._filename)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from api.db.models import GazetteType
 @pytest.mark.parametrize(
     ("filename", "expected"),
     [
-        # Standard NOIP names.
+        # Standard IP VIETNAM names.
         ("A_T3_2026.pdf", (GazetteType.A, 3, 2026)),
         ("B_T2_2026.pdf", (GazetteType.B, 2, 2026)),
         ("B_T5_2026.pdf", (GazetteType.B, 5, 2026)),

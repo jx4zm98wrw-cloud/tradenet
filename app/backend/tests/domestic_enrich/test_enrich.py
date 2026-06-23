@@ -36,7 +36,7 @@ async def test_enrich_one_skips_unmappable_appno(db_session, tmp_path):
 
 @pytest.mark.asyncio
 async def test_enrich_one_not_found_negative_caches(db_session, tmp_path, monkeypatch):
-    # A NOIP not-published (200-skeleton) fetch must NOT write a domestic_records
+    # A IP VIETNAM not-published (200-skeleton) fetch must NOT write a domestic_records
     # row — it records the mark in domestic_not_found and returns NOT_FOUND.
     appno = "4-9999-88801"
     await db_session.execute(delete(DomesticNotFound).where(DomesticNotFound.application_number == appno))

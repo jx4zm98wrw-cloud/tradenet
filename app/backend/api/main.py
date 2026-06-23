@@ -66,7 +66,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Trademark Gazette",
         version="1.0.0",
-        description="NOIP Vietnam trademark gazette workbench",
+        description="IP VIETNAM trademark gazette workbench",
         lifespan=lifespan,
         openapi_url="/openapi.json",
         docs_url="/docs" if not settings.is_production else None,

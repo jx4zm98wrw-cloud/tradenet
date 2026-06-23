@@ -1,6 +1,6 @@
-"""Single source of truth for NOIP gazette filename parsing.
+"""Single source of truth for IP VIETNAM gazette filename parsing.
 
-NOIP publishes gazettes named like `A_T3_2026.pdf` (applications, issue 3,
+IP VIETNAM publishes gazettes named like `A_T3_2026.pdf` (applications, issue 3,
 year 2026) and `B_T2_2026.pdf` (registrations, issue 2, year 2026). This
 module extracts the three pieces of metadata from the filename.
 
@@ -28,7 +28,7 @@ _FILENAME_RE = re.compile(r"^([ABab])_T(\d+)(?:_\d+)?_(\d{4})")
 
 
 def parse_filename_meta(filename: str) -> tuple[GazetteType, int | None, int | None]:
-    """Extract gazette_type / issue_number / issue_year from a NOIP filename.
+    """Extract gazette_type / issue_number / issue_year from a IP VIETNAM filename.
 
     Example:
         >>> parse_filename_meta("A_T3_2026.pdf")

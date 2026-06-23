@@ -281,7 +281,7 @@ class Trademark(Base):
 
     # Denormalized clean entity names (Phase 2 of entity canonicalization).
     # Resolved by scripts/backfill_entity_clean.py from the trusted source by
-    # deterministic identifier (NOIP→WIPO→gazette). *_clean is the trusted
+    # deterministic identifier (IP VIETNAM→WIPO→gazette). *_clean is the trusted
     # display name; *_norm is norm(*_clean) — the dashboard's GROUP BY key,
     # indexed so /overview groups at any DB size without a per-query join.
     applicant_clean: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -361,7 +361,7 @@ class MadridRecord(Base):
 
 
 class DomesticRecord(Base):
-    """NOIP (IP Vietnam) domestic trademark detail, one row per application.
+    """IP VIETNAM domestic trademark detail, one row per application.
 
     Soft-linked to trademarks via `application_number = trademarks.application_number`.
     Hybrid storage: promoted scalar/array columns for display/filter, JSONB for
@@ -411,14 +411,14 @@ class DomesticRecord(Base):
 
 
 class DomesticNotFound(Base):
-    """Negative cache for domestic application numbers NOIP has no published
+    """Negative cache for domestic application numbers IP VIETNAM has no published
     detail for yet (HTTP 200 + skeleton page, no `product-form-label` marker).
 
     A definitive "not published yet", not flakiness — stable across dozens of
     attempts. Recording it lets the sweep skip the mark for a backoff window so
     it can't re-retry the same unresolvable marks every chunk (the stably-ordered
     front of the work-list, which was tripping the circuit breaker). After the
-    window the sweep re-checks, picking the mark up once NOIP publishes it.
+    window the sweep re-checks, picking the mark up once IP VIETNAM publishes it.
     """
 
     __tablename__ = "domestic_not_found"
@@ -480,9 +480,9 @@ class User(Base):
 
 
 class TmNameIndex(Base):
-    """NOIP wordmark reference table — see migration 0011 for the full rationale.
+    """IP VIETNAM wordmark reference table — see migration 0011 for the full rationale.
 
-    Out-of-band index from the NOIP applicant-name extract, keyed by
+    Out-of-band index from the IP VIETNAM applicant-name extract, keyed by
     application number, used by `scripts/enrich_mark_samples.py` to fill
     missing `mark_sample` values in `trademarks`. Not linked by FK to
     `gazettes` — the CSV has no per-PDF provenance and many of its rows
@@ -588,7 +588,7 @@ class DomesticSweepControl(Base):
     processed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     ok: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     failed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-    # Definitive negatives recorded this run (NOIP 200 + skeleton). Tracked apart
+    # Definitive negatives recorded this run (IP VIETNAM 200 + skeleton). Tracked apart
     # from `failed` so the de-wedged sweep is observable: ok + not_found climb
     # while failed stays flat once the not-published front is being recorded.
     not_found: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")

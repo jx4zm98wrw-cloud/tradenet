@@ -1,9 +1,9 @@
 """domestic_not_found negative-cache table + not_found counter on the sweep control
 
-A NOIP detail fetch can return HTTP 200 with a ~2,178-byte skeleton page that
+A IP VIETNAM detail fetch can return HTTP 200 with a ~2,178-byte skeleton page that
 carries no `product-form-label` marker — a definitive "not published yet", not
 flakiness (stable across 40+ attempts). This table records each such mark so the
-sweep can skip it for a backoff window (it re-checks after the window as NOIP
+sweep can skip it for a backoff window (it re-checks after the window as IP VIETNAM
 publishes the detail), instead of retrying it to exhaustion every chunk and
 tripping the circuit breaker on the stably-ordered front of the work-list.
 

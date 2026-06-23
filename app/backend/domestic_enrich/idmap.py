@@ -1,7 +1,7 @@
-"""Map a gazette application number to the NOIP WIPOPublish detail id.
+"""Map a gazette application number to the IP VIETNAM WIPOPublish detail id.
 
 `trademarks.application_number` is `4-YYYY-NNNNN` (sometimes `VN`-prefixed or
-dashed differently). NOIP's detail endpoint keys on `VN` + the digits:
+dashed differently). IP VIETNAM's detail endpoint keys on `VN` + the digits:
 `4-2026-18514` -> `VN4202618514`. Validated on 8 random marks. Unmappable /
 malformed inputs return None so the caller can skip + log rather than crash.
 """

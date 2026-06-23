@@ -42,7 +42,7 @@ router = APIRouter(prefix="/api/v1/gazettes", tags=["gazettes"])
 _DOMESTIC_CATEGORIES = ("domestic_application", "domestic_registration")
 _MADRID_CATEGORIES = ("madrid_registration", "madrid_renewal")
 
-# NOIP gazettes ship ~24 issues/year (2 per month). Used for coverage math.
+# IP VIETNAM gazettes ship ~24 issues/year (2 per month). Used for coverage math.
 _EXPECTED_ISSUES_PER_YEAR = 24
 _MAX_MISSING_LISTED = 50
 
@@ -454,7 +454,7 @@ async def gazette_overview(
 
     # --- Top applicants -------------------------------------------------------
     # Domestic: GROUP BY the denormalized applicant_norm column (backfilled from
-    # the trusted NOIP name → indexed, no per-request join). Same per-mark
+    # the trusted IP VIETNAM name → indexed, no per-request join). Same per-mark
     # counts as Phase 1's join path. Madrid stays per-IRN over madrid_records.
     mad_app_raws = (await session.execute(select(MadridRecord.holder_name))).scalars().all()
     top_applicants = TopApplicants(
@@ -468,7 +468,7 @@ async def gazette_overview(
     )
 
     # --- Top representatives --------------------------------------------------
-    # Domestic: GROUP BY representative_norm (backfilled trusted NOIP rep).
+    # Domestic: GROUP BY representative_norm (backfilled trusted IP VIETNAM rep).
     # Madrid: trusted WIPO representative per-IRN (strip the glued address).
     mad_rep_raws = (await session.execute(select(MadridRecord.representative))).scalars().all()
     top_representatives = TopRepresentatives(

@@ -1,4 +1,4 @@
-"""Polite, resumable NOIP backfill over domestic application numbers."""
+"""Polite, resumable IP VIETNAM backfill over domestic application numbers."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ async def iter_domestic_appnos(session: AsyncSession) -> list[str]:
 
 
 class CircuitBreaker:
-    """Trips after N consecutive failures so a NOIP outage halts the batch
+    """Trips after N consecutive failures so a IP VIETNAM outage halts the batch
     instead of hammering. Any success resets the streak. (Individual flaky-node
     500s are absorbed inside the client's retry loop, so a failure here means
     the client gave up entirely on a mark.)"""
@@ -64,7 +64,7 @@ class BackfillResult:
     attempted: int = 0
     written: int = 0
     skipped: int = 0
-    not_found: int = 0  # NOIP has no published detail yet (negative-cached)
+    not_found: int = 0  # IP VIETNAM has no published detail yet (negative-cached)
     failed: int = 0
     circuit_broke: bool = False
 
@@ -115,7 +115,7 @@ async def run_backfill(
             await session.rollback()
             res.failed += 1
             res.circuit_broke = True
-            log.error("NOIP block (HTTP %s) — halting backfill: %s", exc.status, exc)
+            log.error("IP VIETNAM block (HTTP %s) — halting backfill: %s", exc.status, exc)
             break
         except Exception as exc:  # one bad mark must not kill the batch
             await session.rollback()

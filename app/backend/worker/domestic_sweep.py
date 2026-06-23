@@ -5,7 +5,7 @@ application numbers via enrich_one, re-reading domestic_sweep_control each item
 so pause/stop/cadence edits take effect live, then re-enqueues itself on the
 `domestic` queue while status stays 'running'.
 
-NOTE the cache/work-list key mismatch: cache files are named by VNID (the NOIP
+NOTE the cache/work-list key mismatch: cache files are named by VNID (the IP VIETNAM
 fetch id) but the work-list is application_number, so the uncached filter maps
 each appno through appno_to_vnid.
 """
@@ -38,7 +38,7 @@ QUEUE_NAME = "domestic"
 _MAX_CONSECUTIVE = 5
 JOB_TIMEOUT = 3600  # seconds; chunk_size × (delay + jitter) must stay well under this
 # How long a not-published mark stays out of the work-list before the sweep
-# re-checks it. NOIP publishes detail weeks after filing, so a monthly re-check
+# re-checks it. IP VIETNAM publishes detail weeks after filing, so a monthly re-check
 # converges the sweep (each empty mark is recorded once, then skipped) while
 # still picking marks up once they go live.
 _NOT_FOUND_BACKOFF = timedelta(days=30)
@@ -127,7 +127,7 @@ async def _recent_not_found(session: AsyncSession) -> set[str]:
     """Application numbers recorded not-published within the backoff window — the
     sweep skips these so it can't re-retry the same unresolvable marks every
     chunk (the front-of-list deadlock). They re-enter the work-list once the
-    window lapses, so the sweep picks them up if NOIP has since published them."""
+    window lapses, so the sweep picks them up if IP VIETNAM has since published them."""
     cutoff = datetime.now(UTC) - _NOT_FOUND_BACKOFF
     rows = (
         (
@@ -183,7 +183,7 @@ async def run_chunk(
             outcome = await enrich_one(session, appno, cache, http_session=http, use_cache=True)
             await session.commit()
             if outcome is EnrichOutcome.NOT_FOUND:
-                # NOIP has no published detail yet — recorded in the negative
+                # IP VIETNAM has no published detail yet — recorded in the negative
                 # cache, NOT a failure. Count it apart from ok/failed and reset
                 # the breaker streak so the not-published front of the work-list
                 # can no longer wedge the sweep.
@@ -216,7 +216,7 @@ async def run_chunk(
                 failed=ctl["failed"] + 1,
                 current_appno=appno,
                 next_appno=nxt,
-                last_error=f"NOIP block (HTTP {e.status}) — paused; cool down before resuming",
+                last_error=f"IP VIETNAM block (HTTP {e.status}) — paused; cool down before resuming",
             )
             break
         except Exception as e:

@@ -6,7 +6,7 @@ this migration lands, 100% of `record_type='A'` rows and 95.5% of
 `record_type='B_domestic'` rows have NULL/empty `mark_sample`. The figurative
 elements + logos extract cleanly; the wordmark text doesn't.
 
-NOIP separately publishes an applicant-name extract covering 2008→present
+IP VIETNAM separately publishes an applicant-name extract covering 2008→present
 which has clean `(210)` → `(540)` mappings. We load it into this reference
 table once, then run a one-shot `UPDATE trademarks ... FROM tm_name_index`
 to fill the missing `mark_sample` values (see
@@ -16,7 +16,7 @@ The reference table stays around after enrichment for two reasons:
   1. Future PDF ingests can re-run the enrichment script to pick up
      wordmarks for newly-added rows whose app numbers are already in this
      index.
-  2. If NOIP publishes a refreshed/expanded name extract, we can
+  2. If IP VIETNAM publishes a refreshed/expanded name extract, we can
      `TRUNCATE tm_name_index` + reload + re-enrich without changing any
      other state.
 

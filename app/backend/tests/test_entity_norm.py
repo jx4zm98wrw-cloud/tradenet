@@ -65,9 +65,9 @@ def test_entity_clean_version_is_a_positive_int():
 
 
 def test_resolve_applicant_precedence_noip_over_wipo_over_gazette():
-    # NOIP (domestic) wins outright.
-    assert resolve_applicant("NOIP Co", "WIPO Co", "Gazette Co")[0] == "NOIP Co"
-    # WIPO wins when no NOIP.
+    # IP VIETNAM (domestic) wins outright.
+    assert resolve_applicant("IP VIETNAM Co", "WIPO Co", "Gazette Co")[0] == "IP VIETNAM Co"
+    # WIPO wins when no IP VIETNAM.
     assert resolve_applicant(None, "WIPO Co", "Gazette Co")[0] == "WIPO Co"
     # Gazette is the last-resort fallback.
     assert resolve_applicant(None, None, "Gazette Co")[0] == "Gazette Co"
@@ -103,13 +103,13 @@ def test_resolve_representative_strips_madrid_glued_address_only_for_wipo():
     # WIPO representative carries a glued trailing address — stripped before norm.
     clean, _ = resolve_representative(None, "OVW REP ALPHA 123 Main St, Zürich", None)
     assert clean == "OVW REP ALPHA"
-    # NOIP representative is taken verbatim (no address strip applied).
+    # IP VIETNAM representative is taken verbatim (no address strip applied).
     clean, _ = resolve_representative("Công ty Luật TAGA 12 Pho X", None, None)
     assert clean == "Công ty Luật TAGA 12 Pho X"
 
 
 def test_resolve_representative_precedence():
-    assert resolve_representative("NOIP Rep", "WIPO Rep 1 St", "Gaz Rep")[0] == "NOIP Rep"
+    assert resolve_representative("IP VIETNAM Rep", "WIPO Rep 1 St", "Gaz Rep")[0] == "IP VIETNAM Rep"
     assert resolve_representative(None, "WIPO Rep 1 St", "Gaz Rep")[0] == "WIPO Rep"
     assert resolve_representative(None, None, "Gaz Rep")[0] == "Gaz Rep"
     assert resolve_representative(None, None, None) == (None, None)

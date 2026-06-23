@@ -261,7 +261,7 @@ export default function MarkDetailPage() {
           </Card>
 
           {/* Procedural timeline (gazette-derived). Madrid and domestic-enriched
-              marks have their own NOIP/WIPO prosecution timeline below, so hide
+              marks have their own IP VIETNAM/WIPO prosecution timeline below, so hide
               the gazette-derived one for them. */}
           {!detail.enrichment && !detail.domestic && (
             <Card>
@@ -276,11 +276,11 @@ export default function MarkDetailPage() {
           {/* VN protection banner leads the Madrid section, above the timeline. */}
           {detail.enrichment && <MadridVnBanner e={detail.enrichment} />}
 
-          {/* Vietnam IP prosecution timeline (Madrid) — 2-col Event|Date table,
+          {/* IP VIETNAM prosecution timeline (Madrid) — 2-col Event|Date table,
               mirrors the domestic one. Above Goods & services. */}
           {detail.enrichment && <MadridVnTimeline e={detail.enrichment} />}
 
-          {/* NOIP domestic prosecution timeline — above Goods & services. */}
+          {/* IP VIETNAM domestic prosecution timeline — above Goods & services. */}
           {detail.domestic && <DomesticTimeline e={detail.domestic} />}
 
           {/* Goods & services */}
@@ -305,7 +305,7 @@ export default function MarkDetailPage() {
           {/* WIPO Madrid enrichment — only for enriched Madrid marks */}
           {detail.enrichment && <MadridEnrichment e={detail.enrichment} />}
 
-          {/* NOIP domestic enrichment — only for enriched domestic marks */}
+          {/* IP VIETNAM domestic enrichment — only for enriched domestic marks */}
           {detail.domestic && <DomesticEnrichment e={detail.domestic} isAdmin={isAdmin} />}
 
           {/* Similar marks */}

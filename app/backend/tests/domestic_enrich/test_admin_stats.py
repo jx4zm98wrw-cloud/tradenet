@@ -93,7 +93,7 @@ async def seed() -> AsyncIterator[None]:
                 grant_date=None,
             )
         )
-        # A domestic mark NOIP hasn't published yet: in the work-list (unique +
+        # A domestic mark IP VIETNAM hasn't published yet: in the work-list (unique +
         # remaining), unvalidated (no DomesticRecord), recorded not-published →
         # must land in the pending_publication bucket, not unresolved.
         s.add(
