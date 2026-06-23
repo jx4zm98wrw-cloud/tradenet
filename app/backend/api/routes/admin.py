@@ -14,9 +14,11 @@ from pydantic import BaseModel
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domestic_enrich.idmap import appno_to_vnid
+
 from ..auth import User, require_admin, require_user
 from ..db import Trademark, get_session
-from ..db.models import DomesticNotFound, DomesticRecord, MadridRecord, UserRole
+from ..db.models import DomesticNotFound, DomesticRecord, Gazette, MadridRecord, UserRole
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -107,6 +109,12 @@ async def madrid_enrichment(
     )
 
 
+class MalformedAppno(BaseModel):
+    application_number: str
+    applicant_name: str | None
+    gazette: str | None
+
+
 class DomesticEnrichmentStats(BaseModel):
     unique_appnos: int
     validated: int
@@ -121,6 +129,8 @@ class DomesticEnrichmentStats(BaseModel):
     #       through. This is the real backlog.
     pending_publication: int
     unresolved: int
+    malformed: int
+    malformed_appnos: list[MalformedAppno]
     pct_complete: float  # 0.0–1.0
     granted: int
     by_category: dict[str, int]
@@ -175,12 +185,49 @@ async def domestic_enrichment(
     # Clamp: pending is bounded by remaining in practice, but guard against any
     # transient skew (a negative-cache row whose mark left the work-list).
     pending_publication = min(pending_publication, remaining)
+    # Materialize the unresolved set (domestic appnos not validated and not recorded
+    # not-published) and partition it: appno_to_vnid(appno) is None => malformed
+    # (e.g. the truncated "4-2024-1"); else fetchable-unresolved. Cheap — this set
+    # is tiny once the sweep has converged.
+    # Worst case this pulls the whole unresolved backlog per request — fine once
+    # the sweep has converged to a tiny set; the only row-materializing query
+    # among the otherwise count-only enrichment endpoints.
+    unresolved_rows = (
+        await session.execute(
+            select(Trademark.application_number, Trademark.applicant_name, Gazette.filename)
+            .join(Gazette, Gazette.id == Trademark.gazette_id)
+            .where(Trademark.mark_category.in_(_DOMESTIC_CATEGORIES))
+            .where(Trademark.application_number.is_not(None))
+            .where(Trademark.application_number.not_in(select(DomesticRecord.application_number)))
+            .where(Trademark.application_number.not_in(select(DomesticNotFound.application_number)))
+        )
+    ).all()
+    seen: set[str] = set()
+    malformed_appnos: list[MalformedAppno] = []
+    malformed = 0
+    fetchable = 0
+    for appno, applicant, gazette in unresolved_rows:
+        if appno in seen:
+            continue
+        seen.add(appno)
+        if appno_to_vnid(appno) is None:
+            malformed += 1
+            # malformed_appnos is a truncated SAMPLE (cap 50) for display;
+            # `malformed` carries the full count.
+            if len(malformed_appnos) < 50:
+                malformed_appnos.append(
+                    MalformedAppno(application_number=appno, applicant_name=applicant, gazette=gazette)
+                )
+        else:
+            fetchable += 1
     return DomesticEnrichmentStats(
         unique_appnos=unique_appnos,
         validated=validated,
         remaining=remaining,
         pending_publication=pending_publication,
-        unresolved=remaining - pending_publication,
+        unresolved=fetchable,
+        malformed=malformed,
+        malformed_appnos=malformed_appnos,
         pct_complete=(validated / unique_appnos) if unique_appnos else 0.0,
         granted=granted,
         by_category=by_category,
