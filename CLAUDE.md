@@ -123,9 +123,22 @@ claude_csvbuilder/
 │   │   │                           a separate `not_found` counter. The
 │   │   │                           /domestic-enrichment endpoint splits
 │   │   │                           `remaining` into `pending_publication` (in
-│   │   │                           domestic_not_found, unvalidated) vs
-│   │   │                           `unresolved` (the real backlog), both shown on
-│   │   │                           /admin/domestic.
+│   │   │                           domestic_not_found, unvalidated),
+│   │   │                           `unresolved` (fetchable backlog), and
+│   │   │                           `malformed` (appno_to_vnid is None — the
+│   │   │                           truncated `4-2024-1` class that can't map to
+│   │   │                           an IP VIETNAM id; needs a manual appno fix),
+│   │   │                           all shown on /admin/domestic with the
+│   │   │                           malformed appnos listed (appno/applicant/
+│   │   │                           gazette) for review. Admin re-check control:
+│   │   │                           POST /api/v1/admin/domestic-sweep/recheck-
+│   │   │                           pending resets the not_found backoff on all
+│   │   │                           unvalidated marks (timestamp reset, preserves
+│   │   │                           check_count/first_seen_at) and kicks one
+│   │   │                           normal-mode chunk if idle, re-probing pending
+│   │   │                           marks now instead of waiting out the 30-day
+│   │   │                           window — surfaced as a "Re-check pending (N)"
+│   │   │                           button on /admin/domestic.
 │   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
 │   │   ├── alembic/                Migrations
 │   │   ├── scripts/                One-off scripts (smoke_ingest.py)
