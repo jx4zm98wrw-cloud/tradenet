@@ -42,7 +42,24 @@ claude_csvbuilder/
 │   │   │                           Sweep is a controllable RQ job on the
 │   │   │                           `madrid` queue; admin start/pause/resume/
 │   │   │                           stop/tune at /api/v1/admin/madrid-sweep
-│   │   │                           (worker must be running).
+│   │   │                           (worker must be running). "Fast mode"
+│   │   │                           (self-contained `fast_mode/` package:
+│   │   │                           rate-feedback controller + threaded
+│   │   │                           per-thread-event-loop runner) is a higher-
+│   │   │                           throughput sweep path that paces concurrency
+│   │   │                           to WIPO's PUBLISHED X-RateLimit budget
+│   │   │                           (Limit≈1000; X-RateLimit-Reset is unusable,
+│   │   │                           so it paces off Remaining): step concurrency
+│   │   │                           up while Remaining is healthy, down near a
+│   │   │                           floor, pause on 429/Retry-After. Unlike
+│   │   │                           domestic Dead mode it does NOT AIMD-probe for
+│   │   │                           bans (WIPO hands you the limit) and does NOT
+│   │   │                           auto-revert. The normal sweep delegates via
+│   │   │                           one `if mode=='fast'` branch; toggled from
+│   │   │                           /admin/madrid (mode/concurrency cols on
+│   │   │                           madrid_sweep_control). client.fetch_raw
+│   │   │                           surfaces X-RateLimit-Limit and raises
+│   │   │                           WipoThrottledError on 429.
 │   │   ├── domestic_enrich/        NOIP (IP Vietnam) domestic enrichment package
 │   │   │                           (idmap/client/parser/derive/store/enrich/backfill).
 │   │   │                           Populates `domestic_records` (keyed by
