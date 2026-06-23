@@ -19,6 +19,16 @@ _UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML
 _MIN_DELAY_S = 2.0
 
 
+class WipoThrottledError(RuntimeError):
+    """WIPO returned HTTP 429 / Retry-After. Distinct from a generic fetch
+    failure: the caller should sleep `retry_after` seconds, not retry hard.
+    Mirrors domestic_enrich.client.NoipBlockedError."""
+
+    def __init__(self, retry_after: float | None = None) -> None:
+        self.retry_after = retry_after
+        super().__init__(f"WIPO throttled (Retry-After {retry_after}s)")
+
+
 @dataclass
 class FetchResult:
     irn: str
@@ -26,11 +36,24 @@ class FetchResult:
     source_url: str
     from_cache: bool
     rate_remaining: int | None = None
+    rate_limit: int | None = None
+
+
+def _retry_after_seconds(headers: dict) -> float | None:
+    raw = headers.get("Retry-After")
+    if not raw:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        return None
 
 
 def _http_get(url: str, session: requests.Session | None = None) -> tuple[str, dict]:
     s = session or requests.Session()
     resp = s.get(url, headers={"User-Agent": _UA}, timeout=30)
+    if resp.status_code == 429:
+        raise WipoThrottledError(_retry_after_seconds(dict(resp.headers)))
     resp.raise_for_status()
     return resp.text, dict(resp.headers)
 
@@ -58,6 +81,7 @@ def fetch_raw(
     html, headers = _http_get(url, session=session)
     path.write_text(html, encoding="utf-8")
     rem = headers.get("X-RateLimit-Remaining")
+    lim = headers.get("X-RateLimit-Limit")
     time.sleep(_MIN_DELAY_S)  # space out real network calls
     return FetchResult(
         irn=irn,
@@ -65,4 +89,5 @@ def fetch_raw(
         source_url=url,
         from_cache=False,
         rate_remaining=int(rem) if rem and rem.isdigit() else None,
+        rate_limit=int(lim) if lim and lim.isdigit() else None,
     )

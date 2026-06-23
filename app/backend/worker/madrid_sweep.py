@@ -85,6 +85,8 @@ async def _ctl(session: AsyncSession) -> dict:
         await session.execute(
             select(
                 C.status,
+                C.mode,
+                C.concurrency,
                 C.cap,
                 C.delay,
                 C.jitter,
@@ -114,6 +116,13 @@ async def run_chunk(
     ctl = await _ctl(session)
     if ctl["status"] != "running":
         return {"status": ctl["status"], "did": 0}
+
+    if ctl["mode"] == "fast":
+        # Fast mode is a self-contained package; delegate the whole chunk. Lazy
+        # import keeps the dependency one-way (sweep -> fast_mode, no cycle).
+        from madrid_enrich.fast_mode import run_chunk as run_fast_chunk
+
+        return await run_fast_chunk(session, enqueue_next=enqueue_next, http_session=http_session)
 
     cache = _cache_dir()
     all_irns = await iter_madrid_irns(session)

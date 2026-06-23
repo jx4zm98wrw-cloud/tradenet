@@ -8,6 +8,7 @@ _enqueue_chunk so it can be monkeypatched in tests (no redis/worker needed).
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -30,6 +31,8 @@ class SweepControlOut(BaseModel):
     processed: int
     ok: int
     failed: int
+    mode: str
+    concurrency: int
     current_irn: str | None
     next_irn: str | None
     last_error: str | None
@@ -44,6 +47,7 @@ class CadenceBody(BaseModel):
     delay: float | None = None
     jitter: float | None = None
     chunk_size: int | None = None
+    mode: Literal["normal", "fast"] | None = None
 
 
 def _enqueue_chunk() -> None:
@@ -90,6 +94,8 @@ async def start(
     row.current_irn = None
     row.last_error = None
     row.started_at = _now()
+    row.mode = body.mode or "normal"
+    row.concurrency = 0
     if body.cap is not None:
         row.cap = body.cap
     if body.delay is not None:
@@ -167,6 +173,10 @@ async def config(
         row.jitter = body.jitter
     if body.chunk_size is not None:
         row.chunk_size = body.chunk_size
+    if body.mode is not None:
+        row.mode = body.mode
+        if body.mode == "normal":
+            row.concurrency = 0
     row.updated_at = _now()
     await session.commit()
     return row
