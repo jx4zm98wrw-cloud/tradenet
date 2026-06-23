@@ -405,6 +405,8 @@ export type DomesticEnrichmentStats = {
   remaining: number;
   pending_publication: number; // remaining marks IP VIETNAM hasn't published yet
   unresolved: number; // remaining genuinely-still-to-fetch (the real backlog)
+  malformed: number; // unresolved appnos that can't map to an IP VIETNAM id (need manual fix)
+  malformed_appnos: { application_number: string; applicant_name: string | null; gazette: string | null }[];
   pct_complete: number; // 0..1
   granted: number;
   by_category: Record<string, number>;
@@ -635,6 +637,8 @@ export const api = {
   domesticSweepPause: () => json<DomesticSweepControl>(`/api/v1/admin/domestic-sweep/pause`, { method: "POST" }),
   domesticSweepResume: () => json<DomesticSweepControl>(`/api/v1/admin/domestic-sweep/resume`, { method: "POST" }),
   domesticSweepStop: () => json<DomesticSweepControl>(`/api/v1/admin/domestic-sweep/stop`, { method: "POST" }),
+  domesticSweepRecheckPending: () =>
+    json<{ reset: number }>(`/api/v1/admin/domestic-sweep/recheck-pending`, { method: "POST" }),
   domesticSweepConfig: (body: SweepCadence) =>
     json<DomesticSweepControl>(`/api/v1/admin/domestic-sweep/config`, {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
