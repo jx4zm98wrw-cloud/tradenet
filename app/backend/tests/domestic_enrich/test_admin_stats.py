@@ -39,9 +39,7 @@ async def seed() -> AsyncIterator[None]:
         await s.execute(
             delete(DomesticRecord).where(DomesticRecord.application_number.in_([_APPNO1, _APPNO2]))
         )
-        await s.execute(
-            delete(DomesticNotFound).where(DomesticNotFound.application_number == _APPNO3)
-        )
+        await s.execute(delete(DomesticNotFound).where(DomesticNotFound.application_number == _APPNO3))
         await s.execute(delete(Trademark).where(Trademark.gazette_id == _GZ))
         await s.execute(delete(Gazette).where(Gazette.id == _GZ))
 

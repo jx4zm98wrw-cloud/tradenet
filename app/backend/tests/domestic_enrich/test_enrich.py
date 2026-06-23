@@ -39,9 +39,7 @@ async def test_enrich_one_not_found_negative_caches(db_session, tmp_path, monkey
     # A NOIP not-published (200-skeleton) fetch must NOT write a domestic_records
     # row — it records the mark in domestic_not_found and returns NOT_FOUND.
     appno = "4-9999-88801"
-    await db_session.execute(
-        delete(DomesticNotFound).where(DomesticNotFound.application_number == appno)
-    )
+    await db_session.execute(delete(DomesticNotFound).where(DomesticNotFound.application_number == appno))
     await db_session.commit()
 
     def fake_fetch(vnid, cache_dir, *, session=None, use_cache=True):
@@ -57,21 +55,15 @@ async def test_enrich_one_not_found_negative_caches(db_session, tmp_path, monkey
 
     # Recorded in the negative cache...
     nf = (
-        await db_session.execute(
-            select(DomesticNotFound).where(DomesticNotFound.application_number == appno)
-        )
+        await db_session.execute(select(DomesticNotFound).where(DomesticNotFound.application_number == appno))
     ).scalar_one()
     assert nf.vnid == "VN4999988801"
     assert nf.check_count == 1
     # ...and NOT written to domestic_records.
     dr = (
-        await db_session.execute(
-            select(DomesticRecord).where(DomesticRecord.application_number == appno)
-        )
+        await db_session.execute(select(DomesticRecord).where(DomesticRecord.application_number == appno))
     ).scalar_one_or_none()
     assert dr is None
 
-    await db_session.execute(
-        delete(DomesticNotFound).where(DomesticNotFound.application_number == appno)
-    )
+    await db_session.execute(delete(DomesticNotFound).where(DomesticNotFound.application_number == appno))
     await db_session.commit()
