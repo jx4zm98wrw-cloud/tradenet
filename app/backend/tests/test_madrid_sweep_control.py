@@ -83,3 +83,33 @@ async def test_config_updates_cadence(authed_client: AsyncClient):
 async def test_requires_admin(viewer_client: AsyncClient):
     assert (await viewer_client.get("/api/v1/admin/madrid-sweep")).status_code == 403
     assert (await viewer_client.post("/api/v1/admin/madrid-sweep/start", json={})).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_start_in_fast_mode(authed_client: AsyncClient):
+    r = await authed_client.post("/api/v1/admin/madrid-sweep/start", json={"mode": "fast"})
+    assert r.status_code == 200
+    assert r.json()["mode"] == "fast"
+
+
+@pytest.mark.asyncio
+async def test_start_defaults_to_normal(authed_client: AsyncClient):
+    r = await authed_client.post("/api/v1/admin/madrid-sweep/start", json={})
+    assert r.status_code == 200
+    assert r.json()["mode"] == "normal"
+
+
+@pytest.mark.asyncio
+async def test_config_flips_mode_live(authed_client: AsyncClient):
+    await authed_client.post("/api/v1/admin/madrid-sweep/start", json={})
+    r = await authed_client.patch("/api/v1/admin/madrid-sweep/config", json={"mode": "fast"})
+    assert r.status_code == 200
+    assert r.json()["mode"] == "fast"
+    r2 = await authed_client.patch("/api/v1/admin/madrid-sweep/config", json={"mode": "normal"})
+    assert r2.json()["mode"] == "normal"
+
+
+@pytest.mark.asyncio
+async def test_invalid_mode_rejected(authed_client: AsyncClient):
+    r = await authed_client.post("/api/v1/admin/madrid-sweep/start", json={"mode": "turbo"})
+    assert r.status_code == 422
