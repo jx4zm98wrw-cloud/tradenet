@@ -18,14 +18,16 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from api.db import Gazette, GazetteStatus, GazetteType, RecordType, Trademark
-from api.db.models import DomesticRecord
+from api.db.models import DomesticNotFound, DomesticRecord
 from api.settings import get_settings
 
 _GZ = uuid.UUID("f0000000-0000-4000-8000-0000000000d1")
 _APP_ID1 = uuid.UUID("f0000000-0000-4000-8000-0000000000d2")
 _APP_ID2 = uuid.UUID("f0000000-0000-4000-8000-0000000000d3")
+_APP_ID3 = uuid.UUID("f0000000-0000-4000-8000-0000000000d4")
 _APPNO1 = "4-9999-99901"  # synthetic; won't collide with real data
 _APPNO2 = "4-9999-99902"
+_APPNO3 = "4-9999-99903"  # unvalidated + recorded not-published (pending bucket)
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -37,6 +39,7 @@ async def seed() -> AsyncIterator[None]:
         await s.execute(
             delete(DomesticRecord).where(DomesticRecord.application_number.in_([_APPNO1, _APPNO2]))
         )
+        await s.execute(delete(DomesticNotFound).where(DomesticNotFound.application_number == _APPNO3))
         await s.execute(delete(Trademark).where(Trademark.gazette_id == _GZ))
         await s.execute(delete(Gazette).where(Gazette.id == _GZ))
 
@@ -90,6 +93,18 @@ async def seed() -> AsyncIterator[None]:
                 grant_date=None,
             )
         )
+        # A domestic mark NOIP hasn't published yet: in the work-list (unique +
+        # remaining), unvalidated (no DomesticRecord), recorded not-published →
+        # must land in the pending_publication bucket, not unresolved.
+        s.add(
+            Trademark(
+                id=_APP_ID3,
+                gazette_id=_GZ,
+                record_type=RecordType.A,
+                application_number=_APPNO3,
+            )
+        )
+        s.add(DomesticNotFound(application_number=_APPNO3, vnid="VN4999999903"))
         await s.commit()
 
     yield
@@ -110,6 +125,10 @@ async def test_domestic_enrichment_invariants(authed_client: AsyncClient) -> Non
     assert d["remaining"] == max(d["unique_appnos"] - d["validated"], 0)
     assert d["unique_appnos"] >= d["validated"] >= 0
     assert d["granted"] <= d["validated"]
+    # remaining splits exactly into the two operational buckets.
+    assert d["pending_publication"] + d["unresolved"] == d["remaining"]
+    assert 0 <= d["pending_publication"] <= d["remaining"]
+    assert 0 <= d["unresolved"] <= d["remaining"]
     if d["unique_appnos"]:
         assert abs(d["pct_complete"] - d["validated"] / d["unique_appnos"]) < 1e-9
 
@@ -133,6 +152,21 @@ async def test_domestic_enrichment_granted_count(authed_client: AsyncClient) -> 
     d = r.json()
     assert d["granted"] >= 0
     assert "granted" in d
+
+
+@pytest.mark.asyncio
+async def test_domestic_enrichment_pending_publication_reflects_not_found(
+    authed_client: AsyncClient,
+) -> None:
+    """Our seeded not-published mark (_APPNO3: unvalidated + in domestic_not_found)
+    must be counted in pending_publication, not in unresolved."""
+    r = await authed_client.get("/api/v1/admin/domestic-enrichment")
+    assert r.status_code == 200
+    d = r.json()
+    # At least our one seeded pending mark is present.
+    assert d["pending_publication"] >= 1
+    # And the bucket split is exact.
+    assert d["pending_publication"] + d["unresolved"] == d["remaining"]
 
 
 @pytest.mark.asyncio

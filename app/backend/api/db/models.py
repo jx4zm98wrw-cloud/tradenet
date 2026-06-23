@@ -399,6 +399,30 @@ class DomesticRecord(Base):
     )
 
 
+class DomesticNotFound(Base):
+    """Negative cache for domestic application numbers NOIP has no published
+    detail for yet (HTTP 200 + skeleton page, no `product-form-label` marker).
+
+    A definitive "not published yet", not flakiness — stable across dozens of
+    attempts. Recording it lets the sweep skip the mark for a backoff window so
+    it can't re-retry the same unresolvable marks every chunk (the stably-ordered
+    front of the work-list, which was tripping the circuit breaker). After the
+    window the sweep re-checks, picking the mark up once NOIP publishes it.
+    """
+
+    __tablename__ = "domestic_not_found"
+
+    application_number: Mapped[str] = mapped_column(Text, primary_key=True)
+    vnid: Mapped[str | None] = mapped_column(Text, nullable=True)
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    last_checked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    check_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
 class UserRole(enum.StrEnum):
     """RBAC roles. Sorted from most privileged to least.
 
@@ -547,6 +571,10 @@ class DomesticSweepControl(Base):
     processed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     ok: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     failed: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    # Definitive negatives recorded this run (NOIP 200 + skeleton). Tracked apart
+    # from `failed` so the de-wedged sweep is observable: ok + not_found climb
+    # while failed stays flat once the not-published front is being recorded.
+    not_found: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     mode: Mapped[str] = mapped_column(Text, nullable=False, server_default="normal")
     concurrency: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     current_appno: Mapped[str | None] = mapped_column(Text, nullable=True)

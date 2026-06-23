@@ -3,15 +3,49 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import UTC, datetime
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.db.models import DomesticRecord
+from api.db.models import DomesticNotFound, DomesticRecord
 
 from .parser import DomesticRecord as ParsedRecord
 
 PARSE_VERSION = 1  # bump on any parser change → triggers offline re-derive
+
+
+async def upsert_not_found(
+    session: AsyncSession,
+    application_number: str,
+    vnid: str | None,
+) -> None:
+    """Record a definitive not-published mark in the negative cache. Idempotent:
+    first sighting inserts (check_count=1); a re-check bumps last_checked_at +
+    check_count. Flushes only — the caller owns the commit (same contract as
+    `upsert`)."""
+    now = datetime.now(UTC)
+    stmt = (
+        pg_insert(DomesticNotFound)
+        .values(
+            application_number=application_number,
+            vnid=vnid,
+            first_seen_at=now,
+            last_checked_at=now,
+            check_count=1,
+        )
+        .on_conflict_do_update(
+            index_elements=[DomesticNotFound.application_number],
+            set_={
+                "vnid": vnid,
+                "last_checked_at": now,
+                "check_count": DomesticNotFound.check_count + 1,
+            },
+        )
+    )
+    await session.execute(stmt)
+    await session.flush()
 
 
 async def upsert(

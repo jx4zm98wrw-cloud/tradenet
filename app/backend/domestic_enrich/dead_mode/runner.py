@@ -12,13 +12,14 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import requests
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.db.models import DomesticNotFound
 from api.db.models import DomesticSweepControl as C
 from api.settings import get_settings
 from domestic_enrich.backfill import iter_domestic_appnos
@@ -34,7 +35,11 @@ from domestic_enrich.dead_mode.controller import (
 )
 from domestic_enrich.idmap import appno_to_vnid
 from domestic_enrich.parser import parse
-from domestic_enrich.store import upsert
+from domestic_enrich.store import upsert, upsert_not_found
+
+# Mirror worker.domestic_sweep._NOT_FOUND_BACKOFF. Kept local (like _uncached /
+# _cache_dir) so dead_mode never imports worker.domestic_sweep (one-way dep).
+_NOT_FOUND_BACKOFF = timedelta(days=30)
 
 # Max marks one dead-mode RQ job processes before re-enqueuing — keeps each job
 # well under the worker JOB_TIMEOUT even at concurrency 1, and is > 3 windows so
@@ -52,6 +57,23 @@ def _uncached(all_appnos: list[str], cache: Path) -> list[str]:
     return [a for a in all_appnos if appno_to_vnid(a) not in cached]
 
 
+async def _recent_not_found(session: AsyncSession) -> set[str]:
+    """Application numbers recorded not-published within the backoff window —
+    skipped so dead mode converges instead of re-fetching the unresolvable front
+    every chunk (mirrors worker.domestic_sweep._recent_not_found)."""
+    cutoff = datetime.now(UTC) - _NOT_FOUND_BACKOFF
+    rows = (
+        (
+            await session.execute(
+                select(DomesticNotFound.application_number).where(DomesticNotFound.last_checked_at >= cutoff)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return set(rows)
+
+
 def _fetch_outcome(
     appno: str, cache: Path, http: requests.Session
 ) -> tuple[str, Outcome, FetchResult | None]:
@@ -62,6 +84,10 @@ def _fetch_outcome(
         return (appno, Outcome.FLAKY_FAIL, None)
     try:
         result = fetch_raw(vnid, cache, session=http, use_cache=True, delay=0.0)
+        # HTTP 200 + skeleton: NOIP has no published detail yet. Carry the result
+        # back (it holds the vnid) so the owning coroutine can negative-cache it.
+        if result.outcome == "not_found":
+            return (appno, Outcome.NOT_FOUND, result)
         return (appno, Outcome.SUCCESS, result)
     except NoipBlockedError:
         return (appno, Outcome.BLOCK, None)
@@ -72,7 +98,9 @@ def _fetch_outcome(
 async def _ctl(session: AsyncSession) -> dict:
     row = (
         await session.execute(
-            select(C.status, C.mode, C.cap, C.processed, C.ok, C.failed, C.concurrency).where(C.id == 1)
+            select(C.status, C.mode, C.cap, C.processed, C.ok, C.failed, C.not_found, C.concurrency).where(
+                C.id == 1
+            )
         )
     ).one()
     return dict(row._mapping)
@@ -106,7 +134,8 @@ async def run_chunk(
 
     cache = _cache_dir()
     all_appnos = await iter_domestic_appnos(session)
-    todo = _uncached(all_appnos, cache)
+    recent_nf = await _recent_not_found(session)
+    todo = [a for a in _uncached(all_appnos, cache) if a not in recent_nf]
     http = http_session or requests.Session()
 
     concurrency = max(START, ctl["concurrency"] or START)
@@ -131,20 +160,28 @@ async def run_chunk(
             futures = [loop.run_in_executor(pool, _fetch_outcome, appno, cache, http) for appno in batch]
             results = await asyncio.gather(*futures)
 
-            ok = failed = 0
+            ok = failed = nf = 0
             for appno, outcome, result in results:
                 if outcome is Outcome.SUCCESS and result is not None:
                     await _store_success(session, appno, result)
                     ok += 1
+                elif outcome is Outcome.NOT_FOUND:
+                    # No published detail yet — negative-cache it, never store the
+                    # skeleton. Counted apart from ok/failed.
+                    vnid = result.vnid if result is not None else appno_to_vnid(appno)
+                    await upsert_not_found(session, appno, vnid)
+                    await session.commit()
+                    nf += 1
                 else:
                     failed += 1
                 window.append(outcome)
                 did += 1
             await _set(
                 session,
-                processed=ctl["processed"] + ok + failed,
+                processed=ctl["processed"] + ok + failed + nf,
                 ok=ctl["ok"] + ok,
                 failed=ctl["failed"] + failed,
+                not_found=ctl["not_found"] + nf,
                 current_appno=batch[-1] if batch else None,
                 last_error=None,
             )
@@ -174,7 +211,8 @@ async def run_chunk(
     # Continuation — re-enqueue while there's work and we're still running+dead.
     ctl = await _ctl(session)
     if ctl["status"] == "running" and ctl["mode"] == "dead":
-        remaining = _uncached(all_appnos, cache)
+        recent_nf = await _recent_not_found(session)
+        remaining = [a for a in _uncached(all_appnos, cache) if a not in recent_nf]
         cap_hit = ctl["cap"] is not None and ctl["processed"] >= ctl["cap"]
         if remaining and not cap_hit:
             enqueue_next()

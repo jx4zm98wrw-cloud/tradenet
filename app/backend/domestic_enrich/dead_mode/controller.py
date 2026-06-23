@@ -37,6 +37,7 @@ class Outcome(Enum):
     """How a single fetch ended."""
 
     SUCCESS = "success"  # HTTP 200 + valid body
+    NOT_FOUND = "not_found"  # HTTP 200 + skeleton — no published detail yet
     FLAKY_FAIL = "flaky_fail"  # exhausted retries (flaky cluster) — RuntimeError
     BLOCK = "block"  # NoipBlockedError (403/429)
 
@@ -67,10 +68,13 @@ class Decision:
 
 
 def stats_from(outcomes: Iterable[Outcome]) -> WindowStats:
-    """Tally a sequence of Outcomes into a WindowStats."""
+    """Tally a sequence of Outcomes into a WindowStats. A NOT_FOUND is a clean
+    HTTP 200 (NOIP is healthy, just hasn't published the detail), so it counts as
+    a success for congestion control — it must not look like flakiness/blocking
+    and force concurrency down."""
     success = flaky = block = 0
     for o in outcomes:
-        if o is Outcome.SUCCESS:
+        if o is Outcome.SUCCESS or o is Outcome.NOT_FOUND:
             success += 1
         elif o is Outcome.FLAKY_FAIL:
             flaky += 1

@@ -50,6 +50,43 @@ def test_uses_cache_without_network(tmp_path):
     assert t.calls == 0
 
 
+# A real NOIP 200-skeleton page: HTTP 200 but no `product-form-label` marker —
+# NOIP has no published detail for this id yet. ~2,178 bytes live; shape is what
+# matters here.
+_SKELETON = "<html><body><div class='wopublish'>no detail</div></body></html>"
+
+
+class _SkeletonTransport:
+    """Always returns HTTP 200 with the not-published skeleton (no marker)."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def get(self, url, headers=None, timeout=None, verify=None):
+        self.calls += 1
+        return _Resp(200, _SKELETON)
+
+
+def test_200_skeleton_classified_not_found_without_retry(tmp_path):
+    # A 200-without-marker is a DEFINITIVE negative, not flaky: it must return
+    # immediately as not_found — no retry loop, no RuntimeError — and must NOT be
+    # written to the on-disk cache (it has to be re-checked after the backoff
+    # window once NOIP publishes the detail).
+    t = _SkeletonTransport()
+    res = fetch_raw("VN4202611346", tmp_path, session=t, use_cache=False, max_attempts=10, delay=0.0)
+    assert res.outcome == "not_found"
+    assert res.from_cache is False
+    assert res.attempts == 1
+    assert t.calls == 1  # returned on the first attempt — no retries
+    assert not (tmp_path / "VN4202611346.html").exists()  # skeleton not cached
+
+
+def test_valid_body_has_ok_outcome(tmp_path):
+    t = _FlakyTransport(fails_before_ok=0)
+    res = fetch_raw("VN4202600774", tmp_path, session=t, use_cache=False, delay=0.0)
+    assert res.outcome == "ok"
+
+
 class _BlockTransport:
     """Always returns a block/rate-limit status (403/429)."""
 

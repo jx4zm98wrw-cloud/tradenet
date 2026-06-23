@@ -31,6 +31,7 @@ class SweepControlOut(BaseModel):
     processed: int
     ok: int
     failed: int
+    not_found: int
     mode: str
     concurrency: int
     current_appno: str | None
@@ -91,7 +92,7 @@ async def start(
     if row.status != "idle":
         raise HTTPException(409, f"sweep is {row.status}; stop it before starting a new run")
     row.status = "running"
-    row.processed = row.ok = row.failed = 0
+    row.processed = row.ok = row.failed = row.not_found = 0
     row.current_appno = None
     row.next_appno = None
     row.last_error = None

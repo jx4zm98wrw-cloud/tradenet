@@ -94,7 +94,13 @@ export default function AdminDomesticPage() {
             <div className="h-full bg-stamp transition-all" style={{ width: `${pct}%` }} />
           </div>
           <p className="text-[11.5px] text-mute mt-2">
-            {formatNumber(stats.remaining)} remaining{stats.remaining > 0 ? " · sweep in progress" : " · complete"}
+            {formatNumber(stats.remaining)} remaining
+            {stats.remaining > 0 ? (
+              <>
+                {" "}· <span className="text-ink">{formatNumber(stats.unresolved)}</span> still to fetch
+                {" "}· <span className="text-ink">{formatNumber(stats.pending_publication)}</span> awaiting NOIP publication
+              </>
+            ) : " · complete"}
           </p>
         </div>
       </Card>
@@ -103,7 +109,8 @@ export default function AdminDomesticPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Stat label="Unique app nos" value={stats.unique_appnos} />
         <Stat label="Validated" value={stats.validated} />
-        <Stat label="Remaining" value={stats.remaining} />
+        <Stat label="Unresolved" value={stats.unresolved} />
+        <Stat label="Pending publication" value={stats.pending_publication} />
         <Stat label="Granted" value={stats.granted} />
         <Stat label="Registrations" value={stats.by_category["domestic_registration"] ?? 0} />
         <Stat label="Applications" value={stats.by_category["domestic_application"] ?? 0} />
@@ -243,6 +250,7 @@ function SweepControlCard() {
         <div className="text-[12px] text-mute">
           this run: <span className="font-mono text-ink">{formatNumber(s.processed)}</span> processed ·{" "}
           <span className="font-mono text-ok">{formatNumber(s.ok)}</span> ok ·{" "}
+          <span className="font-mono text-ink">{formatNumber(s.not_found)}</span> not&nbsp;found ·{" "}
           <span className="font-mono text-rose-600">{formatNumber(s.failed)}</span> failed
           {s.current_appno ? <> · current <span className="font-mono text-ink">{s.current_appno}</span></> : null}
           {s.next_appno ? <> · next <span className="font-mono text-ink">{s.next_appno}</span></> : null}
