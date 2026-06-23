@@ -1,7 +1,7 @@
 """Entity-name grouping helpers (Phase 1 of entity canonicalization).
 
 These form a *grouping key* so case/whitespace variants of the SAME trusted
-WIPO/NOIP name collapse into one bucket for the dashboard's "top entities"
+WIPO/IP VIETNAM name collapse into one bucket for the dashboard's "top entities"
 counts. They are deliberately NOT fuzzy matching — `norm()` never merges two
 genuinely different names. See
 docs/superpowers/specs/2026-06-22-entity-canonicalization-design.md.
@@ -80,7 +80,7 @@ def resolve_applicant(
 ) -> tuple[str | None, str | None]:
     """Trusted display name + grouping key for an applicant.
 
-    Precedence: NOIP (`domestic_records.applicant_name`) → WIPO
+    Precedence: IP VIETNAM (`domestic_records.applicant_name`) → WIPO
     (`madrid_records.holder_name`) → gazette fallback
     (`trademarks.applicant_name`). The callers gate `domestic`/`madrid` by
     `mark_category`, so at most one is set per mark.
@@ -93,7 +93,7 @@ def resolve_representative(
 ) -> tuple[str | None, str | None]:
     """Trusted display name + grouping key for a representative.
 
-    Precedence NOIP (`domestic_records.representative`) → WIPO
+    Precedence IP VIETNAM (`domestic_records.representative`) → WIPO
     (`madrid_records.representative`) → gazette fallback
     (`trademarks.ip_agency_raw_740`). The WIPO value glues a trailing postal
     address onto the firm name; strip it (deterministic cut) before clean/norm.

@@ -159,7 +159,7 @@ export const COMPARISON_SECTIONS: ReadonlyArray<ComparisonSection> = [
   {
     label: "Coverage",
     rows: [
-      { feature: "Vietnamese gazette (Vietnam IP)", solo: "check", firm: "check", enterprise: "check" },
+      { feature: "Vietnamese gazette (IP VIETNAM)", solo: "check", firm: "check", enterprise: "check" },
       { feature: "Madrid Protocol marks", solo: "dash", firm: "check", enterprise: "check" },
       { feature: "WIPO Global Brand DB mirror", solo: "dash", firm: "check", enterprise: "check" },
       { feature: "Historical archive", solo: "2 years", firm: "10 years", enterprise: "Full" },
@@ -208,11 +208,11 @@ export const FAQ: ReadonlyArray<FaqEntry> = [
   },
   {
     q: "How quickly do new gazette issues appear?",
-    a: "Vietnam IP publishes weekly issues T1–T4. We typically have a new issue OCR'd, deduplicated, and searchable within 4 hours of release. Watchlists re-run automatically once the issue lands.",
+    a: "IP VIETNAM publishes weekly issues T1–T4. We typically have a new issue OCR'd, deduplicated, and searchable within 4 hours of release. Watchlists re-run automatically once the issue lands.",
   },
   {
     q: "Can we file oppositions through Tradenet?",
-    a: "Not directly — opposition filing happens through Vietnam IP or your IP agent. We export a pre-filled brief (mark, grounds, prior rights, evidence pack) that drops into your filing template. Direct e-filing is on the roadmap for late 2026.",
+    a: "Not directly — opposition filing happens through IP VIETNAM or your IP agent. We export a pre-filled brief (mark, grounds, prior rights, evidence pack) that drops into your filing template. Direct e-filing is on the roadmap for late 2026.",
   },
   {
     q: "Is the data hosted in Vietnam?",

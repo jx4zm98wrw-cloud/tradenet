@@ -1,5 +1,5 @@
 """The committed CA bundle must exist, parse, and carry more than the bare
-certifi roots (i.e. include the Sectigo R36 intermediate the NOIP server omits).
+certifi roots (i.e. include the Sectigo R36 intermediate the IP VIETNAM server omits).
 Guards against an empty/partial bundle silently regressing to a TLS failure at
 sweep time. The exact-subject check happens at build time (Task 2 Step 1)."""
 

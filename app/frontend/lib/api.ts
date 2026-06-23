@@ -156,7 +156,7 @@ export type CountryCount = { country: string; n: number };
 export type TopApplicants = { domestic: NamedCount[]; madrid: NamedCount[] };
 
 export type TopRepresentatives = {
-  // Counts are exact — trusted WIPO/NOIP source grouped by a normalized key.
+  // Counts are exact — trusted WIPO/IP VIETNAM source grouped by a normalized key.
   domestic: NamedCount[];
   madrid: NamedCount[];
 };
@@ -374,7 +374,7 @@ export type ScoredSearchParams = SearchParams & {
   sort?: SortKey;
 };
 
-/** NOIP domestic enrichment for a domestic mark. Detail-only —
+/** IP VIETNAM domestic enrichment for a domestic mark. Detail-only —
  * never on the lean list/search Trademark shape. */
 export type DomesticEnrichment = {
   application_number: string;
@@ -403,7 +403,7 @@ export type DomesticEnrichmentStats = {
   unique_appnos: number;
   validated: number;
   remaining: number;
-  pending_publication: number; // remaining marks NOIP hasn't published yet
+  pending_publication: number; // remaining marks IP VIETNAM hasn't published yet
   unresolved: number; // remaining genuinely-still-to-fetch (the real backlog)
   pct_complete: number; // 0..1
   granted: number;
@@ -475,7 +475,7 @@ export type MarkDetail = {
   raw_511_text: string | null;
   /** WIPO Madrid enrichment — present only for enriched Madrid marks. */
   enrichment: MadridEnrichment | null;
-  /** NOIP domestic enrichment — present only for enriched domestic marks. */
+  /** IP VIETNAM domestic enrichment — present only for enriched domestic marks. */
   domestic: DomesticEnrichment | null;
 };
 

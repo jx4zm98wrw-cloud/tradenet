@@ -15,9 +15,9 @@
 /** Hero block at the top of the page. */
 export const coverageHero = {
   eyebrow: "Data Coverage",
-  h1: "Every Vietnam IP issue, every Madrid designation, every week.",
+  h1: "Every IP VIETNAM issue, every Madrid designation, every week.",
   sub:
-    "We ingest the Vietnamese trademark gazette directly from Vietnam IP — the agency formerly known as NOIP, officially Cục Sở hữu trí tuệ — the day each issue publishes — plus Madrid Protocol designations from WIPO. Here's exactly what's in the corpus, how fresh it is, and how we measure quality.",
+    "We ingest the Vietnamese trademark gazette directly from IP VIETNAM — the agency formerly known as NOIP, officially Cục Sở hữu trí tuệ — the day each issue publishes — plus Madrid Protocol designations from WIPO. Here's exactly what's in the corpus, how fresh it is, and how we measure quality.",
 };
 
 export type CoverageStat = {
@@ -46,7 +46,7 @@ export const coverageStats: ReadonlyArray<CoverageStat> = [
     label: "Ingest lag · median",
     value: "3.8",
     valueSuffix: "h",
-    meta: "From Vietnam IP publication to searchable",
+    meta: "From IP VIETNAM publication to searchable",
   },
   {
     label: "OCR confidence · avg",
@@ -71,7 +71,7 @@ export type SourceCard = {
 /** Four source cards (2 primary + 2 non-primary) in a 2-col grid. */
 export const sourceCards: ReadonlyArray<SourceCard> = [
   {
-    name: "Vietnam IP · Section A — Applications published",
+    name: "IP VIETNAM · Section A — Applications published",
     sub: "Cục Sở hữu trí tuệ · A_T*_YYYY.pdf",
     primary: true,
     pillLabel: "Primary source",
@@ -85,7 +85,7 @@ export const sourceCards: ReadonlyArray<SourceCard> = [
     ],
   },
   {
-    name: "Vietnam IP · Section B — Registered marks",
+    name: "IP VIETNAM · Section B — Registered marks",
     sub: "Cục Sở hữu trí tuệ · B_T*_YYYY.pdf",
     primary: true,
     pillLabel: "Primary source",
@@ -104,7 +104,7 @@ export const sourceCards: ReadonlyArray<SourceCard> = [
     primary: false,
     pillLabel: "Firm + Enterprise",
     body:
-      "International Registrations designating Vietnam — straight from WIPO before they appear in the local gazette. Catches conflicts 4–12 weeks earlier than waiting for Vietnam IP publication.",
+      "International Registrations designating Vietnam — straight from WIPO before they appear in the local gazette. Catches conflicts 4–12 weeks earlier than waiting for IP VIETNAM publication.",
     kvs: [
       { dt: "Frequency", dd: "Daily delta sync" },
       { dt: "Lag", dd: "~24 hours from WIPO" },
@@ -187,7 +187,7 @@ export const dqCards: ReadonlyArray<DqCard> = [
     fillPct: 100,
     fillColorVar: "ok",
     meta:
-      "Mark status (pending → registered → opposed → abandoned) updates within 24 hours of Vietnam IP change.",
+      "Mark status (pending → registered → opposed → abandoned) updates within 24 hours of IP VIETNAM change.",
   },
   {
     heading: "Historical archive",

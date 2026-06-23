@@ -166,7 +166,7 @@ export const DOCS_GROUPS: ReadonlyArray<{
       },
       {
         slug: "glossary",
-        title: "Vietnam IP glossary",
+        title: "IP VIETNAM glossary",
         written: true,
         group: "Reference",
         eyebrow: "Reference · Glossary",

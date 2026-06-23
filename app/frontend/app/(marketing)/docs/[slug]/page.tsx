@@ -91,9 +91,9 @@ const HEADERS: Record<
     Component: NiceRef,
   },
   glossary: {
-    h1: "Vietnam IP glossary & INID codes",
+    h1: "IP VIETNAM glossary & INID codes",
     lede:
-      "The vocabulary of the Vietnamese trademark system — Vietnamese terminology, Vietnam IP's specific conventions, and the WIPO INID numerical field codes that appear in every gazette entry. Bookmark this page.",
+      "The vocabulary of the Vietnamese trademark system — Vietnamese terminology, IP VIETNAM's specific conventions, and the WIPO INID numerical field codes that appear in every gazette entry. Bookmark this page.",
     Component: Glossary,
   },
 };

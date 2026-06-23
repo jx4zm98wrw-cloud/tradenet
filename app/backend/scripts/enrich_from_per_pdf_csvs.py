@@ -124,7 +124,7 @@ def _normalize_id(raw: str, *, pad_to_7: bool) -> str:
     """Strip whitespace; for Madrid, left-pad with zeros to 7 chars.
 
     Our DB stores madrid_number as a 7-char zero-padded string
-    (`0492543`), but NOIP publishes the same number in minimal form
+    (`0492543`), but IP VIETNAM publishes the same number in minimal form
     (`492543`) in the per-PDF CSVs. Normalize on the CSV side so the
     JOIN can be an equality match.
     """

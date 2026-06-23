@@ -6,7 +6,7 @@
  *   - Metric cards (Total · Domestic · Madrid reg · Madrid renewal · Coverage %)
  *   - Marks-per-year stacked bar (Chart.js, 4 streams kept distinct)
  *   - Stream-split share bar
- *   - Enrichment (Madrid WIPO % + Domestic NOIP %) — NOT in the overview payload,
+ *   - Enrichment (Madrid WIPO % + Domestic IP VIETNAM %) — NOT in the overview payload,
  *     so sourced from the existing admin enrichment endpoints
  *   - Madrid origin ranked bars
  *   - Top applicants + Top representatives, each with a Domestic|Madrid toggle
@@ -134,7 +134,7 @@ export function GazettesDashboard() {
               <h3 className="text-sm font-semibold mb-3">Enrichment</h3>
               <EnrichmentRow label="Madrid · WIPO" pct={enrich.madrid} color={COLOR.madrid_registrations} />
               <div className="h-2" />
-              <EnrichmentRow label="Domestic · NOIP" pct={enrich.domestic} color={COLOR.domestic_registrations} />
+              <EnrichmentRow label="Domestic · IP VIETNAM" pct={enrich.domestic} color={COLOR.domestic_registrations} />
             </div>
           </Card>
         </div>

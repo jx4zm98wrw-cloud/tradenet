@@ -84,7 +84,7 @@ def _fetch_outcome(
         return (appno, Outcome.FLAKY_FAIL, None)
     try:
         result = fetch_raw(vnid, cache, session=http, use_cache=True, delay=0.0)
-        # HTTP 200 + skeleton: NOIP has no published detail yet. Carry the result
+        # HTTP 200 + skeleton: IP VIETNAM has no published detail yet. Carry the result
         # back (it holds the vnid) so the owning coroutine can negative-cache it.
         if result.outcome == "not_found":
             return (appno, Outcome.NOT_FOUND, result)
@@ -199,7 +199,7 @@ async def run_chunk(
                             mode="normal",
                             status="paused",
                             concurrency=0,
-                            last_error="dead mode: sustained NOIP blocks — reverted to normal + paused; cool down",
+                            last_error="dead mode: sustained IP VIETNAM blocks — reverted to normal + paused; cool down",
                         )
                         return {"status": "paused", "did": did}
                     await asyncio.sleep(COOLDOWN_S)

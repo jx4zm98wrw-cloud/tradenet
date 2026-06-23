@@ -1,6 +1,6 @@
-"""Load NOIP wordmark CSV (TM_Name_A_*.csv) into `tm_name_index`.
+"""Load IP VIETNAM wordmark CSV (TM_Name_A_*.csv) into `tm_name_index`.
 
-The CSV is a NOIP-published flat extract of every Vietnam trademark
+The CSV is a IP VIETNAM-published flat extract of every Vietnam trademark
 application's `(210) → (220) → (540)` triple from 2008 to present. We
 load it into the dedicated `tm_name_index` reference table; downstream
 enrichment (`scripts/enrich_mark_samples.py`) joins on
@@ -60,7 +60,7 @@ def _parse_us_date(raw: str) -> date | None:
     if not raw:
         return None
     # `%y` (lowercase) interprets 2-digit years per Python's rule:
-    # 00-68 → 2000-2068, 69-99 → 1969-1999. Real NOIP data only spans
+    # 00-68 → 2000-2068, 69-99 → 1969-1999. Real IP VIETNAM data only spans
     # 2003+ so we land in the right century.
     try:
         return datetime.strptime(raw, "%m/%d/%y").date()

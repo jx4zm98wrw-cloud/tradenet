@@ -18,7 +18,7 @@
  * prototype mints six made-up wordmarks (NEUREX, VEXIS, Masan, VEXARIS,
  * NUROFEN+, ZENPHARM, BIVAXIS) plus one Λ-shaped icon-only cell and one
  * "VX" circle mark.  All evoke pharma / industrial trademark styling
- * (the categories that drive the bulk of NOIP gazette filings) without
+ * (the categories that drive the bulk of IP VIETNAM gazette filings) without
  * any specific real owner.
  */
 

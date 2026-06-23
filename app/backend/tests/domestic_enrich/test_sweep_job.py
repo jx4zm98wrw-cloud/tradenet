@@ -61,7 +61,7 @@ async def test_chunk_processes_uncached_and_stops_at_chunk_size(db_session, tmp_
 
 @pytest.mark.asyncio
 async def test_not_found_does_not_trip_circuit_breaker(db_session, tmp_path, monkeypatch):
-    # The wedge: NOIP not-published marks cluster at the stably-ordered front and
+    # The wedge: IP VIETNAM not-published marks cluster at the stably-ordered front and
     # were misread as failures, tripping the breaker at 5 consecutive. A not_found
     # must NOT count as failed and must NOT advance the streak — so a run of them
     # (well past _MAX_CONSECUTIVE) keeps the sweep RUNNING and advancing.

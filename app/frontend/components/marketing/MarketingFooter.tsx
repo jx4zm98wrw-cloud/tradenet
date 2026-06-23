@@ -70,7 +70,7 @@ export function MarketingFooter() {
         </div>
         <div className="mk-footer-bottom">
           <span>
-            © 2026 Tradenet Pte. Ltd. · Singapore · Operating in Vietnam under license from Vietnam IP
+            © 2026 Tradenet Pte. Ltd. · Singapore · Operating in Vietnam under license from IP VIETNAM
           </span>
           <span
             className="mono"

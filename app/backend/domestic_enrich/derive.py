@@ -1,6 +1,6 @@
-"""Derive a human status from a parsed DomesticRecord's NOIP status field.
+"""Derive a human status from a parsed DomesticRecord's IP VIETNAM status field.
 
-NOIP's status field is polymorphic: a numeric code (e.g. 1904) for pending
+IP VIETNAM's status field is polymorphic: a numeric code (e.g. 1904) for pending
 applications, or Vietnamese text ("Cấp bằng" = granted) once granted. Numeric
 codes get mapped to a label via STATUS_LABELS (extend as observed); text
 statuses are already human-readable and pass through unchanged. `is_granted`

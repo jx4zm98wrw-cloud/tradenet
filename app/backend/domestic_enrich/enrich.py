@@ -25,8 +25,8 @@ class EnrichOutcome(enum.Enum):
 
     WROTE = "wrote"  # a domestic_records row was inserted/updated
     UNCHANGED = "unchanged"  # content_hash + parse_version matched; no write
-    NOT_FOUND = "not_found"  # NOIP has no published detail yet (negative-cached)
-    UNMAPPABLE = "unmappable"  # application_number couldn't map to a NOIP id
+    NOT_FOUND = "not_found"  # IP VIETNAM has no published detail yet (negative-cached)
+    UNMAPPABLE = "unmappable"  # application_number couldn't map to a IP VIETNAM id
 
 
 async def enrich_one(
@@ -39,7 +39,7 @@ async def enrich_one(
 ) -> EnrichOutcome:
     """Fetch, parse, and store one domestic mark. Returns an EnrichOutcome rather
     than raising on a bad app number (logs + skips so one bad row can't kill a
-    sweep chunk). A NOIP "not published yet" (HTTP 200 + skeleton, no detail
+    sweep chunk). A IP VIETNAM "not published yet" (HTTP 200 + skeleton, no detail
     marker) is recorded in the negative cache and returned as NOT_FOUND — it is
     NOT a failure."""
     vnid = appno_to_vnid(application_number)

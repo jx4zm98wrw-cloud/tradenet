@@ -1,8 +1,8 @@
-"""Pure NOIP (IP Vietnam) trademark detail-page HTML -> DomesticRecord parser.
+"""Pure IP VIETNAM trademark detail-page HTML -> DomesticRecord parser.
 
 No I/O. Mirrors the structural approach of ``madrid_enrich.parser``: a
 ``_lines()`` helper tag-strips the page to a clean line stream, and a date
-helper normalises NOIP's ``dd.mm.yyyy`` format. NOIP pages, unlike WIPO Madrid
+helper normalises IP VIETNAM's ``dd.mm.yyyy`` format. IP VIETNAM pages, unlike WIPO Madrid
 Monitor, pair each field's INID label and value as *adjacent* divs::
 
     <div class="... product-form-label">(NNN) Label</div>
@@ -84,7 +84,7 @@ def _clean(s: str) -> str:
 
 def _details_after_label(html_src: str, code: str) -> str | None:
     """Return the raw HTML of the ``product-form-details`` div paired with the
-    ``(code)`` label div. NOIP places the value div immediately after the label
+    ``(code)`` label div. IP VIETNAM places the value div immediately after the label
     div, so we anchor on ``(code) ...</div>`` and capture the next
     ``product-form-details`` body (non-greedy, balanced enough for these pages)."""
     # Capture the details body from its opening tag up to the next field's
@@ -102,7 +102,7 @@ def _details_after_label(html_src: str, code: str) -> str | None:
 
 
 def _strip_lang_prefix(s: str) -> str:
-    """Drop a leading ``(VI)`` / ``(EN)`` language tag NOIP prepends to text."""
+    """Drop a leading ``(VI)`` / ``(EN)`` language tag IP VIETNAM prepends to text."""
     return re.sub(r"^\s*\([A-Za-z]{2}\)\s*", "", s).strip()
 
 

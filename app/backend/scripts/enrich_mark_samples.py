@@ -1,9 +1,9 @@
 """Backfill `trademarks.mark_sample` from `tm_name_index`.
 
 After a fresh PDF ingest (or after `scripts/load_tm_name_index.py` loads a
-NOIP wordmark CSV), ~100% of `record_type='A'` rows in `trademarks` have
+IP VIETNAM wordmark CSV), ~100% of `record_type='A'` rows in `trademarks` have
 NULL/empty `mark_sample` — the PDF parser doesn't extract `(540)` cleanly
-for application-side gazettes. The NOIP wordmark CSV closes that gap.
+for application-side gazettes. The IP VIETNAM wordmark CSV closes that gap.
 
 This script runs a single UPDATE that joins `trademarks` to `tm_name_index`
 on `application_number` and copies `mark_sample` over wherever it's currently

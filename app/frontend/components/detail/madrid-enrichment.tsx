@@ -64,7 +64,7 @@ const isVnEvent = (e: { type?: string; parties?: string[] }) =>
 
 // MadridVnTimeline — VN-scoped prosecution events as a 2-column (Event | Date)
 // table, mirroring DomesticTimeline so Madrid and domestic marks present an
-// identical "Vietnam IP prosecution timeline" card. Rendered only when there is
+// identical "IP VIETNAM prosecution timeline" card. Rendered only when there is
 // at least one VN-related event. Event types render verbatim (they can be long
 // and are allowed to wrap); ISO dates are formatted with the shared formatDate.
 export function MadridVnTimeline({ e }: { e: MadridEnrichmentData }) {
@@ -76,7 +76,7 @@ export function MadridVnTimeline({ e }: { e: MadridEnrichmentData }) {
 
   return (
     <Card>
-      <CardHead title="Vietnam IP prosecution timeline" />
+      <CardHead title="IP VIETNAM prosecution timeline" />
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-line text-left">

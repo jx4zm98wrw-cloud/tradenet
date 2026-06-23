@@ -77,7 +77,7 @@ test.describe("Visual regression", () => {
     // route group. The ingest timeline below is a client component but
     // its data is deterministic, so the rendered grid is pixel-stable.
     await expect(
-      page.getByRole("heading", { name: /Every Vietnam IP issue/i }),
+      page.getByRole("heading", { name: /Every IP VIETNAM issue/i }),
     ).toBeVisible();
     await expect(page).toHaveScreenshot("coverage.png", {
       fullPage: false,

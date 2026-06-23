@@ -1,6 +1,6 @@
-"""Fetch NOIP WIPOPublish trademark detail HTML, with the TLS fix + retry.
+"""Fetch IP VIETNAM WIPOPublish trademark detail HTML, with the TLS fix + retry.
 
-Two NOIP obstacles are handled here (both verified live):
+Two IP VIETNAM obstacles are handled here (both verified live):
   1. Broken TLS chain — the server omits the Sectigo R36 intermediate, so we
      pass our committed bundle (certifi roots + that intermediate) as `verify`.
      Verification stays ON (deterministic in the Linux worker/CI).
@@ -29,7 +29,7 @@ _MIN_DELAY_S = 1.0
 # pauses immediately and a human decides when to resume. 5xx stays retryable
 # (the flaky-cluster case we built the retry loop for).
 _BLOCK_STATUSES = frozenset({403, 429})
-# Cap the flaky-5xx retry backoff LOW. NOIP's ~50% 500s are random cluster
+# Cap the flaky-5xx retry backoff LOW. IP VIETNAM's ~50% 500s are random cluster
 # flakiness, not rate-limiting, so waiting longer doesn't improve the next
 # attempt's odds — it just stalls the sweep (a 60s cap produced ~286s/mark
 # tails, ~doubling wall-clock). Genuine rate-limit signals are handled
@@ -38,14 +38,14 @@ _MAX_BACKOFF_S = 8.0
 
 
 class NoipBlockedError(RuntimeError):
-    """NOIP returned a block/rate-limit status (403/429). Distinct from the
+    """IP VIETNAM returned a block/rate-limit status (403/429). Distinct from the
     retryable flaky-cluster 5xx: the caller should STOP and pause, not retry."""
 
     def __init__(self, vnid: str, status: int, retry_after: float | None = None) -> None:
         self.status = status
         self.retry_after = retry_after
         suffix = f" (Retry-After {retry_after:.0f}s)" if retry_after else ""
-        super().__init__(f"NOIP blocked fetch for {vnid}: HTTP {status}{suffix}")
+        super().__init__(f"IP VIETNAM blocked fetch for {vnid}: HTTP {status}{suffix}")
 
 
 @dataclass
@@ -56,7 +56,7 @@ class FetchResult:
     from_cache: bool
     attempts: int = 0
     # "ok"        — HTTP 200 with a real detail page (`product-form-label`).
-    # "not_found" — HTTP 200 but a skeleton page (marker absent): NOIP has no
+    # "not_found" — HTTP 200 but a skeleton page (marker absent): IP VIETNAM has no
     #               published detail for this id yet. A definitive negative, not
     #               flakiness, so the caller records + skips it instead of
     #               retrying to exhaustion. The skeleton is NOT cached to disk.
@@ -97,7 +97,7 @@ def fetch_raw(
     delay: float = 1.5,
 ) -> FetchResult:
     """Fetch one mark's detail HTML, retrying the flaky cluster. `vnid` is the
-    NOIP id (`VN4202600774`). Raises RuntimeError if no valid body after
+    IP VIETNAM id (`VN4202600774`). Raises RuntimeError if no valid body after
     `max_attempts`. `session` is injectable for tests (any object with a
     requests-style `.get`)."""
     cache_dir = Path(cache_dir)
@@ -119,7 +119,7 @@ def fetch_raw(
             if delay:
                 time.sleep(_MIN_DELAY_S)
             return FetchResult(vnid=vnid, html=body, source_url=url, from_cache=False, attempts=attempt)
-        # HTTP 200 but no detail marker = NOIP has no published detail for this id
+        # HTTP 200 but no detail marker = IP VIETNAM has no published detail for this id
         # yet (the ~2,178-byte skeleton page). This is a DEFINITIVE negative,
         # stable across attempts — not the flaky-cluster 500. Return it at once so
         # the caller records + skips it; do NOT retry (pointless) and do NOT write
@@ -145,5 +145,5 @@ def fetch_raw(
                 wait = _backoff_seconds(attempt, delay)
             time.sleep(wait)
     raise RuntimeError(
-        f"NOIP fetch failed for {vnid}: no valid body in {max_attempts} attempts (last status {last_status})"
+        f"IP VIETNAM fetch failed for {vnid}: no valid body in {max_attempts} attempts (last status {last_status})"
     )

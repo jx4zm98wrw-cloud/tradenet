@@ -46,7 +46,7 @@ export const landing = {
       strikeWord: "before",
       tail: " the opposition window closes.",
     },
-    sub: "Tradenet ingests every Vietnam IP issue the day it publishes, runs your watchlists against it, and surfaces the ten marks you actually need to look at this morning. No more reading 4,000-page PDFs.",
+    sub: "Tradenet ingests every IP VIETNAM issue the day it publishes, runs your watchlists against it, and surfaces the ten marks you actually need to look at this morning. No more reading 4,000-page PDFs.",
     ctaPrimary: "Start free 14-day trial",
     ctaGhost: "Watch 2-min tour",
     microcopy: "No credit card · 46,758 marks already indexed · Live coverage of T1–T4 weekly issues",
@@ -211,7 +211,7 @@ export const landing = {
 
   coverageSection: {
     eyebrow: "Coverage",
-    h2: "Every Vietnam IP issue, the day it publishes.",
+    h2: "Every IP VIETNAM issue, the day it publishes.",
     sub: "Vietnam's Cục Sở hữu trí tuệ publishes weekly applications (Section A) and registrations (Section B). We OCR, deduplicate, and index all of it within hours of release.",
     /** Free-form footnote under the grid */
     footnote: "Madrid Protocol coverage included on Firm and Enterprise plans · WIPO Global Brand Database mirrored daily",
