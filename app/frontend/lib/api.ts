@@ -196,9 +196,10 @@ export type SearchParams = {
   designated_country?: string;
   /** Granted: true → marks with a resolved VN grant date (vn_grant_date IS NOT NULL). */
   granted?: boolean;
-  /** ISO date strings (YYYY-MM-DD). Filter by INID (151) certificate issue
-   * date. Only B-files (domestic + Madrid registrations) carry this, so
-   * A-files are naturally excluded by any grant-date filter. */
+  /** ISO date strings (YYYY-MM-DD). Filter by the unified VN grant date
+   * (trademarks.vn_grant_date — domestic grant OR Madrid grant), the same
+   * column the `granted` facet reads. Ungranted marks (vn_grant_date IS NULL)
+   * are naturally excluded by any grant-date filter. */
   grant_date_from?: string;
   grant_date_to?: string;
   limit?: number;

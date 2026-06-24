@@ -213,7 +213,7 @@ export function FilterRail({
         })}
       </RailGroup>
 
-      <RailGroup title="Grant date" subtitle="Filters by certificate issue date (B-files only).">
+      <RailGroup title="Grant date" subtitle="Filters by VN grant date (granted marks only).">
         <div className="grid grid-cols-2 gap-2 px-1">
           <DateField
             label="From"
