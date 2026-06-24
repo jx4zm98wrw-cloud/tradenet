@@ -328,6 +328,26 @@ facet. `vn_status` + `/api/v1/facets/vn-status` are retained for
 `/api/v1/trademarks`. See
 `docs/superpowers/specs/2026-06-24-search-grant-status-design.md`.
 
+### Resolved mark name
+
+`trademarks.mark_name` (nullable text, btree-indexed; migration
+`20260624_0028`) is the **resolved display name** every surface reads, fixing
+~172k domestic marks that previously showed the *applicant* as their name.
+Resolved per mark from the trusted source: `mark_sample` (non-empty) →
+domestic ← `domestic_records.mark_text` (by `application_number`) | Madrid ←
+`madrid_records.mark_text` (by `lineage_key = irn`) → NULL (figurative, no
+transcribed name anywhere — ~7.5k rows). Written by
+`scripts/backfill_mark_name.py` (re-runnable, idempotent recompute-and-compare,
+`MARK_NAME_VERSION`; same `ids=`-scoped/stats-dict shape as
+`backfill_vn_grant`). The ingest worker does NOT populate it — **re-run the
+backfill after a fresh ingest/enrichment.** Serialized on `TrademarkOut`, so
+search/cmdk/compare/exports/watchlists/today all get it with no per-payload
+join. The frontend `markDisplay` (`lib/mark-display.ts`) resolves the wordmark
+as `markText ?? mark_name ?? mark_sample` and renders `"(figurative mark)"`
+(never the applicant) when none exists. Display-only: search ranking still
+matches `mark_sample`/`applicant_name` (`search.py`). See
+`docs/superpowers/specs/2026-06-24-mark-name-resolution-design.md`.
+
 ## Data files
 
 ### `cities_by_country.json`
