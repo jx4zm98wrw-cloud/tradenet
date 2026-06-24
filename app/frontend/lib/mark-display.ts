@@ -41,7 +41,6 @@ export function markDisplay(
     Trademark,
     | "mark_sample"
     | "mark_name"
-    | "applicant_name"
     | "application_number"
     | "certificate_number"
     | "madrid_number"
