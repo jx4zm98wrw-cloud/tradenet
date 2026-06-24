@@ -135,7 +135,11 @@ async def run_chunk(
     cache = _cache_dir()
     all_appnos = await iter_domestic_appnos(session)
     recent_nf = await _recent_not_found(session)
-    todo = [a for a in _uncached(all_appnos, cache) if a not in recent_nf]
+    # Exclude malformed appnos (appno_to_vnid is None) so dead mode CONVERGES too —
+    # they can never map to a IP VIETNAM id, so re-fetching them every chunk is wasted
+    # work (and would otherwise count as failed via _fetch_outcome's None-vnid
+    # branch). Mirrors worker.domestic_sweep._worklist.
+    todo = [a for a in _uncached(all_appnos, cache) if a not in recent_nf and appno_to_vnid(a) is not None]
     http = http_session or requests.Session()
 
     concurrency = max(START, ctl["concurrency"] or START)
@@ -212,7 +216,9 @@ async def run_chunk(
     ctl = await _ctl(session)
     if ctl["status"] == "running" and ctl["mode"] == "dead":
         recent_nf = await _recent_not_found(session)
-        remaining = [a for a in _uncached(all_appnos, cache) if a not in recent_nf]
+        remaining = [
+            a for a in _uncached(all_appnos, cache) if a not in recent_nf and appno_to_vnid(a) is not None
+        ]
         cap_hit = ctl["cap"] is not None and ctl["processed"] >= ctl["cap"]
         if remaining and not cap_hit:
             enqueue_next()

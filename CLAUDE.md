@@ -130,7 +130,17 @@ claude_csvbuilder/
 │   │   │                           an IP VIETNAM id; needs a manual appno fix),
 │   │   │                           all shown on /admin/domestic with the
 │   │   │                           malformed appnos listed (appno/applicant/
-│   │   │                           gazette) for review. Admin re-check control:
+│   │   │                           gazette) for review. The sweep CONVERGES on
+│   │   │                           malformed appnos: `_worklist` (and dead mode's
+│   │   │                           todo) EXCLUDE them (`appno_to_vnid(a) is None`)
+│   │   │                           the same way `recent_not_found` is excluded —
+│   │   │                           knowable from the appno string alone, so no
+│   │   │                           negative-cache is needed; they never reach
+│   │   │                           enrich_one and stop wasting a chunk slot every
+│   │   │                           pass. Defensively, if an UNMAPPABLE outcome
+│   │   │                           still reaches run_chunk it is NOT counted as
+│   │   │                           `ok`/`failed` and does not advance the breaker
+│   │   │                           streak. Admin re-check control:
 │   │   │                           POST /api/v1/admin/domestic-sweep/recheck-
 │   │   │                           pending resets the not_found backoff on all
 │   │   │                           unvalidated marks (timestamp reset, preserves
@@ -138,10 +148,21 @@ claude_csvbuilder/
 │   │   │                           normal-mode chunk if idle, re-probing pending
 │   │   │                           marks now instead of waiting out the 30-day
 │   │   │                           window — surfaced as a "Re-check pending (N)"
-│   │   │                           button on /admin/domestic.
+│   │   │                           button on /admin/domestic. Orphan negative-
+│   │   │                           cache hygiene: a domestic_not_found row whose
+│   │   │                           appno is no longer a current domestic-category
+│   │   │                           trademark (re-ingested/re-categorized) inflates
+│   │   │                           `pending_publication` above `remaining`.
+│   │   │                           `store.reconcile_not_found` deletes those
+│   │   │                           orphans (run via `python -m
+│   │   │                           scripts.reconcile_domestic_not_found`),
+│   │   │                           restoring the exact `pending + unresolved +
+│   │   │                           malformed == remaining` bucket split.
 │   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
 │   │   ├── alembic/                Migrations
-│   │   ├── scripts/                One-off scripts (smoke_ingest.py)
+│   │   ├── scripts/                One-off scripts (smoke_ingest.py;
+│   │   │                           reconcile_domestic_not_found.py prunes orphan
+│   │   │                           domestic_not_found rows)
 │   │   ├── tests/                  pytest suite (httpx + ASGI)
 │   │   ├── pyproject.toml          Lint, type-check, package config
 │   │   ├── requirements.txt        Pinned runtime deps (includes pymupdf etc. for image_extractor)

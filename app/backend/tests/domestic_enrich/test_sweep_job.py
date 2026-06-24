@@ -93,6 +93,68 @@ async def test_not_found_does_not_trip_circuit_breaker(db_session, tmp_path, mon
 
 
 @pytest.mark.asyncio
+async def test_worklist_excludes_malformed_appnos(db_session, tmp_path, monkeypatch):
+    # Malformed appnos (appno_to_vnid is None — too few digits) can never map to a
+    # IP VIETNAM id, so they'd be re-processed every chunk and never converge. The
+    # work-list must drop them BEFORE enrich_one ever sees them, while the two
+    # well-formed marks around them are still processed.
+    await _set_running(db_session, chunk_size=10, delay=0.0, jitter=0.0)
+
+    async def fake_iter(session):
+        return ["4-2026-00001", "4-9999-1", "4-2026-00002"]  # middle one is malformed
+
+    seen = []
+
+    async def fake_enrich(session, appno, cache, *, http_session=None, use_cache=True):
+        seen.append(appno)
+        return True
+
+    monkeypatch.setattr(ds, "iter_domestic_appnos", fake_iter)
+    monkeypatch.setattr(ds, "enrich_one", fake_enrich)
+    monkeypatch.setattr(ds, "_cache_dir", lambda: tmp_path)
+
+    await ds.run_chunk(db_session, enqueue_next=lambda: None)
+
+    assert seen == ["4-2026-00001", "4-2026-00002"]  # malformed never fetched
+    row = (await db_session.execute(select(C).where(C.id == 1))).scalar_one()
+    assert row.processed == 2  # only the two mappable marks counted
+
+
+@pytest.mark.asyncio
+async def test_unmappable_outcome_not_counted_as_ok(db_session, tmp_path, monkeypatch):
+    # Defensive accounting: if an UNMAPPABLE somehow reaches enrich_one (it won't
+    # via _worklist, but a future caller might), it must NOT count as ok (that
+    # would mask a malformed mark behind an inflated success count) and must NOT
+    # trip the breaker — a run of them past _MAX_CONSECUTIVE keeps the sweep
+    # running with all counters at zero.
+    from domestic_enrich.enrich import EnrichOutcome
+
+    n = ds._MAX_CONSECUTIVE + 3
+    await _set_running(db_session, chunk_size=n + 5, delay=0.0, jitter=0.0)
+
+    appnos = [f"4-2026-{i:05d}" for i in range(n)]  # all well-formed (pass _worklist)
+
+    async def fake_iter(session):
+        return appnos
+
+    async def fake_enrich(session, appno, cache, *, http_session=None, use_cache=True):
+        return EnrichOutcome.UNMAPPABLE
+
+    monkeypatch.setattr(ds, "iter_domestic_appnos", fake_iter)
+    monkeypatch.setattr(ds, "enrich_one", fake_enrich)
+    monkeypatch.setattr(ds, "_cache_dir", lambda: tmp_path)
+
+    await ds.run_chunk(db_session, enqueue_next=lambda: None)
+
+    row = (await db_session.execute(select(C).where(C.id == 1))).scalar_one()
+    assert row.status == "running"  # breaker never tripped
+    assert row.ok == 0
+    assert row.failed == 0
+    assert row.not_found == 0
+    assert row.processed == 0  # no real work happened
+
+
+@pytest.mark.asyncio
 async def test_chunk_noop_when_not_running(db_session, tmp_path, monkeypatch):
     monkeypatch.setattr(ds, "_cache_dir", lambda: tmp_path)
     res = await ds.run_chunk(db_session, enqueue_next=lambda: None)
