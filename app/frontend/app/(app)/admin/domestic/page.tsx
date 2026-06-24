@@ -20,7 +20,9 @@ export default function AdminDomesticPage() {
   const [isAdmin, setIsAdmin] = React.useState<boolean | null>(null);
   const [stats, setStats] = React.useState<DomesticEnrichmentStats | null>(null);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [rechecking, setRechecking] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
 
   // Gate: redirect non-admins to Today.
   React.useEffect(() => {
@@ -72,12 +74,36 @@ export default function AdminDomesticPage() {
             Derived live from the database.
           </p>
         </div>
-        <Button variant="ghost" onClick={() => refresh()} disabled={refreshing}>
-          {refreshing ? "Refreshing…" : "Refresh"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            disabled={rechecking || stats.pending_publication === 0}
+            onClick={async () => {
+              if (!confirm(`Re-check ${formatNumber(stats.pending_publication)} pending mark(s) against IP VIETNAM now?`)) return;
+              setRechecking(true);
+              setError(null);
+              setNotice(null);
+              try {
+                const { reset } = await api.domesticSweepRecheckPending();
+                setNotice(`Re-queued ${formatNumber(reset)} mark(s) for re-check.`);
+                await refresh();
+              } catch (e) {
+                setError(errorMessage(e));
+              } finally {
+                setRechecking(false);
+              }
+            }}
+          >
+            {rechecking ? "Re-checking…" : `Re-check pending (${formatNumber(stats.pending_publication)})`}
+          </Button>
+          <Button variant="ghost" onClick={() => refresh()} disabled={refreshing}>
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </Button>
+        </div>
       </div>
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
+      {notice && <p className="text-sm text-mute">{notice}</p>}
 
       <SweepControlCard />
 
@@ -110,11 +136,33 @@ export default function AdminDomesticPage() {
         <Stat label="Unique app nos" value={stats.unique_appnos} />
         <Stat label="Validated" value={stats.validated} />
         <Stat label="Unresolved" value={stats.unresolved} />
+        <Stat label="Malformed" value={stats.malformed} />
         <Stat label="Pending publication" value={stats.pending_publication} />
         <Stat label="Granted" value={stats.granted} />
         <Stat label="Registrations" value={stats.by_category["domestic_registration"] ?? 0} />
         <Stat label="Applications" value={stats.by_category["domestic_application"] ?? 0} />
       </div>
+
+      {stats.malformed_appnos.length > 0 && (
+        <Card>
+          <div className="px-4 py-4">
+            <div className="text-sm font-semibold">Malformed application numbers — needs review</div>
+            <p className="text-[11.5px] text-mute mt-1 mb-3 max-w-prose">
+              These can’t be mapped to an IP VIETNAM id (e.g. a truncated number), so the sweep skips them. Fix{" "}
+              <span className="font-mono text-ink">trademarks.application_number</span>, then they enrich automatically.
+            </p>
+            <ul className="space-y-1 text-[13px]">
+              {stats.malformed_appnos.map((m) => (
+                <li key={m.application_number} className="flex gap-3 min-w-0">
+                  <span className="font-mono text-ink shrink-0">{m.application_number}</span>
+                  <span className="text-mute truncate">{m.applicant_name ?? "—"}</span>
+                  <span className="text-mute font-mono truncate">{m.gazette ?? "—"}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
