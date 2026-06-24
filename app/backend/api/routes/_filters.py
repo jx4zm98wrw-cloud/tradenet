@@ -85,6 +85,7 @@ def build_trademark_where(
     ip_agency: str | None = None,
     designated_country: str | None = None,
     vn_status: str | None = None,
+    granted: bool | None = None,
     grant_date_from: date | None = None,
     grant_date_to: date | None = None,
     exclude: str | None = None,
@@ -157,12 +158,18 @@ def build_trademark_where(
     if vn_status and exclude != "vn_status":
         irns = select(MadridRecord.irn).where(MadridRecord.vn_status == vn_status)
         where.append(Trademark.lineage_key.in_(irns))
-    # Grant date = INID (151), the date the registration certificate was
-    # issued. Only B-files (domestic + Madrid registrations) carry this;
-    # A-files have NULL here, so they're naturally excluded from any
-    # grant-date filter.
+    # "Granted" status: any mark with a resolved VN grant date (domestic grant
+    # OR Madrid grant), via the denormalized trademarks.vn_grant_date column —
+    # a single indexed predicate, no per-query join. Replaces the old Madrid-only
+    # vn_status='granted' facet that silently missed ~100k domestic grants.
+    if granted and exclude != "granted":
+        where.append(Trademark.vn_grant_date.is_not(None))
+    # Grant-date range filters by the unified VN grant date
+    # (trademarks.vn_grant_date) — the same column the Granted facet uses,
+    # covering both domestic and Madrid grants. Marks without a resolved grant
+    # date have NULL here, so they're naturally excluded from any range filter.
     if grant_date_from is not None and exclude != "grant_date":
-        where.append(Trademark.registration_date_151 >= grant_date_from)
+        where.append(Trademark.vn_grant_date >= grant_date_from)
     if grant_date_to is not None and exclude != "grant_date":
-        where.append(Trademark.registration_date_151 <= grant_date_to)
+        where.append(Trademark.vn_grant_date <= grant_date_to)
     return where

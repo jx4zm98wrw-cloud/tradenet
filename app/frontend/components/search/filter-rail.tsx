@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   api, type CountBucket, type SearchParams as Params, type NiceMode,
-  countryDisplay, NICE_LABELS, MARK_CATEGORY_LABELS, VN_STATUS_LABELS,
+  countryDisplay, NICE_LABELS, MARK_CATEGORY_LABELS,
 } from "@/lib/api";
 import { Flag } from "@/components/ui";
 import { Icon } from "@/components/icons";
@@ -19,7 +19,7 @@ type Props = {
   applicants: CountBucket[];
   ipAgencies: CountBucket[];
   markCategories: CountBucket[];
-  vnStatuses: CountBucket[];
+  grantedFacet: CountBucket[];
 };
 
 // Logical display order for the derived classification facet (lifecycle stage,
@@ -32,13 +32,9 @@ const MARK_CATEGORY_ORDER = [
   "unknown",
 ] as const;
 
-// Logical display order for the VN protection-status facet (lifecycle stage,
-// not count). Empty buckets are hidden at render time.
-const VN_STATUS_ORDER = ["granted", "pending", "refused"] as const;
-
 export function FilterRail({
   filters, setFilter, niceMode, onNiceModeChange,
-  countries, classes, applicants, ipAgencies, markCategories, vnStatuses,
+  countries, classes, applicants, ipAgencies, markCategories, grantedFacet,
 }: Props) {
   const [countryModal, setCountryModal] = React.useState(false);
   const [classesModal, setClassesModal] = React.useState(false);
@@ -67,32 +63,12 @@ export function FilterRail({
         })}
       </RailGroup>
 
-      <RailGroup title="VN status">
-        {VN_STATUS_ORDER.map((key) => {
-          const count = vnStatuses.find((b) => b.key === key)?.count ?? 0;
-          const active = filters.vn_status === key;
-          // Hide buckets with no rows (unless selected).
-          if (count === 0 && !active) return null;
-          return (
-            <Row
-              key={key}
-              checked={active}
-              onToggle={() => setFilter({ vn_status: active ? undefined : key })}
-              label={VN_STATUS_LABELS[key] ?? key}
-              count={count}
-              empty={count === 0 && !active}
-            />
-          );
-        })}
-      </RailGroup>
-
-      <RailGroup title="Designated jurisdiction">
+      <RailGroup title="Status">
         <Row
-          checked={filters.designated_country === "VN"}
-          onToggle={() =>
-            setFilter({ designated_country: filters.designated_country === "VN" ? undefined : "VN" })
-          }
-          label="Protected in VN"
+          checked={!!filters.granted}
+          onToggle={() => setFilter({ granted: filters.granted ? undefined : true })}
+          label="Granted"
+          count={grantedFacet.find((b) => b.key === "granted")?.count ?? 0}
         />
       </RailGroup>
 
@@ -237,7 +213,7 @@ export function FilterRail({
         })}
       </RailGroup>
 
-      <RailGroup title="Grant date" subtitle="Filters by certificate issue date (B-files only).">
+      <RailGroup title="Grant date" subtitle="Filters by VN grant date (granted marks only).">
         <div className="grid grid-cols-2 gap-2 px-1">
           <DateField
             label="From"

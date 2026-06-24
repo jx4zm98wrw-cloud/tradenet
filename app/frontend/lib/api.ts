@@ -194,11 +194,12 @@ export type SearchParams = {
   /** Madrid designated jurisdiction (ISO2). Matches marks whose Madrid record
    * covers this country. "VN" = protected/processed in Vietnam. */
   designated_country?: string;
-  /** VN protection status: granted | pending | refused. */
-  vn_status?: string;
-  /** ISO date strings (YYYY-MM-DD). Filter by INID (151) certificate issue
-   * date. Only B-files (domestic + Madrid registrations) carry this, so
-   * A-files are naturally excluded by any grant-date filter. */
+  /** Granted: true → marks with a resolved VN grant date (vn_grant_date IS NOT NULL). */
+  granted?: boolean;
+  /** ISO date strings (YYYY-MM-DD). Filter by the unified VN grant date
+   * (trademarks.vn_grant_date — domestic grant OR Madrid grant), the same
+   * column the `granted` facet reads. Ungranted marks (vn_grant_date IS NULL)
+   * are naturally excluded by any grant-date filter. */
   grant_date_from?: string;
   grant_date_to?: string;
   limit?: number;
@@ -578,8 +579,8 @@ export const api = {
     json<CountBucket[]>(`/api/v1/facets/ip-agencies?${qs({ ...filters, limit, offset: undefined })}`, init),
   facetsMarkCategories: (filters: SearchParams, init?: RequestInit) =>
     json<CountBucket[]>(`/api/v1/facets/mark-categories?${qs({ ...filters, offset: undefined })}`, init),
-  facetsVnStatus: (filters: SearchParams, init?: RequestInit) =>
-    json<CountBucket[]>(`/api/v1/facets/vn-status?${qs({ ...filters, offset: undefined })}`, init),
+  facetsGranted: (filters: SearchParams, init?: RequestInit) =>
+    json<CountBucket[]>(`/api/v1/facets/granted?${qs({ ...filters, offset: undefined })}`, init),
   statsTopApplicants: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-applicants?limit=${limit}`),
   statsTopAgents: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-agents?limit=${limit}`),
   getMark: (id: string) => json<MarkDetail>(`/api/v1/marks/${id}`),
@@ -697,13 +698,6 @@ export const MARK_CATEGORY_LABELS: Record<string, string> = {
   madrid_registration: "Madrid registration",
   madrid_renewal: "Madrid renewal",
   unknown: "Unclassified",
-};
-
-// VN protection-status labels (mirrors backend VN_STATUS_LABELS in facets.py).
-export const VN_STATUS_LABELS: Record<string, string> = {
-  granted: "Granted in VN",
-  pending: "Pending in VN",
-  refused: "Refused in VN",
 };
 
 // Short Nice class labels (mirrors backend/api/v1/routes/stats.py NICE_LABELS).

@@ -306,6 +306,28 @@ from the domestic panels (which filter `*_norm IS NOT NULL`) until the
 backfill is re-run — re-run `scripts/backfill_entity_clean.py` after a fresh
 ingest. See `docs/superpowers/specs/2026-06-22-entity-canonicalization-design.md`.
 
+### Search grant-status filter
+
+`trademarks.vn_grant_date` (nullable date, btree-indexed; migration
+`20260624_0027`) is the **unified VN registration grant date**: resolved per
+mark by identifier from the trusted source — domestic ← `domestic_records.grant_date`
+(by `application_number`); Madrid ← `madrid_records.vn_grant_date` when
+`vn_status='granted'` (by `lineage_key = irn`); else NULL. Written by
+`scripts/backfill_vn_grant.py` (re-runnable, idempotent recompute-and-compare,
+`VN_GRANT_VERSION`; same `ids=`-scoped/stats-dict shape as
+`backfill_entity_clean`). The ingest worker does NOT populate it — **re-run the
+backfill after a fresh ingest/enrichment.** The `/search` page reads it through
+a clean `granted: bool` filter (`vn_grant_date IS NOT NULL`, indexed, no
+per-query join) + a `GET /api/v1/facets/granted` count (~141,961 = domestic +
+Madrid grants — note a domestic appno present as both an application and a
+registration row is counted under each). `grant_date_from`/`grant_date_to` also
+range over this column. This **replaced** the old Madrid-only "Granted in VN"
+facet (`madrid_records.vn_status='granted'`, ~18,994, which silently dropped
+~100k domestic grants) and dropped the universal-and-useless "Protected in VN"
+facet. `vn_status` + `/api/v1/facets/vn-status` are retained for
+`/api/v1/trademarks`. See
+`docs/superpowers/specs/2026-06-24-search-grant-status-design.md`.
+
 ## Data files
 
 ### `cities_by_country.json`

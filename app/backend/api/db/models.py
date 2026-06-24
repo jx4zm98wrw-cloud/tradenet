@@ -231,6 +231,9 @@ class Trademark(Base):
     publication_date_441: Mapped[date | None] = mapped_column(Date, nullable=True)  # (441)
     publication_date_450: Mapped[date | None] = mapped_column(Date, nullable=True)  # (450)
     registration_date_151: Mapped[date | None] = mapped_column(Date, nullable=True)  # (151)
+    vn_grant_date: Mapped[date | None] = mapped_column(
+        Date, nullable=True, index=True
+    )  # unified VN grant date (domestic grant_date | Madrid vn_grant_date); NULL = not granted
     renewal_date_156: Mapped[date | None] = mapped_column(Date, nullable=True)  # (156)
     expiry_date_141: Mapped[date | None] = mapped_column(Date, nullable=True)  # (141)
     expiry_date_181: Mapped[date | None] = mapped_column(Date, nullable=True)  # (181)

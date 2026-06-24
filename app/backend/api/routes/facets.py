@@ -35,6 +35,7 @@ def _filter_params(
     ip_agency: str | None = Query(None),
     designated_country: str | None = Query(None),
     vn_status: str | None = Query(None),
+    granted: bool | None = Query(None),
     grant_date_from: date | None = Query(None),
     grant_date_to: date | None = Query(None),
 ):
@@ -52,6 +53,7 @@ def _filter_params(
         ip_agency=ip_agency,
         designated_country=designated_country,
         vn_status=vn_status,
+        granted=granted,
         grant_date_from=grant_date_from,
         grant_date_to=grant_date_to,
     )
@@ -187,6 +189,23 @@ async def facet_vn_status(
     return [
         CountBucket(key=st, label=VN_STATUS_LABELS.get(st, st), count=n) for st, n in rows if st is not None
     ]
+
+
+@router.get("/granted", response_model=list[CountBucket])
+async def facet_granted(
+    filters: dict = Depends(_filter_params),
+    session: AsyncSession = Depends(get_session),
+) -> list[CountBucket]:
+    """Count of marks with a resolved VN grant date (trademarks.vn_grant_date
+    IS NOT NULL) under the current filter set, excluding the granted filter
+    itself. Unifies domestic + Madrid grants — replaces the Madrid-only
+    vn_status='granted' bucket."""
+    where = build_trademark_where(**filters, exclude="granted")
+    stmt = select(func.count()).select_from(Trademark).where(Trademark.vn_grant_date.is_not(None))
+    if where:
+        stmt = stmt.where(and_(*where))
+    n = (await session.execute(stmt)).scalar_one()
+    return [CountBucket(key="granted", label="Granted", count=n)]
 
 
 @router.get("/ip-agencies", response_model=list[CountBucket])
