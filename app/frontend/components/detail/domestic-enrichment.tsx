@@ -97,7 +97,7 @@ export function DomesticEnrichment({ e, isAdmin = false }: { e: DomesticEnrichme
         <CardHead>
           <div className="flex items-center gap-2">
             <h2 className="head-serif m-0 text-sm font-semibold text-ink leading-tight tracking-tight">
-              IP VIETNAM domestic record
+              Domestic record
             </h2>
             <Pill tone="stamp" size="sm">IP VIETNAM</Pill>
           </div>
