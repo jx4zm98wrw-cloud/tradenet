@@ -110,15 +110,12 @@ function ComparePage() {
             ))}
           </CmpRow>
           <CmpRow label="Status" n={N}>
-            {data.marks.map((m) => {
-              const isA = m.record_type === "A";
-              return (
-                <span key={m.id} className="flex items-center gap-2">
-                  <PulseDot tone={isA ? "warn" : "ok"} />
-                  {isA ? "Pending publication" : "Active"}
-                </span>
-              );
-            })}
+            {data.marks.map((m) => (
+              <span key={m.id} className="flex items-center gap-2">
+                <PulseDot tone={m.status_tone} />
+                {m.status_label}
+              </span>
+            ))}
           </CmpRow>
           <CmpRow label="Application №" n={N}>
             {data.marks.map((m) => (

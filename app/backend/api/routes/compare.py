@@ -25,9 +25,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import similarity as sim
+from .._status import derive_status
 from ..db import Trademark, get_session
+from ..db.models import DomesticRecord
 from ..schemas import TrademarkOut
 from ..settings import get_settings
+from .today import DEMO_TODAY
 
 router = APIRouter(prefix="/api/v1/compare", tags=["compare"])
 
@@ -65,9 +68,14 @@ class PairScore(BaseModel):
     visualConfidence: str = "none"
 
 
+class CompareMarkOut(TrademarkOut):
+    status_label: str
+    status_tone: str  # "ok" | "warn" | "mute"
+
+
 class CompareResponse(BaseModel):
     anchorId: str
-    marks: list[TrademarkOut]
+    marks: list[CompareMarkOut]
     scores: list[PairScore]
     weights: dict[str, float]
 
@@ -84,8 +92,18 @@ async def compare(body: CompareRequest, session: AsyncSession = Depends(get_sess
     total = sum(weights.values()) or 1.0
     weights = {k: v / total for k, v in weights.items()}
 
-    rows = (await session.execute(select(Trademark).where(Trademark.id.in_(body.markIds)))).scalars().all()
-    by_id = {str(m.id): m for m in rows}
+    result = (
+        await session.execute(
+            select(Trademark, DomesticRecord.status_code)
+            .outerjoin(
+                DomesticRecord,
+                Trademark.application_number == DomesticRecord.application_number,
+            )
+            .where(Trademark.id.in_(body.markIds))
+        )
+    ).all()
+    by_id = {str(m.id): m for m, _ in result}
+    status_by_id = {str(m.id): status_code for m, status_code in result}
     ordered = [by_id[mid] for mid in body.markIds if mid in by_id]
     if len(ordered) < 2:
         raise HTTPException(404, "Some mark IDs were not found")
@@ -105,9 +123,18 @@ async def compare(body: CompareRequest, session: AsyncSession = Depends(get_sess
 
     return CompareResponse(
         anchorId=str(anchor.id),
-        marks=[TrademarkOut.model_validate(m) for m in ordered],
+        marks=[_mark_out(m, status_by_id.get(str(m.id))) for m in ordered],
         scores=scores,
         weights=weights,
+    )
+
+
+def _mark_out(m: Trademark, status_code: str | None) -> CompareMarkOut:
+    label, tone = derive_status(status_code, m.vn_grant_date, m.expiry_date_141, today=DEMO_TODAY)
+    return CompareMarkOut(
+        **TrademarkOut.model_validate(m).model_dump(),
+        status_label=label,
+        status_tone=tone,
     )
 
 

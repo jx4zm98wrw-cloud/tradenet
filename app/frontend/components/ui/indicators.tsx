@@ -27,8 +27,8 @@ export function SimilarityRing({ score, size = 36 }: { score: number; size?: num
 }
 
 /** Live-state pulse — used in status pills ("Examination pending", "Active"). */
-export function PulseDot({ tone = "ok", className = "" }: { tone?: "ok" | "warn" | "stamp"; className?: string }) {
-  const c = { ok: "text-ok", warn: "text-warn", stamp: "text-stamp" }[tone];
+export function PulseDot({ tone = "ok", className = "" }: { tone?: "ok" | "warn" | "stamp" | "mute"; className?: string }) {
+  const c = { ok: "text-ok", warn: "text-warn", stamp: "text-stamp", mute: "text-mute" }[tone];
   return <span className={`pulse-dot ${c} ${className}`} aria-hidden="true" />;
 }
 

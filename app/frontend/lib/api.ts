@@ -537,9 +537,16 @@ export type PairScore = {
   visualConfidence: "phash" | "typographic" | "none";
 };
 
+/** A mark in a compare response — base Trademark plus the derived status
+ * (label = IP VIETNAM-faithful; tone drives the PulseDot color). */
+export type CompareMark = Trademark & {
+  status_label: string;
+  status_tone: "ok" | "warn" | "mute";
+};
+
 export type CompareResponse = {
   anchorId: string;
-  marks: Trademark[];
+  marks: CompareMark[];
   scores: PairScore[];
   weights: Record<string, number>;
 };

@@ -21,6 +21,7 @@ from sqlalchemy import and_, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import similarity as sim
+from .._status import derive_status
 from ..db import RecordType, Trademark, Watchlist, get_session
 from ..db.models import DomesticRecord, MadridRecord
 from ..schemas import DomesticEnrichmentOut, MadridEnrichmentOut, TrademarkOut
@@ -38,7 +39,7 @@ class MarkDetailOut(BaseModel):
     oppositionEnds: date | None
     oppositionDaysLeft: int | None
     oppositionOpen: bool
-    statusLabel: str  # "Examination pending" | "Active registration" | "Lapsed" | "Pending publication"
+    statusLabel: str  # IP VIETNAM-faithful label from derive_status: domestic status_code verbatim, else Granted/Lapsed/Pending
     statusTone: str  # "warn" | "ok" | "mute"
     # Goods-and-services text extracted from the (511) field. Kept off the
     # base TrademarkOut so it doesn't bloat list/search responses — average
@@ -85,12 +86,10 @@ def _build_detail(
         opp_ends = _opp_close_date(m.publication_date_441)
         opp_left = (opp_ends - today).days
         opp_open = opp_left > 0
-    if m.record_type == RecordType.A:
-        status_label, status_tone = ("Examination pending", "warn")
-    elif m.expiry_date_141 and m.expiry_date_141 < today:
-        status_label, status_tone = ("Lapsed", "mute")
-    else:
-        status_label, status_tone = ("Active registration", "ok")
+    domestic_status_code = domestic.status_code if domestic else None
+    status_label, status_tone = derive_status(
+        domestic_status_code, m.vn_grant_date, m.expiry_date_141, today=today
+    )
     return MarkDetailOut(
         mark=TrademarkOut.model_validate(m),
         oppositionEnds=opp_ends,
