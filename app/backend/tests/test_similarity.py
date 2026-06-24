@@ -387,6 +387,45 @@ def test_typographic_visual_cannot_satisfy_conjunction_guard_alone() -> None:
     )
 
 
+def test_composite_figurative_phash_visual_alone_is_low_risk() -> None:
+    """Two nameless figurative marks with near-identical logos (real pHash
+    visual ~0.95) but NO shared figurative classification (vienna_o = 0) and
+    no name/sound signal (phonetic = 0). The conjunction guards both pass —
+    pHash visual carries max_sig past the 0.50 sight-or-sound floor, and the
+    class guard passes — but the weighted composite lands 0.438, below the
+    0.50 floor, so the engine verdicts 'Low risk'.
+
+    This is the precision boundary for the 'Similar marks landing this period'
+    card: a bare pHash resemblance with nothing else shared is most likely a
+    perceptual-hash coincidence (the gazette classified the two logos'
+    elements completely differently), so it is deliberately NOT surfaced."""
+    c = composite_score(phonetic=0.0, visual=0.95, class_o=1.0, vienna_o=0.0, visual_confidence="phash")
+    # composite = 0.4*0 + 0.25*0.95 + 0.2*1.0 + 0 = 0.438 < 0.50 → Low risk
+    assert c.verdict == "Low risk"
+
+
+def test_composite_figurative_phash_visual_with_shared_vienna_is_conflict() -> None:
+    """The genuine figurative-look-alike case: two nameless marks with
+    near-identical logos (pHash visual ~0.95) that ALSO share Vienna codes —
+    which is the norm, since Vienna codes ARE the classification of a mark's
+    figurative elements, so real visual twins almost always share them. The
+    second signal pushes the composite to 0.587, clearing the 0.50 floor →
+    'Possible conflict'.
+
+    Confirms that dropping the applicant-name fallback from the similar-marks
+    scoring does NOT kill genuine figurative matches: the visual + vienna axes
+    carry them past the conjunction verdict the card now gates on."""
+    c = composite_score(
+        phonetic=0.0,
+        visual=0.95,
+        class_o=1.0,
+        vienna_o=1.0,
+        visual_confidence="phash",
+    )
+    # composite = 0.4*0 + 0.25*0.95 + 0.2*1.0 + 0.15*1.0 = 0.587 >= 0.50 → Possible
+    assert c.verdict == "Possible conflict"
+
+
 def test_phash_visual_does_satisfy_conjunction_guard() -> None:
     """Real pHash visual IS independent evidence. If the engine ran a
     perceptual-hash comparison on extracted logo PNGs and found 0.85

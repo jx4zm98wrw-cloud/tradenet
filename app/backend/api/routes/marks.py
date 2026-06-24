@@ -6,7 +6,7 @@
   - procedural timeline (derived from filed/pub/reg dates)
   - applicant portfolio stats (real count from DB)
   - co-marks (same applicant)
-  - similar marks landing this period (mocked similarity until PR #5)
+  - similar marks landing this period
   - raw INID markers (extra_markers JSONB passthrough)
 """
 
@@ -298,22 +298,19 @@ class SimilarMark(BaseModel):
     visualConfidence: str = "none"
 
 
-# Minimum composite score for a mark to be considered "similar" enough to
-# surface as a recommendation. Below this the engine considers the two
-# marks unrelated and a trademark professional wouldn't bother flagging
-# them — return nothing rather than noise.
-_SIMILAR_MIN_COMPOSITE = 0.30
-
 # Candidate pool size before re-ranking with the real engine. The DB
 # typically has hundreds of rows in a single class + ±60d window; we
 # fetch up to this many, compute composite for each, then return the
-# top `limit` above the threshold. Keeping this bounded means Compare
-# pages stay fast even for popular classes.
+# top `limit` the engine verdicts a conflict. Keeping this bounded means
+# Compare pages stay fast even for popular classes.
 _SIMILAR_CANDIDATE_POOL = 40
 
 # Stage-1 recall cap for wordmark anchors: max candidates pulled by trigram /
-# dmetaphone similarity on `mark_sample` before the composite rerank. Ordered by
-# trigram similarity so the genuinely-similar marks come first; bounded so the
+# dmetaphone similarity before the composite rerank. Candidates are matched on
+# their `mark_sample` (the trigram/dmetaphone index lives there); the anchor is
+# the subject's resolved name (`mark_name` or `mark_sample`), which may differ —
+# the asymmetry is intentional, there is no trigram index on `mark_name`. Ordered
+# by trigram similarity so the genuinely-similar marks come first; bounded so the
 # per-candidate pHash work stays fast.
 _SIMILAR_RECALL_CAP = 50
 
@@ -329,16 +326,18 @@ async def similar_marks(
 
     Two-stage retrieval (mirrors the search route):
       1. RECALL — for marks with a wordmark, pull candidates whose `mark_sample`
-         is trigram- or Double-Metaphone-similar to this mark's wordmark
-         (index-backed), scoped to the ±60-day "this period" window. This
-         replaces the old "40 most-recent rows sharing any Nice class" screen,
-         which — in a crowded class like 35 (10k+ marks) — surfaced unrelated
-         class-mates rather than genuinely confusable marks. Figurative-only
-         marks (no wordmark) fall back to the class + period screen, since there
-         is no text to recall by and no pHash index.
+         is trigram- or Double-Metaphone-similar to this mark's resolved name
+         (`mark_name` or `mark_sample`) (index-backed), scoped to the ±60-day
+         "this period" window. This replaces the old "40 most-recent rows
+         sharing any Nice class" screen, which — in a crowded class like 35
+         (10k+ marks) — surfaced unrelated class-mates rather than genuinely
+         confusable marks. Marks with no resolved name and no wordmark fall back
+         to the class + period screen, since there is no text to recall by and
+         no pHash index.
       2. RERANK — composite score (phonetic + visual + class + vienna) per
-         candidate, drop < 0.30, sort descending, return top `limit`. An empty
-         result is correct here: "no confusable marks landed this period".
+         candidate, drop marks the engine verdicts Low risk, sort descending,
+         return top `limit`. An empty result is correct here: "no confusable
+         marks landed this period".
     """
     m = await session.get(Trademark, id)
     if m is None:
@@ -350,7 +349,7 @@ async def similar_marks(
         hi = m.publication_date_441 + timedelta(days=60)
         pub_range = [Trademark.publication_date_441.between(lo, hi)]
 
-    anchor_word = (m.mark_sample or "").strip()
+    anchor_word = (m.mark_name or m.mark_sample or "").strip()
     if anchor_word:
         # Stage 1: similarity recall on the wordmark — trigram `%` OR same
         # Double-Metaphone code, ordered by trigram similarity (index-backed).
@@ -383,7 +382,7 @@ async def similar_marks(
         fq = fq.order_by(desc(Trademark.publication_date_441), Trademark.id).limit(_SIMILAR_CANDIDATE_POOL)
         candidates = list((await session.execute(fq)).scalars().all())
     image_root = get_settings().data_dir / "image"
-    m_text = m.mark_sample or m.applicant_name
+    m_text = (m.mark_name or m.mark_sample or "").strip()
 
     # Per-matter weights: when a watchlist context is supplied, rank with that
     # matter's weight profile (e.g. pharma up-weights phonetic); else defaults.
@@ -395,7 +394,7 @@ async def similar_marks(
 
     scored: list[tuple[Trademark, float, str]] = []
     for r in candidates:
-        r_text = r.mark_sample or r.applicant_name
+        r_text = (r.mark_name or r.mark_sample or "").strip()
         phon = sim.phonetic_similarity(m_text, r_text)
         vis = sim.visual_similarity(
             a_logo=m.logo_path,
@@ -409,7 +408,12 @@ async def similar_marks(
         cs = sim.composite_score(
             phon, vis.score, class_o, vienna_o, weights=weights, visual_confidence=vis.confidence
         )
-        if cs.composite >= _SIMILAR_MIN_COMPOSITE:
+        # Surface only marks the engine itself verdicts a Possible/Likely conflict
+        # (its conjunction rule for Possible conflict: mark_strength >= 0.50 AND
+        # class >= 0.20 AND composite >= 0.50; Likely conflict clears it too).
+        # "Low risk" means class overlap alone — not a similar mark — so it is
+        # excluded. Same rule Compare uses; single source of truth.
+        if cs.verdict != "Low risk":
             scored.append((r, cs.composite, vis.confidence))
 
     scored.sort(key=lambda x: -x[1])
