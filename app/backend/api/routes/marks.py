@@ -383,7 +383,7 @@ async def similar_marks(
         fq = fq.order_by(desc(Trademark.publication_date_441), Trademark.id).limit(_SIMILAR_CANDIDATE_POOL)
         candidates = list((await session.execute(fq)).scalars().all())
     image_root = get_settings().data_dir / "image"
-    m_text = m.mark_sample or m.applicant_name
+    m_text = (m.mark_name or m.mark_sample or "").strip()
 
     # Per-matter weights: when a watchlist context is supplied, rank with that
     # matter's weight profile (e.g. pharma up-weights phonetic); else defaults.
@@ -395,7 +395,7 @@ async def similar_marks(
 
     scored: list[tuple[Trademark, float, str]] = []
     for r in candidates:
-        r_text = r.mark_sample or r.applicant_name
+        r_text = (r.mark_name or r.mark_sample or "").strip()
         phon = sim.phonetic_similarity(m_text, r_text)
         vis = sim.visual_similarity(
             a_logo=m.logo_path,
