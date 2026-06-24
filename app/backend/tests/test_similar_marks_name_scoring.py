@@ -40,9 +40,14 @@ async def seed() -> AsyncIterator[None]:
                 status=GazetteStatus.completed,
             )
         )
-        # Subject: figurative (no mark_sample) with a resolved name "Gemy".
-        # Its APPLICANT is phonetically identical to the candidate's wordmark —
-        # the old code (m_text = applicant) would score them as a match.
+        # Subject: truly nameless (mark_sample ∅, mark_name ∅) with a distinctive
+        # applicant. Nameless → the recall anchor is empty → it takes the class +
+        # period screen, which DOES recall the same-class candidate below. So the
+        # candidate enters the scoring loop, and ONLY the scoring resolution
+        # decides its fate: under the new code m_text is "" (no applicant signal)
+        # → verdict "Low risk" → dropped; under the old code m_text fell back to
+        # this applicant → phonetic ≈ 0.93 → "Likely conflict" → kept. This
+        # isolates the scoring change (recall no longer co-determines the result).
         s.add(
             Trademark(
                 id=_SUBJECT,
@@ -50,14 +55,15 @@ async def seed() -> AsyncIterator[None]:
                 record_type=RecordType.A,
                 application_number="SN-2099-1",
                 mark_sample=None,
-                mark_name="Gemy",
+                mark_name=None,
                 applicant_name="FOSHAN AILIHUA SANITARY WARE",
                 nice_classes=["11"],
                 publication_date_441=date(2099, 1, 1),
             )
         )
         # Candidate wordmark phonetically close to the subject's APPLICANT, not
-        # its name. Must NOT be surfaced once we stop scoring the applicant.
+        # its name. Same class + period, so it IS recalled — it must be dropped
+        # purely because the applicant text is no longer scored.
         s.add(
             Trademark(
                 id=_CANDIDATE,
