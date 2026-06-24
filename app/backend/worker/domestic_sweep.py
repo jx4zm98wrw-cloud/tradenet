@@ -142,8 +142,19 @@ async def _recent_not_found(session: AsyncSession) -> set[str]:
 
 
 def _worklist(all_appnos: list[str], cache: Path, recent_not_found: set[str]) -> list[str]:
-    """Sweep work-list = uncached AND not recently recorded as not-published."""
-    return [a for a in _uncached(all_appnos, cache) if a not in recent_not_found]
+    """Sweep work-list = uncached AND mappable AND not recently recorded as
+    not-published.
+
+    Malformed appnos (`appno_to_vnid(a) is None` — the truncated `4-2024-1`
+    class) are excluded so the sweep CONVERGES instead of re-processing the same
+    unmappable marks every chunk: they can never map to a IP VIETNAM id, so fetching
+    them is wasted work that never resolves (the same spirit as the not_found
+    wedge, but knowable from the appno string alone — no negative-cache needed).
+    They surface on /admin/domestic for a manual `application_number` fix; once
+    fixed they map cleanly and re-enter the work-list."""
+    return [
+        a for a in _uncached(all_appnos, cache) if a not in recent_not_found and appno_to_vnid(a) is not None
+    ]
 
 
 async def run_chunk(
@@ -182,6 +193,17 @@ async def run_chunk(
         try:
             outcome = await enrich_one(session, appno, cache, http_session=http, use_cache=True)
             await session.commit()
+            if outcome is EnrichOutcome.UNMAPPABLE:
+                # Defensive: _worklist already excludes malformed appnos, so this
+                # is effectively unreachable in normal mode. If one slips through,
+                # it is NOT a real enrichment — never count it as `ok` (that would
+                # mask a malformed mark behind an inflated success count) and NOT a
+                # fetch failure (enrich_one returns before any network call), so it
+                # must not advance the breaker streak. Skip without touching the
+                # ok/failed/not_found counters; the mark shows on /admin/domestic
+                # for a manual application_number fix.
+                streak = 0
+                continue
             if outcome is EnrichOutcome.NOT_FOUND:
                 # IP VIETNAM has no published detail yet — recorded in the negative
                 # cache, NOT a failure. Count it apart from ok/failed and reset

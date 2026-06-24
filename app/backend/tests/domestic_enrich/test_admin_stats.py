@@ -155,15 +155,14 @@ async def test_domestic_enrichment_invariants(authed_client: AsyncClient) -> Non
     assert d["remaining"] == max(d["unique_appnos"] - d["validated"], 0)
     assert d["unique_appnos"] >= d["validated"] >= 0
     assert d["granted"] <= d["validated"]
-    # remaining splits into the three operational buckets. Strict equality would
-    # hold if the dev DB were internally consistent, but it carries pre-existing
-    # skew: a stale domestic_not_found row whose appno is no longer a current
-    # domestic-category trademark (e.g. 4-2026-550931, re-ingested/re-categorized
-    # after the negative-cache row was written). That row inflates
-    # pending_publication but not remaining (the min(pending, remaining) clamp only
-    # caps it). So the three buckets can exceed remaining by that orphan count.
-    # Unrelated to this change — see report. Bound with <= rather than ==.
-    assert d["pending_publication"] + d["unresolved"] + d["malformed"] >= d["remaining"]
+    # remaining splits EXACTLY into the three operational buckets. This holds once
+    # orphan negative-cache rows are pruned (domestic_enrich.store.reconcile_not_found
+    # / scripts.reconcile_domestic_not_found): an orphan domestic_not_found row whose
+    # appno is no longer a current domestic-category trademark would inflate
+    # pending_publication above remaining (the min(pending, remaining) clamp only caps
+    # it), forcing >=. With orphans reconciled, pending counts only in-work-list marks
+    # and the split is exact.
+    assert d["pending_publication"] + d["unresolved"] + d["malformed"] == d["remaining"]
     assert 0 <= d["pending_publication"] <= d["remaining"]
     assert 0 <= d["unresolved"] <= d["remaining"]
     assert 0 <= d["malformed"] <= d["remaining"]
@@ -203,10 +202,9 @@ async def test_domestic_enrichment_pending_publication_reflects_not_found(
     d = r.json()
     # At least our one seeded pending mark is present.
     assert d["pending_publication"] >= 1
-    # Bucket split: >= rather than == due to pre-existing dev-DB skew (a stale
-    # domestic_not_found row no longer in the work-list inflates
-    # pending_publication). See test_domestic_enrichment_invariants for detail.
-    assert d["pending_publication"] + d["unresolved"] + d["malformed"] >= d["remaining"]
+    # Bucket split is exact once orphan negative-cache rows are reconciled away.
+    # See test_domestic_enrichment_invariants for detail.
+    assert d["pending_publication"] + d["unresolved"] + d["malformed"] == d["remaining"]
 
 
 @pytest.mark.asyncio

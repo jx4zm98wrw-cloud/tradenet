@@ -4,16 +4,44 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime
+from typing import cast
 
-from sqlalchemy import select
+from sqlalchemy import CursorResult, delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.db.models import DomesticNotFound, DomesticRecord
+from api.db.models import DomesticNotFound, DomesticRecord, Trademark
 
 from .parser import DomesticRecord as ParsedRecord
 
 PARSE_VERSION = 1  # bump on any parser change → triggers offline re-derive
+
+# Domestic mark categories — must match worker.domestic_sweep / the admin
+# enrichment endpoint's work-list definition.
+_DOMESTIC_CATEGORIES = ("domestic_application", "domestic_registration")
+
+
+async def reconcile_not_found(session: AsyncSession) -> int:
+    """Delete negative-cache rows whose appno is no longer a current
+    domestic-category trademark, returning the number removed.
+
+    A `domestic_not_found` row can outlive its mark: e.g. a mark recorded
+    not-published, then re-ingested/re-categorized so it leaves the domestic
+    work-list. Such an orphan still counts toward `pending_publication` on
+    /admin/domestic (which counts not_found rows, not work-list membership) while
+    being absent from `remaining` — so it inflates the bucket split above
+    `remaining`. Pruning orphans restores the `pending + unresolved + malformed ==
+    remaining` invariant. Flushes only — the caller owns the commit."""
+    stmt = delete(DomesticNotFound).where(
+        DomesticNotFound.application_number.not_in(
+            select(Trademark.application_number)
+            .where(Trademark.mark_category.in_(_DOMESTIC_CATEGORIES))
+            .where(Trademark.application_number.is_not(None))
+        )
+    )
+    result = cast("CursorResult[None]", await session.execute(stmt))
+    await session.flush()
+    return result.rowcount or 0
 
 
 async def upsert_not_found(
