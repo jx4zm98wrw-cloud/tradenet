@@ -42,6 +42,7 @@ log = logging.getLogger("mark_name.backfill")
 MARK_NAME_VERSION = 1
 
 _DOMESTIC = ("domestic_application", "domestic_registration")
+_MADRID = ("madrid_registration", "madrid_renewal")
 _CHUNK = 1000
 
 
@@ -85,7 +86,12 @@ async def backfill_mark_name(session: AsyncSession, *, ids: Sequence[object] | N
         stats["scanned"] += 1
         want = _clean(row.mark_sample)
         if want is None:
-            want = _clean(row.dom_mark_text) if row.mark_category in _DOMESTIC else _clean(row.mad_mark_text)
+            if row.mark_category in _DOMESTIC:
+                want = _clean(row.dom_mark_text)
+            elif row.mark_category in _MADRID:
+                want = _clean(row.mad_mark_text)
+            else:
+                want = None
 
         if want == row.mark_name:
             stats["unchanged"] += 1
