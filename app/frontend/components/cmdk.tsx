@@ -156,7 +156,7 @@ function CmdKPalette({ open, onClose }: { open: boolean; onClose: () => void }) 
       // TNHH Acme Ltd"). The previous direct field access bypassed the helper
       // and produced different labels in the palette vs. the mark detail page.
       const md = markDisplay(t);
-      const initials = (md.text || "").slice(0, 2).toUpperCase();
+      const initials = md.isPlaceholder ? "◧" : (md.text || "").slice(0, 2).toUpperCase();
       return {
         id: `tm-${t.id}`,
         icon: <span className="font-sans font-bold text-[11px] text-stamp tracking-wider">{initials}</span>,

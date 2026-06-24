@@ -78,6 +78,10 @@ export type Trademark = {
   /** WIPO 531 figurative-element classification codes (e.g. "26.1.2"). */
   vienna_codes: string[] | null;
   mark_sample: string | null;
+  /** Resolved display name (mark_sample | domestic.mark_text | madrid.mark_text), or
+   * null for figurative marks with no transcribed name anywhere. Denormalized on
+   * `trademarks` by scripts/backfill_mark_name.py — re-run after a fresh ingest. */
+  mark_name: string | null;
   /** Path relative to /static/image/ of the extracted logo PNG, or null when
    * no logo was extracted (text-only mark, extraction skipped, or pre-Phase-2
    * row). Frontend prepends "/static/image/" to form the URL. */

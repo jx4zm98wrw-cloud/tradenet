@@ -254,6 +254,9 @@ class Trademark(Base):
 
     # Mark
     mark_sample: Mapped[str | None] = mapped_column(Text, nullable=True)  # (540) — case preserved
+    mark_name: Mapped[str | None] = mapped_column(
+        Text, nullable=True, index=True
+    )  # resolved display name (mark_sample|domestic.mark_text|madrid.mark_text); NULL = figurative
     mark_status: Mapped[str | None] = mapped_column(Text, nullable=True)  # (551)
     protected_colors: Mapped[str | None] = mapped_column(Text, nullable=True)  # (591)
     # Path to the extracted logo PNG, relative to the static root.
