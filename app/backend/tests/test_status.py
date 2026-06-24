@@ -27,3 +27,13 @@ def test_pending_default():
 
 def test_empty_status_code_falls_back():
     assert derive_status("", None, None, today=T) == ("Pending", "warn")
+
+
+def test_status_code_label_wins_but_tone_mute_when_expired():
+    # Enriched label is verbatim even when expired; tone still reflects expiry.
+    assert derive_status("Hết hiệu lực", None, date(2020, 1, 1), today=T) == ("Hết hiệu lực", "mute")
+
+
+def test_expiry_equal_today_is_not_lapsed():
+    # Boundary: expiry == today is NOT past (strict <), so warn/Pending.
+    assert derive_status(None, None, T, today=T) == ("Pending", "warn")
