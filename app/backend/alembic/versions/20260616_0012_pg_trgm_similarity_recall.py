@@ -1,6 +1,6 @@
 """Enable pg_trgm + GIN trigram indexes for two-stage similar-marks recall.
 
-The phonetic similarity engine (api/similarity.py) is examiner-grade, but the
+The phonetic similarity engine (tm_similarity) is examiner-grade, but the
 search route only ever scored a publication-date-ordered over-fetch window of
 ~100 rows in Python — so "sort by similarity" never ranked the full corpus and
 could miss the true top conflicts. This migration adds the DB-side recall half

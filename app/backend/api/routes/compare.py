@@ -2,7 +2,7 @@
 
 Two callers feed this: Search → multi-select → Compare N, and Detail →
 "Compare in side-by-side". Per-channel scores are computed by the real
-similarity engine in `api.similarity`:
+similarity engine in `tm_similarity`:
 
   - phonetic    — Jaro-Winkler on raw + Metaphone-encoded forms,
                   Vietnamese-diacritic-aware
@@ -24,12 +24,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import similarity as sim
+from tm_similarity import MarkFeatures, score
+
 from .._status import derive_status
 from ..db import Trademark, get_session
 from ..db.models import DomesticRecord
 from ..schemas import TrademarkOut
-from ..settings import get_settings
 from .today import DEMO_TODAY
 
 router = APIRouter(prefix="/api/v1/compare", tags=["compare"])
@@ -113,13 +113,11 @@ async def compare(body: CompareRequest, session: AsyncSession = Depends(get_sess
     if anchor is None:
         raise HTTPException(400, "anchorId must be one of markIds")
 
-    image_root = get_settings().data_dir / "image"
-
     scores: list[PairScore] = []
     for m in ordered:
         if str(m.id) == str(anchor.id):
             continue
-        scores.append(_score_pair(anchor, m, weights, image_root))
+        scores.append(_score_pair(anchor, m, weights))
 
     return CompareResponse(
         anchorId=str(anchor.id),
@@ -138,59 +136,50 @@ def _mark_out(m: Trademark, status_code: str | None) -> CompareMarkOut:
     )
 
 
-def _score_pair(anchor: Trademark, other: Trademark, w: dict[str, float], image_root) -> PairScore:
+def _score_pair(anchor: Trademark, other: Trademark, w: dict[str, float]) -> PairScore:
     """Compute the four per-signal scores + composite + examiner verdict.
 
-    Inputs are drawn from real columns:
-      - mark_sample (fall back to applicant_name for unbranded rows)
-      - nice_classes, vienna_codes
-      - logo_path (used for pHash comparison when both marks have one)
-
-    The composite + verdict apply conjunction guards: composite alone
-    isn't enough — at least one of phonetic/visual must clear a minimum
-    strength, AND class proximity must be non-trivial. See
-    api.similarity.composite_score for the rationale.
+    Inputs are drawn from real columns: mark_sample (fall back to
+    applicant_name for unbranded rows), nice_classes, vienna_codes, and the
+    precomputed logo_phash. See tm_similarity.composite_score for the
+    conjunction-guard rationale.
     """
-    # Text for the wordmark comparisons. Fall back to applicant_name only
-    # when there's literally no other signal — most A-files lack
-    # mark_sample but have applicants, and "ZOTT SE & CO. KG" vs
-    # "FAPA VITAL AG" is still a meaningful name comparison.
     a_text = anchor.mark_sample or anchor.applicant_name
     o_text = other.mark_sample or other.applicant_name
 
-    phon = sim.phonetic_similarity(a_text, o_text)
-    vis = sim.visual_similarity(
-        a_logo=anchor.logo_path,
-        b_logo=other.logo_path,
-        a_text=a_text,
-        b_text=o_text,
-        image_root=image_root,
-    )
-    class_o = sim.class_overlap(anchor.nice_classes, other.nice_classes)
-    vienna_o = sim.vienna_overlap(anchor.vienna_codes, other.vienna_codes)
-
-    # Map the per-signal weights dict (which uses our public field names)
-    # to the keys composite_score expects.
+    # Map the per-signal weights dict (public field names) to the keys the
+    # engine expects.
     composite_w = {
         "phonetic": w["phonetic"],
         "visual": w["visual"],
         "class": w["classOverlap"],
         "vienna": w["viennaOverlap"],
     }
-    cs = sim.composite_score(
-        phon, vis.score, class_o, vienna_o, composite_w, visual_confidence=vis.confidence
+    result = score(
+        MarkFeatures(
+            mark_text=a_text,
+            logo_phash=anchor.logo_phash,
+            nice_classes=anchor.nice_classes or [],
+            vienna_codes=anchor.vienna_codes or [],
+        ),
+        MarkFeatures(
+            mark_text=o_text,
+            logo_phash=other.logo_phash,
+            nice_classes=other.nice_classes or [],
+            vienna_codes=other.vienna_codes or [],
+        ),
+        weights=composite_w,
     )
-
     return PairScore(
         markId=str(other.id),
-        phonetic=round(phon, 3),
-        visual=round(vis.score, 3),
-        classOverlap=round(class_o, 3),
-        viennaOverlap=round(vienna_o, 3),
-        composite=cs.composite,
-        verdict=cs.verdict,
-        verdictTone=cs.verdict_tone,
-        visualConfidence=vis.confidence,
+        phonetic=round(result.phonetic, 3),
+        visual=round(result.visual, 3),
+        classOverlap=round(result.class_overlap, 3),
+        viennaOverlap=round(result.vienna_overlap, 3),
+        composite=result.composite,
+        verdict=result.verdict,
+        verdictTone=result.verdict_tone,
+        visualConfidence=result.visual_confidence,
     )
 
 

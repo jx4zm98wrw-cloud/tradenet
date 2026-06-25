@@ -120,8 +120,8 @@ class Watchlist(Base):
     query: Mapped[dict] = mapped_column(JSONB, nullable=False)
     query_desc: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Per-matter similarity weight overrides (keys: phonetic/visual/class/vienna).
-    # NULL → use api.similarity.DEFAULT_WEIGHTS. Applied when ranking similar
-    # marks in this matter's context. See api.similarity.resolve_weights.
+    # NULL → use tm_similarity.DEFAULT_WEIGHTS. Applied when ranking similar
+    # marks in this matter's context. See tm_similarity.resolve_weights.
     weights: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     total_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

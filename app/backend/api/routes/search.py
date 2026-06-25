@@ -3,7 +3,7 @@
 Per-mode scoring:
   - text:     substring strength against wordmark / applicant (mock — text
               mode is a literal-match search, not a similarity search).
-  - phonetic: REAL Jaro-Winkler + Metaphone via api.similarity. NEUROFAX
+  - phonetic: REAL Jaro-Winkler + Metaphone via tm_similarity. NEUROFAX
               correctly surfaces NEUREX (both encode NRKS-family).
   - vienna:   REAL Jaccard overlap of the user's selected figurative codes
               against the mark's stored vienna_codes — a row sharing 3/3
@@ -24,7 +24,8 @@ from pydantic import BaseModel
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import similarity as sim
+from tm_similarity import phonetic_similarity
+
 from ..db import RecordType, Trademark, get_session
 from ..schemas import TrademarkOut
 from ._filters import build_trademark_where, normalize_vienna_code, vienna_code_match
@@ -34,7 +35,7 @@ router = APIRouter(prefix="/api/v1/search", tags=["search"])
 SearchMode = Literal["text", "phonetic", "image", "vienna"]
 
 # Phonetic search is a two-stage retrieval: a cheap pg_trgm `%` candidate recall
-# in Postgres (stage 1), then a precise rerank by api.similarity (stage 2). This
+# in Postgres (stage 1), then a precise rerank by tm_similarity (stage 2). This
 # is the recall cap — the max candidates pulled from the DB before reranking.
 # Generous so the trigram net surfaces sound-alikes the engine will score high
 # (NEUREX/NEUROFAX share the "neu"/"eur" trigrams), bounded so the Python
@@ -94,7 +95,7 @@ def _score(
         # wordmark (most A-files lack mark_sample but have applicants).
         # No jitter — the real signal carries its own ordering.
         target = mark.mark_sample or mark.applicant_name
-        return round(sim.phonetic_similarity(q, target), 3)
+        return round(phonetic_similarity(q, target), 3)
 
     if mode == "vienna" and vienna_query:
         # Coverage score: fraction of the user's requested codes that the
@@ -117,7 +118,7 @@ def _score(
     if mode == "image":
         # Placeholder. The uploaded-image pipeline isn't wired yet — when it
         # lands, this branch will pHash the uploaded bytes once and call
-        # sim.visual_similarity() per row against logo_path.
+        # tm_similarity.visual_similarity() per row against logo_phash.
         return round(min(0.999, 0.78 + _jitter(str(mark.id))), 2)
 
     # mode == "text" — substring-strength heuristic. Text mode is a literal

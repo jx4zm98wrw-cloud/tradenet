@@ -18,10 +18,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tm_similarity import DEFAULT_WEIGHTS
+
 from ..auth import User, optional_user, require_user
 from ..db import RecordType, Trademark, Watchlist, get_session
 from ..schemas import TrademarkOut
-from ..similarity import DEFAULT_WEIGHTS
 from ._filters import build_trademark_where
 from .today import DEMO_TODAY
 
@@ -206,7 +207,7 @@ def _clean_weights(weights: dict[str, float] | None) -> dict[str, float] | None:
     profile). Raises 400 on clearly-invalid input (unknown keys or
     negative/non-numeric values) so the caller gets a real error rather than
     silent correction. Values are stored as given; normalisation to sum 1
-    happens at scoring time via api.similarity.resolve_weights.
+    happens at scoring time via tm_similarity.resolve_weights.
     """
     if not weights:
         return None
