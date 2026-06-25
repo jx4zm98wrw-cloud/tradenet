@@ -6,6 +6,10 @@
 pdfplumber==0.11.10        # was 0.11.4, bump pulls patched pdfminer.six (CVE-2025-64512 + 70559)
 pandas==3.0.3
 numpy==2.4.6
+# Multilingual mark embeddings (LaBSE) — used ONLY by api/_embed.py on the
+# backfill path (scripts/backfill_mark_embedding.py). Not imported by the API
+# routes or tm_similarity. Pulls in torch; grows the worker image (accepted).
+sentence-transformers==5.6.0
 colorama==0.4.6
 tqdm==4.68.3
 
