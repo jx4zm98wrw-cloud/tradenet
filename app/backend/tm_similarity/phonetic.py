@@ -5,6 +5,8 @@ import unicodedata
 
 import jellyfish
 
+from .vn_phonetic import is_vietnamese, vn_phonetic_key
+
 # ---------------------------------------------------------------------------
 # Vietnamese-aware normalisation
 
@@ -109,8 +111,8 @@ def _token_jw(a: str, b: str) -> float:
 # ---------------------------------------------------------------------------
 # Phonetic similarity
 
-# Aural length-disparity tolerance. JW + Metaphone ignore syllable count and
-# rhythm — Metaphone drops vowels, so "KAITO" and "KAT" both encode to "KT" and
+# Aural length-disparity tolerance. JW + phonetic encoding ignore syllable count
+# and rhythm — Metaphone drops vowels, so "KAITO" and "KAT" both encode to "KT" and
 # spuriously score ~0.93. When the two surface forms differ in length by more
 # than this fraction, the phonetic score is scaled down proportionally; within
 # it (the shorter is ≥80% of the longer) the score is unchanged, so plurals /
@@ -126,10 +128,11 @@ def phonetic_similarity(a: str | None, b: str | None) -> float:
     Weighted blend of two signals, both computed at the *token* level:
       - Raw JW (70% weight) — best-pair JW between tokens of the two marks,
         on diacritic-normalised uppercase strings.
-      - Metaphone-encoded JW (30% weight) — same best-pair scheme on the
-        Metaphone code of each token; catches sound-alike variants like
-        NEUREX/NEUROFAX where the surface spellings diverge but the
-        phoneme sequences align.
+      - Phonetic-code JW (30% weight) — same best-pair scheme on a phonetic
+        code per token. The code is the Vietnamese key (vn_phonetic_key) when
+        both marks read as Vietnamese, else the English Metaphone code.
+        Catches sound-alikes like NEUREX/NEUROFAX (English) and GIA/DA (VN,
+        Northern d/gi -> /z/ merger) where surface spellings diverge.
 
     Why token-level matters:
     Whole-string Jaro-Winkler over multi-word marks ("OMBRES TENDRES"
@@ -141,7 +144,7 @@ def phonetic_similarity(a: str | None, b: str | None) -> float:
 
     Single-word marks are unchanged: best-pair JW on one-element token
     lists reduces to whole-string JW. MONTINIS/MONTANIS still scores
-    0.94; NEUREX/NEUROFAX still scores 0.90.
+    0.94; NEUREX/NEUROFAX still scores 0.851.
 
     Why a weighted blend rather than max:
     Metaphone reduces aggressively for short/alphanumeric marks
@@ -166,15 +169,19 @@ def phonetic_similarity(a: str | None, b: str | None) -> float:
     la, lb = len(na.replace(" ", "")), len(nb.replace(" ", ""))
     length_factor = min(1.0, (min(la, lb) / max(la, lb)) / _PHONETIC_LENGTH_TOLERANCE) if la and lb else 1.0
 
-    # Metaphone per token, then best-pair JW on the resulting codes.
-    # Encoding the whole multi-word string in one call produces a single
-    # blob ("OMBRSTNTRS") that loses the same word-boundary information
-    # whole-string JW does — defeats the point of going token-level.
-    ma_codes = [c for c in (jellyfish.metaphone(t) for t in _tokens(na)) if c]
-    mb_codes = [c for c in (jellyfish.metaphone(t) for t in _tokens(nb)) if c]
-    if not ma_codes or not mb_codes:
+    # 30% phonetic component, language-routed. Both marks Vietnamese -> compare
+    # VN phonetic keys (same syllabic space; mirrors Track 1's "both figurative"
+    # gate). Otherwise the original English-Metaphone path, unchanged. Encoding
+    # per token (not the whole string) preserves word boundaries either way.
+    if is_vietnamese(a) and is_vietnamese(b):
+        a_codes = [k for k in (vn_phonetic_key(tok) for tok in _tokens(na)) if k]
+        b_codes = [k for k in (vn_phonetic_key(tok) for tok in _tokens(nb)) if k]
+    else:
+        a_codes = [c for c in (jellyfish.metaphone(tok) for tok in _tokens(na)) if c]
+        b_codes = [c for c in (jellyfish.metaphone(tok) for tok in _tokens(nb)) if c]
+    if not a_codes or not b_codes:
         return round(raw * length_factor, 3)
-    short, long = (ma_codes, mb_codes) if len(ma_codes) <= len(mb_codes) else (mb_codes, ma_codes)
+    short, long = (a_codes, b_codes) if len(a_codes) <= len(b_codes) else (b_codes, a_codes)
     phon = _best_pair_jw(short, long)
 
     return round((0.7 * raw + 0.3 * phon) * length_factor, 3)

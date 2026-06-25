@@ -9,9 +9,10 @@ from .classes import class_overlap, vienna_overlap
 from .composite import DEFAULT_WEIGHTS, CompositeScore, composite_score, resolve_weights
 from .features import MarkFeatures, ScoreResult
 from .phonetic import normalize_vn, phonetic_similarity
+from .vn_phonetic import is_vietnamese, vn_phonetic_key
 from .visual import VisualConfidence, VisualScore, visual_similarity
 
-SIMILARITY_VERSION = "1.1"
+SIMILARITY_VERSION = "1.2"
 
 __all__ = [
     "DEFAULT_WEIGHTS",
@@ -23,12 +24,14 @@ __all__ = [
     "VisualScore",
     "class_overlap",
     "composite_score",
+    "is_vietnamese",
     "normalize_vn",
     "phonetic_similarity",
     "resolve_weights",
     "score",
     "vienna_overlap",
     "visual_similarity",
+    "vn_phonetic_key",
 ]
 
 
