@@ -6,9 +6,11 @@
 embedding of each mark's wordmark at ingest, store it per mark, and backfill the corpus — with
 **zero scoring change**. This is **Track 3b-1**, the infrastructure half of the semantic-axis epic;
 it produces stored vectors that **Track 3b-2** (the semantic axis + 5-axis weight reallocation)
-consumes. It mirrors Track 1's split of the `logo_phash` feature store from the visual routing: the
-heavy compute (a model, here) lives in one module on the ingest/backfill path, and nothing in the
-serving path or the pure engine imports it.
+consumes. It follows Track 1's split of the `logo_phash` feature store from the visual routing — the
+heavy compute (a model, here) lives in one module on the backfill path, and nothing in the serving
+path or the pure engine imports it — but with one deliberate divergence: the embedding is
+**backfill-only**, not self-populated at ingest, because its source field (`mark_name`) is itself
+backfill-derived (see "Lifecycle" below).
 
 ## Why (program context)
 
@@ -33,10 +35,22 @@ review tractable (the decomposition decision, 2026-06-25).
 | `api/_phash.py:compute_logo_phash(path) -> str \| None` — the ONLY Pillow importer | `api/_embed.py:compute_mark_embedding(text, *, encoder=None) -> bytes \| None` — the ONLY model importer |
 | `trademarks.logo_phash` (hex text) | `trademarks.mark_embedding` (bytea: 768 float32) |
 | `scripts/backfill_logo_phash.py` — `PHASH_VERSION=1`, `_CHUNK=1000`, `async backfill_logo_phash(session, *, ids=None) -> dict[str,int]` | `scripts/backfill_mark_embedding.py` — `EMBED_VERSION=1`, same shape |
-| `worker/ingest.py:_phash_for_logo(...)` lazy-imports `api._phash`; tests monkeypatch before first use; set at ingest | `worker/ingest.py:_embedding_for_mark(...)` lazy-imports `api._embed`; tests monkeypatch; set at ingest |
+| self-populated at ingest (source `logo_path` exists at ingest) | **backfill-only** (source `mark_name` is itself backfill-derived — see "Lifecycle") |
 
 No `mark_embedding` exists today. `numpy` is already a dependency; `sentence-transformers`/`torch` are
 new.
+
+### Lifecycle: backfill-only (the deliberate divergence from `logo_phash`)
+
+`logo_phash` self-populates at ingest because its source, `logo_path`, is resolved during ingest.
+`mark_embedding`'s source is `mark_name` — the resolved display name — which the **ingest worker does
+NOT set** (`worker/mapper.py` writes only `mark_sample`; `mark_name` is written by
+`scripts/backfill_mark_name.py`, like `vn_grant_date` and the entity-clean columns). Embedding from
+`mark_name` at ingest would therefore always be NULL. So `mark_embedding` inherits `mark_name`'s
+lifecycle: **populated by its backfill only**, run *after* `backfill_mark_name`. New marks carry NULL
+`mark_embedding` until the backfill runs — the identical, already-documented "re-run the backfill
+after a fresh ingest" pattern shared by `mark_name`/`vn_grant_date`/entity-clean. There is **no
+`worker/ingest.py` change** in 3b-1.
 
 ## Resolution
 
@@ -73,26 +87,19 @@ by primary-key-scoped joins, never filtered/ordered on).
 Same shape as `backfill_logo_phash.py`: `EMBED_VERSION = 1`, `_CHUNK`, `async def
 backfill_mark_embedding(session, *, ids: list[int] | None = None) -> dict[str, int]` returning
 `{"scanned", "updated", "unchanged"}`. **Idempotent recompute-and-compare** — recompute each mark's
-embedding and write only when the stored bytes differ, so re-runs are no-ops. `ids=`-scoped for
-targeted reruns. Bump `EMBED_VERSION` if the model or normalisation changes. **Re-run after a fresh
-ingest** (same caveat as `logo_phash`/`mark_name` — though new ingests also self-populate it).
-
-### 4. Ingest self-population (`worker/ingest.py`)
-
-A `_embedding_for_mark(mark_name)` helper lazy-imports `from api._embed import compute_mark_embedding`
-(keeping worker boot cheap and letting tests monkeypatch before first use — the exact `_phash_for_logo`
-pattern), and `ingest_pdf` sets `trademark.mark_embedding = _embedding_for_mark(...)` after the mark
-name is resolved. Failure degrades to `mark_embedding = NULL` (like a failed pHash); the ingest
-proceeds.
+embedding and write only when the stored bytes differ, so re-runs are no-ops. Scans marks with a
+non-NULL `mark_name` (`ids=`-scoped for targeted reruns). Bump `EMBED_VERSION` if the model or
+normalisation changes. **Run after `backfill_mark_name`, and re-run after a fresh ingest** (same
+caveat as `mark_name`/`vn_grant_date`/entity-clean — all backfill-derived).
 
 ## Data flow
 
 ```
-ingest_pdf(pdf):
-  ... resolve mark_name ...
-  trademark.mark_embedding = _embedding_for_mark(mark_name)   # bytes | None; lazy LaBSE
+# ingest is UNCHANGED in 3b-1 (mark_embedding stays NULL on new rows until backfill).
+backfill_mark_name(session)        # prerequisite: resolves trademarks.mark_name
 backfill_mark_embedding(session, ids=None):
-  for each mark chunk: recompute embedding(mark_name); write if changed   # idempotent
+  for each mark with non-NULL mark_name:
+      recompute embedding(mark_name); write bytea if changed              # idempotent
 # 3b-2 (LATER) reads trademarks.mark_embedding into MarkFeatures and does cosine. NOT in 3b-1.
 ```
 
@@ -103,9 +110,9 @@ backfill_mark_embedding(session, ids=None):
 | `api/_embed.py` | text → normalised 768-float32 bytes; lazy LaBSE; DI encoder seam | `sentence-transformers`, `numpy` (lazy) |
 | `trademarks.mark_embedding` (model + migration) | persist the per-mark vector | Alembic / SQLAlchemy |
 | `scripts/backfill_mark_embedding.py` | idempotent corpus backfill, `EMBED_VERSION` | `api._embed`, ORM |
-| `worker/ingest.py:_embedding_for_mark` | self-populate at ingest; lazy import; monkeypatchable | `api._embed` (lazy) |
 
-`tm_similarity/*`, `composite.py`, the API routes, the frontend — **untouched**. The semantic axis,
+`worker/ingest.py`, `tm_similarity/*`, `composite.py`, the API routes, the frontend — **untouched**
+(embedding is backfill-only). The semantic axis,
 `MarkFeatures` field, `composite_score` reweight, and route adapters are all **Track 3b-2**.
 
 ## Versioning
@@ -123,9 +130,9 @@ The 470 MB model must NOT run in normal CI. The DI encoder is the seam:
 2. **Backfill units (mocked encoder):** seed marks, run `backfill_mark_embedding` with a fake encoder
    → assert `scanned`/`updated`/`unchanged` counts; a second run is all-`unchanged` (idempotent);
    `ids=` scoping touches only those rows; NULL-`mark_name` marks get NULL embedding.
-3. **Ingest self-population (monkeypatched `_embed`):** monkeypatch `compute_mark_embedding` before
-   ingest (the `_phash_for_logo` test pattern) → assert the row's `mark_embedding` is set; a failing
-   embed degrades to NULL without failing the ingest.
+3. **Backfill prerequisite/scope:** a mark whose `mark_name` is NULL (not yet name-backfilled) is
+   scanned-but-skipped (stays NULL `mark_embedding`); after its `mark_name` is set, the embedding
+   backfill populates it — confirming the `backfill_mark_name` → `backfill_mark_embedding` chain.
 4. **One marked/optional real-model integration test** (`@pytest.mark.slow` or skipped unless an env
    flag is set): load real LaBSE and assert **cross-lingual ordering** —
    `cos(APPLE, TÁO) > cos(APPLE, CHAIR)` and `cos(RED BULL, BÒ ĐỎ) > cos(RED BULL, TABLE)` — proving
@@ -139,8 +146,10 @@ The 470 MB model must NOT run in normal CI. The DI encoder is the seam:
   reweight, no `MarkFeatures.mark_embedding` field, no `score()`/route-adapter change, no
   `SIMILARITY_VERSION` bump. All of that is **Track 3b-2**.
 - **No pgvector / no semantic search** — serialized `bytea`, read by id-scoped joins only.
-- **No model in the API image or `tm_similarity`** — `_embed.py` is imported only by the worker/ingest
-  and the backfill script.
+- **No `worker/ingest.py` change / no ingest self-population** — embedding is backfill-only (its
+  source `mark_name` is backfill-derived). New marks carry NULL until the backfill runs.
+- **No model in the API image or `tm_similarity`** — `_embed.py` is imported only by the backfill
+  script (and, in 3b-2, nothing — the engine reads stored bytes).
 - **No embedding of goods/classes/applicant** — only the resolved `mark_name` wordmark (the goods axis
   is separate; mixing dilutes the meaning signal).
 - No frontend change.
@@ -165,9 +174,8 @@ The 470 MB model must NOT run in normal CI. The DI encoder is the seam:
 2. **Model + migration**: add nullable `bytea` `trademarks.mark_embedding`; Alembic up/down; model
    attribute; migration round-trip test.
 3. **`scripts/backfill_mark_embedding.py`**: `EMBED_VERSION`, chunked idempotent recompute-and-compare,
-   `ids=` scoping, stats dict; backfill units with a fake encoder (counts, idempotency, scoping, NULL).
-4. **Ingest wiring**: `_embedding_for_mark` lazy import + self-populate; monkeypatched ingest test;
-   failure-degrades-to-NULL test.
-5. **Deps + docs**: add `sentence-transformers` to requirements (worker/backfill use only); CLAUDE.md
-   (new `mark_embedding` feature-store entry + "re-run the backfill after a fresh ingest" caveat +
-   the 3b-1/3b-2 split note).
+   non-NULL-`mark_name` scope, `ids=` scoping, stats dict; backfill units with a fake encoder (counts,
+   idempotency, scoping, NULL-`mark_name` skip).
+4. **Deps + docs**: add `sentence-transformers` to requirements (backfill use only); CLAUDE.md
+   (new `mark_embedding` feature-store entry + "backfill-only, run after `backfill_mark_name`,
+   re-run after a fresh ingest" caveat + the 3b-1/3b-2 split note).
