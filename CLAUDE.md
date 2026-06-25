@@ -386,6 +386,22 @@ is 1.1. **Re-run `scripts/backfill_logo_kind.py` after a fresh ingest** (same ca
 as logo_phash / mark_name / vn_grant_date). See
 `docs/superpowers/specs/2026-06-25-visual-axis-routing-recalibration-design.md`.
 
+### Phonetic axis routing (Track 2)
+
+**Track 2 (phonetic axis):** the 30% phonetic sub-component is now
+language-routed. A new pure module `tm_similarity/vn_phonetic.py` (stdlib `re`
+only) adds `is_vietnamese(text)` (diacritic + phonotactic VN detector) and
+`vn_phonetic_key(token)` (toneless Northern-Hanoi onset–glide–nucleus–coda key:
+`c/k/q→/k/`, `d/gi/r→/z/`, `ch/tr→/tɕ/`, `s/x→/s/`, `ng/ngh→/ŋ/`; 8-segment
+coda `/p t k m n ŋ j w/`; cited from Kirby 2011 JIPA / Pham 2006). When BOTH
+marks read as Vietnamese, `phonetic_similarity` compares VN keys instead of
+English Metaphone — catching aural confusion Metaphone is blind to (GIA HƯNG/DA
+HƯNG 0.50→0.65; TRANG/CHANG 0.73→0.81). Non-VN pairs keep the single-Metaphone
+path unchanged (Double Metaphone deferred to Track 3). The 70% raw-JW backbone
+and length dampener are unchanged. SIMILARITY_VERSION is 1.2. **Schema-free** —
+no column, migration, backfill, or ingest wiring (unlike Track 1). See
+`docs/superpowers/specs/2026-06-25-vn-phonetic-axis-design.md`.
+
 ## Data files
 
 ### `cities_by_country.json`
