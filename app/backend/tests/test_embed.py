@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from api._embed import compute_mark_embedding
+from api.db import Trademark
 
 _DIM = 768
 
@@ -53,3 +54,8 @@ def test_real_labse_cross_lingual_ordering():
 
     assert cos("APPLE", "TÁO") > cos("APPLE", "CHAIR")
     assert cos("RED BULL", "BÒ ĐỎ") > cos("RED BULL", "TABLE")
+
+
+def test_trademark_has_mark_embedding_column():
+    col = Trademark.__table__.c.mark_embedding
+    assert col.nullable is True
