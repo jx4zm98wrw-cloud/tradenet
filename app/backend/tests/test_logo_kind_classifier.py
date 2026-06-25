@@ -46,3 +46,16 @@ def test_classify_no_vienna_routes_to_backstop(tmp_path):
     ImageDraw.Draw(img).text((10, 30), "ACME BRAND", fill=0)
     img.save(p)
     assert classify_logo_kind([], p) == "wordmark"
+
+
+def test_logo_kind_for_helper_none_path_is_none(tmp_path):
+    from worker.ingest import _logo_kind_for
+
+    assert _logo_kind_for([], tmp_path, None) is None
+
+
+def test_logo_kind_for_helper_vienna_is_figurative(tmp_path):
+    from worker.ingest import _logo_kind_for
+
+    # Vienna present → 'figurative' without needing the file to exist.
+    assert _logo_kind_for(["26.4"], tmp_path, "missing.png") == "figurative"

@@ -253,6 +253,17 @@ def _phash_for_logo(image_root: Path, logo_path: str | None) -> str | None:
     return compute_logo_phash(image_root / logo_path)
 
 
+def _logo_kind_for(vienna_codes: list[str], image_root: Path, logo_path: str | None) -> str | None:
+    """Classify the specimen for visual-axis routing. None when there is no logo."""
+    if logo_path is None:
+        return None
+    # Lazy import: api._phash pulls in Pillow. Keep worker boot cheap and let
+    # tests monkey-patch before first use (same pattern as _phash_for_logo).
+    from api._phash import classify_logo_kind
+
+    return classify_logo_kind(vienna_codes, image_root / logo_path)
+
+
 def _purge_trademarks(session: Session, gazette_id: uuid.UUID) -> int:
     """Delete every Trademark row for the given gazette and commit.
 
@@ -417,6 +428,7 @@ def ingest_pdf(gazette_id: str) -> dict:
             )
             trademark = section_to_trademark(gazette.id, rt, section, logo_path=logo_path)
             trademark.logo_phash = _phash_for_logo(image_root, logo_path)
+            trademark.logo_kind = _logo_kind_for(trademark.vienna_codes or [], image_root, logo_path)
             batch.append(trademark)
             if len(batch) >= batch_size:
                 session.add_all(batch)
