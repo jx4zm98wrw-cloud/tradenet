@@ -11,7 +11,7 @@ from .features import MarkFeatures, ScoreResult
 from .phonetic import normalize_vn, phonetic_similarity
 from .visual import VisualConfidence, VisualScore, visual_similarity
 
-SIMILARITY_VERSION = "1.0"
+SIMILARITY_VERSION = "1.1"
 
 __all__ = [
     "DEFAULT_WEIGHTS",
@@ -35,7 +35,7 @@ __all__ = [
 def score(a: MarkFeatures, b: MarkFeatures, *, weights: dict[str, float] | None = None) -> ScoreResult:
     """Score one pair of marks across all axes; assemble the full ScoreResult."""
     phon = phonetic_similarity(a.mark_text, b.mark_text)
-    vis = visual_similarity(a.logo_phash, b.logo_phash, a.mark_text, b.mark_text)
+    vis = visual_similarity(a.logo_phash, b.logo_phash, a.logo_kind, b.logo_kind, a.mark_text, b.mark_text)
     class_o = class_overlap(a.nice_classes, b.nice_classes)
     vienna_o = vienna_overlap(a.vienna_codes, b.vienna_codes)
     cs = composite_score(

@@ -41,11 +41,22 @@ def _hamming_hex(a: str, b: str) -> int:
 def visual_similarity(
     a_phash: str | None,
     b_phash: str | None,
+    a_kind: str | None,
+    b_kind: str | None,
     a_text: str | None,
     b_text: str | None,
 ) -> VisualScore:
-    """pHash Hamming when both hashes exist; else typographic JW on the wordmark."""
-    if a_phash and b_phash:
+    """Route by specimen kind. Recalibrated pHash only when BOTH specimens are
+    genuine figurative devices (neither explicitly a wordmark-strip) and both
+    hashes exist; otherwise typographic JW on the wordmark text.
+
+    `None` kind (unclassified / pre-backfill) is treated permissively — only an
+    explicit 'wordmark' suppresses the pHash path, so the axis never goes dark
+    before the backfill runs.
+    """
+    a_word = a_kind == "wordmark"
+    b_word = b_kind == "wordmark"
+    if a_phash and b_phash and not a_word and not b_word:
         return VisualScore(_phash_score(_hamming_hex(a_phash, b_phash)), "phash")
     na, nb = normalize_vn(a_text), normalize_vn(b_text)
     if na and nb:

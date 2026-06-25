@@ -161,12 +161,14 @@ def _score_pair(anchor: Trademark, other: Trademark, w: dict[str, float]) -> Pai
             logo_phash=anchor.logo_phash,
             nice_classes=anchor.nice_classes or [],
             vienna_codes=anchor.vienna_codes or [],
+            logo_kind=anchor.logo_kind,
         ),
         MarkFeatures(
             mark_text=o_text,
             logo_phash=other.logo_phash,
             nice_classes=other.nice_classes or [],
             vienna_codes=other.vienna_codes or [],
+            logo_kind=other.logo_kind,
         ),
         weights=composite_w,
     )
