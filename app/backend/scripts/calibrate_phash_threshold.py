@@ -36,7 +36,7 @@ async def _main() -> None:
     await engine.dispose()
 
     hist: Counter[int] = Counter()
-    for a, b in zip(hashes[::2], hashes[1::2]):
+    for a, b in zip(hashes[::2], hashes[1::2], strict=False):
         hist[_hamming_hex(a, b)] += 1
     total = sum(hist.values())
     print(f"pairs={total}")
@@ -44,7 +44,7 @@ async def _main() -> None:
     for hd in range(0, 65):
         cum += hist.get(hd, 0)
         if hist.get(hd, 0) or hd in (5, 10, 16, 32):
-            print(f"hd={hd:2d}  n={hist.get(hd,0):5d}  cum%={100*cum/total:5.1f}")
+            print(f"hd={hd:2d}  n={hist.get(hd, 0):5d}  cum%={100 * cum / total:5.1f}")
 
 
 if __name__ == "__main__":

@@ -371,6 +371,21 @@ as `markText ?? mark_name ?? mark_sample` and renders `"(figurative mark)"`
 matches `mark_sample`/`applicant_name` (`search.py`). See
 `docs/superpowers/specs/2026-06-24-mark-name-resolution-design.md`.
 
+### Visual axis routing (Track 1)
+
+**Track 1 (visual axis):** the visual sub-score is now specimen-routed. A new
+`trademarks.logo_kind` column ('figurative' | 'wordmark' | NULL), computed by
+`api/_phash.py:classify_logo_kind` (Vienna-(531)-primary, cheap pixel backstop
+for no-Vienna marks) and populated by `scripts/backfill_logo_kind.py`
+(LOGO_KIND_VERSION) + the ingest worker. `tm_similarity.visual_similarity`
+compares perceptual hashes (recalibrated `1 - hd/VISUAL_PHASH_THRESHOLD`, T=10 —
+unrelated images now score ~0, not ~0.50) ONLY when both specimens are genuine
+figurative devices; a wordmark-strip (or NULL pre-backfill is permissive) routes
+to typographic JW so rendered text can't inflate the visual axis. SIMILARITY_VERSION
+is 1.1. **Re-run `scripts/backfill_logo_kind.py` after a fresh ingest** (same caveat
+as logo_phash / mark_name / vn_grant_date). See
+`docs/superpowers/specs/2026-06-25-visual-axis-routing-recalibration-design.md`.
+
 ## Data files
 
 ### `cities_by_country.json`
