@@ -371,6 +371,25 @@ as `markText ?? mark_name ?? mark_sample` and renders `"(figurative mark)"`
 matches `mark_sample`/`applicant_name` (`search.py`). See
 `docs/superpowers/specs/2026-06-24-mark-name-resolution-design.md`.
 
+### Mark embedding feature store (Track 3b-1)
+
+`trademarks.mark_embedding` (nullable `bytea`, no index; migration
+`20260625_0031`) stores an **L2-normalised 768-float32 LaBSE embedding** of the
+resolved `mark_name`, computed by `api/_embed.py:compute_mark_embedding` (the
+ONLY module importing `sentence-transformers`/LaBSE — lazy-loaded + cached, off
+the API-route and `tm_similarity` import paths, mirroring `_phash.py`). Written
+by `scripts/backfill_mark_embedding.py` (re-runnable, idempotent
+recompute-and-compare, `EMBED_VERSION`; `ids=`-scoped, same shape as
+`backfill_logo_phash`). **Backfill-only** — the ingest worker does NOT populate
+it (its source `mark_name` is itself backfill-derived): **run it after
+`backfill_mark_name`, and re-run after a fresh ingest** (same caveat as
+`mark_name`/`vn_grant_date`/entity-clean). The feature store has **no scoring
+effect yet** — it is consumed by Track 3b-2 (the semantic axis + 5-axis weight
+reallocation), which reads the stored vector into `MarkFeatures` and does pure
+cosine. `sentence-transformers` is a backfill-only dependency (pulls in torch;
+grows the worker image — accepted). See
+`docs/superpowers/specs/2026-06-25-mark-embedding-infrastructure-design.md`.
+
 ### Visual axis routing (Track 1)
 
 **Track 1 (visual axis):** the visual sub-score is now specimen-routed. A new
