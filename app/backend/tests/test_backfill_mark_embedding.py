@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from collections.abc import AsyncIterator
 from datetime import date
@@ -25,7 +26,9 @@ _DIM = 768
 def _fake_encoder(texts: list[str]) -> np.ndarray:
     out = np.zeros((len(texts), _DIM), dtype=np.float32)
     for i, t in enumerate(texts):
-        out[i, 0] = float(abs(hash(t)) % 97 + 1)  # deterministic, non-zero
+        out[i, 0] = float(
+            int(hashlib.md5(t.encode()).hexdigest(), 16) % 97 + 1
+        )  # deterministic across processes, non-zero
     return out
 
 
