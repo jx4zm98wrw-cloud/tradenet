@@ -159,6 +159,29 @@ claude_csvbuilder/
 │   │   │                           restoring the exact `pending + unresolved +
 │   │   │                           malformed == remaining` bucket split.
 │   │   ├── image_extractor/        Vendored logo extractor (was Final_TRADEMARK_image_extractor_refine.py)
+│   │   ├── tm_similarity/          Standalone pure conflict-similarity engine
+│   │   │                           (stdlib + jellyfish only; no FastAPI/
+│   │   │                           SQLAlchemy/filesystem). Reads a
+│   │   │                           `MarkFeatures` DTO (mark_text + precomputed
+│   │   │                           `trademarks.logo_phash` hex + nice_classes +
+│   │   │                           vienna_codes) → `ScoreResult` via `score()`.
+│   │   │                           Axis-per-file (phonetic/visual/classes/
+│   │   │                           composite) + features (DTOs) + `__init__`
+│   │   │                           (public API, `SIMILARITY_VERSION`). The
+│   │   │                           visual axis does pure integer Hamming on the
+│   │   │                           stored hex pHash — the pHash is computed by
+│   │   │                           `api/_phash.py` (the ONLY module importing
+│   │   │                           Pillow/imagehash for similarity) at ingest
+│   │   │                           (`worker/ingest.py`) and via the idempotent
+│   │   │                           backfill `scripts/backfill_logo_phash.py`.
+│   │   │                           **Re-run `scripts/backfill_logo_phash.py`
+│   │   │                           after a fresh ingest** (same caveat as
+│   │   │                           `mark_name` / `vn_grant_date`; note new
+│   │   │                           ingests also self-populate it). Extracted
+│   │   │                           from the former `api/similarity.py`
+│   │   │                           (deleted) — strictly behaviour-preserving
+│   │   │                           (golden test
+│   │   │                           `tests/test_tm_similarity_engine.py`).
 │   │   ├── alembic/                Migrations
 │   │   ├── scripts/                One-off scripts (smoke_ingest.py;
 │   │   │                           reconcile_domestic_not_found.py prunes orphan

@@ -4,7 +4,7 @@ A watchlist IS the "matter" entity (it already carries client/matter columns).
 This column stores per-channel similarity weight overrides
 (keys: phonetic/visual/class/vienna). NULL means "use DEFAULT_WEIGHTS"; a
 stored dict is merged over the defaults and renormalised at use time by
-api.similarity.resolve_weights. Applied when ranking similar marks in a
+tm_similarity.resolve_weights. Applied when ranking similar marks in a
 matter's context (e.g. pharma matters up-weight phonetic).
 
 Additive and backward-compatible: existing watchlists keep NULL → default

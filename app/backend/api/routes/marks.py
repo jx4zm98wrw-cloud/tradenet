@@ -20,12 +20,12 @@ from pydantic import BaseModel
 from sqlalchemy import and_, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import similarity as sim
+from tm_similarity import MarkFeatures, resolve_weights, score
+
 from .._status import derive_status
 from ..db import RecordType, Trademark, Watchlist, get_session
 from ..db.models import DomesticRecord, MadridRecord
 from ..schemas import DomesticEnrichmentOut, MadridEnrichmentOut, TrademarkOut
-from ..settings import get_settings
 from .today import DEMO_TODAY, _opp_close_date
 
 router = APIRouter(prefix="/api/v1/marks", tags=["marks"])
@@ -381,7 +381,6 @@ async def similar_marks(
             fq = fq.where(and_(*pub_range))
         fq = fq.order_by(desc(Trademark.publication_date_441), Trademark.id).limit(_SIMILAR_CANDIDATE_POOL)
         candidates = list((await session.execute(fq)).scalars().all())
-    image_root = get_settings().data_dir / "image"
     m_text = (m.mark_name or m.mark_sample or "").strip()
 
     # Per-matter weights: when a watchlist context is supplied, rank with that
@@ -390,31 +389,35 @@ async def similar_marks(
     if watchlist_id is not None:
         wl = await session.get(Watchlist, watchlist_id)
         if wl is not None:
-            weights = sim.resolve_weights(wl.weights)
+            weights = resolve_weights(wl.weights)
+
+    m_feat = MarkFeatures(
+        mark_text=m_text,
+        logo_phash=m.logo_phash,
+        nice_classes=m.nice_classes or [],
+        vienna_codes=m.vienna_codes or [],
+    )
 
     scored: list[tuple[Trademark, float, str]] = []
     for r in candidates:
         r_text = (r.mark_name or r.mark_sample or "").strip()
-        phon = sim.phonetic_similarity(m_text, r_text)
-        vis = sim.visual_similarity(
-            a_logo=m.logo_path,
-            b_logo=r.logo_path,
-            a_text=m_text,
-            b_text=r_text,
-            image_root=image_root,
-        )
-        class_o = sim.class_overlap(m.nice_classes, r.nice_classes)
-        vienna_o = sim.vienna_overlap(m.vienna_codes, r.vienna_codes)
-        cs = sim.composite_score(
-            phon, vis.score, class_o, vienna_o, weights=weights, visual_confidence=vis.confidence
+        result = score(
+            m_feat,
+            MarkFeatures(
+                mark_text=r_text,
+                logo_phash=r.logo_phash,
+                nice_classes=r.nice_classes or [],
+                vienna_codes=r.vienna_codes or [],
+            ),
+            weights=weights,
         )
         # Surface only marks the engine itself verdicts a Possible/Likely conflict
         # (its conjunction rule for Possible conflict: mark_strength >= 0.50 AND
         # class >= 0.20 AND composite >= 0.50; Likely conflict clears it too).
         # "Low risk" means class overlap alone — not a similar mark — so it is
         # excluded. Same rule Compare uses; single source of truth.
-        if cs.verdict != "Low risk":
-            scored.append((r, cs.composite, vis.confidence))
+        if result.verdict != "Low risk":
+            scored.append((r, result.composite, result.visual_confidence))
 
     scored.sort(key=lambda x: -x[1])
 

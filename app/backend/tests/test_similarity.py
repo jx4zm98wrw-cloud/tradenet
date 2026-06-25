@@ -7,11 +7,9 @@ relationship, not just what the math happens to produce.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
-from api.similarity import (
+from tm_similarity import (
     DEFAULT_WEIGHTS,
     class_overlap,
     composite_score,
@@ -211,58 +209,42 @@ def test_vienna_overlap_no_codes_returns_zero() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Visual similarity (no real images in test corpus → typographic fallback)
+# Visual similarity (no pHash pair available → typographic fallback)
 
 
-def test_visual_falls_back_to_typographic_when_no_logos(tmp_path: Path) -> None:
-    """Neither mark has a logo file. Engine returns the typographic JW
+def test_visual_falls_back_to_typographic_when_no_logos() -> None:
+    """Neither mark has a stored pHash. Engine returns the typographic JW
     score on the wordmark text, with confidence='typographic' so the UI
     can warn the user that this isn't a real visual match."""
-    vs = visual_similarity(
-        a_logo=None,
-        b_logo=None,
-        a_text="MONTINIS",
-        b_text="MONTANIS",
-        image_root=tmp_path,
-    )
+    vs = visual_similarity(None, None, "MONTINIS", "MONTANIS")
     assert vs.confidence == "typographic"
     assert vs.score >= 0.85  # similar text
 
 
-def test_visual_typographic_uses_token_level_jw(tmp_path: Path) -> None:
+def test_visual_typographic_uses_token_level_jw() -> None:
     """The same false-positive trap as phonetic: 'OMBRES TENDRES' vs
-    'MAYBELLINE SPOT RESCUE' both lack logos, fall to typographic JW.
+    'MAYBELLINE SPOT RESCUE' both lack a pHash, fall to typographic JW.
     Whole-string JW would return 0.70 (looks visually 'similar' purely
     because of letter frequency). Token-level pairing must agree with
     the examiner's read: two visually distinct multi-word wordmarks
     score well below 0.50."""
-    vs = visual_similarity(
-        a_logo=None,
-        b_logo=None,
-        a_text="OMBRES TENDRES",
-        b_text="MAYBELLINE SPOT RESCUE",
-        image_root=tmp_path,
-    )
+    vs = visual_similarity(None, None, "OMBRES TENDRES", "MAYBELLINE SPOT RESCUE")
     assert vs.confidence == "typographic"
     assert vs.score < 0.50, f"expected <0.50, got {vs.score}"
 
 
-def test_visual_returns_none_signal_for_blank_marks(tmp_path: Path) -> None:
-    vs = visual_similarity(None, None, "", "", image_root=tmp_path)
+def test_visual_returns_none_signal_for_blank_marks() -> None:
+    vs = visual_similarity(None, None, "", "")
     assert vs.confidence == "none"
     assert vs.score == 0.0
 
 
-def test_visual_missing_logo_file_falls_to_typographic(tmp_path: Path) -> None:
-    """logo_path points at a file that doesn't exist on disk (e.g. extractor
-    crashed for that gazette but DB row exists). Don't raise; fall back."""
-    vs = visual_similarity(
-        a_logo="missing/4-2026-99999.png",
-        b_logo=None,
-        a_text="ALPHA",
-        b_text="ALPHA",
-        image_root=tmp_path,
-    )
+def test_visual_one_sided_phash_falls_to_typographic() -> None:
+    """Only one side has a stored pHash; the other is None. A pHash
+    comparison needs BOTH hashes (the `if a_phash and b_phash` branch),
+    so a single-sided pHash can't produce a perceptual signal and the
+    engine falls back to typographic JW on the wordmark text."""
+    vs = visual_similarity("ffffffffffffffff", None, "ALPHA", "ALPHA")
     assert vs.confidence == "typographic"
 
 
