@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tm_similarity.vn_phonetic import vn_phonetic_key
+from tm_similarity.vn_phonetic import is_vietnamese, vn_phonetic_key
 
 
 def test_northern_z_merger_gia_d_r():
@@ -52,9 +52,6 @@ def test_multi_syllable_token():
 def test_empty_and_nonalpha():
     assert vn_phonetic_key("") == ""
     assert vn_phonetic_key("123") == ""
-
-
-from tm_similarity.vn_phonetic import is_vietnamese
 
 
 def test_detector_diacritics_true():

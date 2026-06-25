@@ -3,7 +3,7 @@
 Pure stdlib (``re``/``unicodedata``). Reimplements the published Northern
 (Hanoi) phonological correspondences — Kirby (2011), JIPA "Vietnamese (Hanoi
 Vietnamese)"; Pham (2006) G2P rules as used by vPhon — to encode a toneless
-onset–(glide)–nucleus–(coda) key for fuzzy aural-confusion matching. No code
+onset-(glide)-nucleus-(coda) key for fuzzy aural-confusion matching. No code
 is copied from vPhon; only the cited phonological facts are reused.
 
 Routed in by ``phonetic.phonetic_similarity`` for VN-vs-VN comparisons only.
@@ -24,12 +24,33 @@ import unicodedata
 #   /tʰ/=d (th)     /ɲ/=J (nh)       plus b l m n p t v h.
 # "QU" emits onset /k/ + the /w/ on-glide via the trailing "w" sentinel.
 _ONSETS: list[tuple[str, str]] = [
-    ("NGH", "q"), ("NG", "q"), ("GH", "g"), ("GI", "z"), ("CH", "c"),
-    ("TR", "c"), ("TH", "d"), ("KH", "x"), ("PH", "f"), ("QU", "kw"),
-    ("NH", "J"), ("C", "k"), ("K", "k"), ("Q", "k"), ("G", "g"),
-    ("D", "z"), ("R", "z"), ("S", "s"), ("X", "s"), ("B", "b"),
-    ("L", "l"), ("M", "m"), ("N", "n"), ("P", "p"), ("T", "t"),
-    ("V", "v"), ("H", "h"),
+    ("NGH", "q"),
+    ("NG", "q"),
+    ("GH", "g"),
+    ("GI", "z"),
+    ("CH", "c"),
+    ("TR", "c"),
+    ("TH", "d"),
+    ("KH", "x"),
+    ("PH", "f"),
+    ("QU", "kw"),
+    ("NH", "J"),
+    ("C", "k"),
+    ("K", "k"),
+    ("Q", "k"),
+    ("G", "g"),
+    ("D", "z"),
+    ("R", "z"),
+    ("S", "s"),
+    ("X", "s"),
+    ("B", "b"),
+    ("L", "l"),
+    ("M", "m"),
+    ("N", "n"),
+    ("P", "p"),
+    ("T", "t"),
+    ("V", "v"),
+    ("H", "h"),
 ]
 
 _VOWELS = frozenset("AEIOUY")
