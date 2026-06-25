@@ -115,3 +115,80 @@ def vn_phonetic_key(token: str) -> str:
             coda, nucleus = "w", nucleus[:-1]  # off-glide /w/
         codes.append(onset + glide + nucleus.lower() + coda)
     return "".join(codes)
+
+
+# ---------------------------------------------------------------------------
+# Language detector
+
+# Vietnamese-specific base letters (đ + the seven extra vowels). Their
+# presence is an unambiguous VN signal even before tone marks are considered.
+_VN_DIACRITIC = re.compile(r"[ăâêôơưđĂÂÊÔƠƯĐ]")
+
+# Legal VN syllable-final codas (orthographic), for the phonotactic check.
+_VALID_FINAL = frozenset({"C", "CH", "NG", "NH", "P", "T", "M", "N"})
+_VALID_FINAL_HEAD = frozenset({"C", "P", "T", "M", "N"})  # first char of a split cluster
+
+
+def _has_vn_diacritic(text: str) -> bool:
+    """True if the text carries any Vietnamese letter or tone mark."""
+    if _VN_DIACRITIC.search(text):
+        return True
+    # NFD exposes combining tone/vowel marks (Mn = Mark, nonspacing).
+    return any(unicodedata.category(c) == "Mn" for c in unicodedata.normalize("NFD", text))
+
+
+def _is_vn_token(token: str) -> bool:
+    """True if a toneless ASCII token parses cleanly as VN syllable(s).
+
+    Maximal-onset parse mirroring ``vn_phonetic_key``: every consonant run
+    must form a legal onset or coda, and every syllable needs a vowel. Rejects
+    tokens with a consonant cluster that no VN syllabification can absorb
+    (e.g. ``MAYBELLINE`` -> ``…LL…`` has no vowel between, ``APPLE`` -> ``PPL``).
+    """
+    t = "".join(ch for ch in token.upper() if ch.isalpha())
+    if not t:
+        return False
+    pos = 0
+    saw_syllable = False
+    while pos < len(t):
+        for spelling, _code in _ONSETS:
+            if t.startswith(spelling, pos):
+                pos += len(spelling)
+                break
+        vstart = pos
+        while pos < len(t) and t[pos] in _VOWELS:
+            pos += 1
+        if pos == vstart:
+            return False  # consonant(s) with no following vowel — not VN-shaped
+        saw_syllable = True
+        cstart = pos
+        while pos < len(t) and t[pos] not in _VOWELS:
+            pos += 1
+        cons = t[cstart:pos]
+        if cons:
+            if pos >= len(t):  # word-final coda
+                if cons not in _VALID_FINAL:
+                    return False
+            elif len(cons) >= 2:  # cluster: first char must be a legal coda
+                if cons[0] not in _VALID_FINAL_HEAD and cons[:2] not in ("NG", "NH", "CH"):
+                    return False
+                pos = cstart + 1
+            else:
+                pos = cstart  # single intervocalic consonant -> next onset
+    return saw_syllable
+
+
+def is_vietnamese(text: str | None) -> bool:
+    """Heuristic: does this mark read as Vietnamese?
+
+    Diacritic signal OR every token parsing as VN syllable(s). Deliberately
+    coarse on the phonotactic side (some foreign brands look VN-syllabic) — a
+    false-positive only changes the 30% phonetic encoder, never the 70%
+    raw-JW backbone. Empty/blank -> False.
+    """
+    if not text or not text.strip():
+        return False
+    if _has_vn_diacritic(text):
+        return True
+    tokens = " ".join(text.upper().split()).split()
+    return bool(tokens) and all(_is_vn_token(tok) for tok in tokens)

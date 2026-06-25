@@ -52,3 +52,36 @@ def test_multi_syllable_token():
 def test_empty_and_nonalpha():
     assert vn_phonetic_key("") == ""
     assert vn_phonetic_key("123") == ""
+
+
+from tm_similarity.vn_phonetic import is_vietnamese
+
+
+def test_detector_diacritics_true():
+    assert is_vietnamese("GIA HƯNG") is True
+    assert is_vietnamese("CÔNG TY DƯỢC") is True
+
+
+def test_detector_toneless_valid_syllables_true():
+    assert is_vietnamese("GIA HUNG") is True
+    assert is_vietnamese("TRANG") is True
+    assert is_vietnamese("BAO LONG") is True
+
+
+def test_detector_foreign_false():
+    # L is not a legal VN coda; PP is not a legal onset/coda cluster.
+    assert is_vietnamese("MAYBELLINE") is False
+    assert is_vietnamese("APPLE") is False
+
+
+def test_detector_empty_false():
+    assert is_vietnamese("") is False
+    assert is_vietnamese(None) is False
+    assert is_vietnamese("   ") is False
+
+
+def test_detector_known_coarseness_documented():
+    # Some foreign brands parse as VN-syllabic (SAMSUNG = SAM.SUNG). This is
+    # accepted: a mis-route only swaps the 30% encoder; the 70% raw-JW
+    # dominates, so a false-positive route is low-harm (see spec §Testing).
+    assert is_vietnamese("SAMSUNG") is True
