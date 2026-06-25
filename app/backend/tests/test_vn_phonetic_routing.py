@@ -21,14 +21,15 @@ def test_vn_pair_does_not_over_merge():
 
 
 def test_foreign_pair_unchanged_metaphone_path():
-    # Neither mark is VN -> Metaphone path, identical to pre-Track-2 value.
-    # 0.851 = undampened blend ~0.907 * length_factor 0.9375 (6 vs 8 chars);
-    # exact equality proves the non-VN branch is byte-for-byte the old path.
+    # Neither mark is VN -> non-VN (Double Metaphone) path. This pair's score is
+    # 0.851 = undampened blend ~0.907 * length_factor 0.9375 (6 vs 8 chars) under
+    # BOTH single Metaphone and Double Metaphone, so the Track 3a encoder swap
+    # leaves it unchanged (the alternate-pronunciation lift doesn't apply here).
     assert phonetic_similarity("NEUREX", "NEUROFAX") == 0.851
 
 
 def test_version_bumped():
-    assert t.SIMILARITY_VERSION == "1.2"
+    assert t.SIMILARITY_VERSION == "1.3"
 
 
 def test_new_symbols_exported():

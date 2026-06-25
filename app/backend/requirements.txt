@@ -55,9 +55,10 @@ prometheus-fastapi-instrumentator==8.0.2   # 8.x supports starlette>=1.0 (7.x ca
 python-magic==0.4.27
 
 # === Similarity engine (api.similarity) ===
-# Phonetic + string similarity: Jaro-Winkler + Metaphone via jellyfish — the
-# trademark industry's standard pair (Cohen-Ravikumar-Fienberg 2003). Pure C,
-# no extra runtime deps. Perceptual visual hashing for logo comparison via
+# Phonetic + string similarity: Jaro-Winkler via jellyfish (the trademark
+# industry's standard string metric, Cohen-Ravikumar-Fienberg 2003; pure C, no
+# extra runtime deps). Double Metaphone is vendored in tm_similarity/ (BSD-3),
+# not a runtime dep. Perceptual visual hashing for logo comparison via
 # imagehash on the existing Pillow install — extracted PNGs already live in
 # the data dir, so pHash compares the actual specimens rather than wordmark
 # text alone.

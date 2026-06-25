@@ -396,9 +396,15 @@ only) adds `is_vietnamese(text)` (diacritic + phonotactic VN detector) and
 coda `/p t k m n ŋ j w/`; cited from Kirby 2011 JIPA / Pham 2006). When BOTH
 marks read as Vietnamese, `phonetic_similarity` compares VN keys instead of
 English Metaphone — catching aural confusion Metaphone is blind to (GIA HƯNG/DA
-HƯNG 0.50→0.65; TRANG/CHANG 0.73→0.81). Non-VN pairs keep the single-Metaphone
-path unchanged (Double Metaphone deferred to Track 3). The 70% raw-JW backbone
-and length dampener are unchanged. SIMILARITY_VERSION is 1.2. **Schema-free** —
+HƯNG 0.50→0.65; TRANG/CHANG 0.73→0.81). Non-VN pairs use vendored **Double
+Metaphone** (Track 3a — BSD-3 `tm_similarity/double_metaphone.py`, no new
+dependency): each token's `(primary, secondary)` code-set is compared by best
+cross-product JW, catching alternate-pronunciation marks single Metaphone
+collapsed wrong (THOMAS/TOMAS 0.90→0.97, CAESAR/SEZAR 0.65→0.71, JOAQUIN/WAKEEN
+0.61→0.68). This trades a little precision on spelling-similar short pairs (the
+70% raw-JW stays dominant and the verdict guards gate any lone phonetic bump).
+The 70% raw-JW backbone and length dampener are unchanged. SIMILARITY_VERSION is
+1.3. **Schema-free** —
 no column, migration, backfill, or ingest wiring (unlike Track 1). See
 `docs/superpowers/specs/2026-06-25-vn-phonetic-axis-design.md`.
 
