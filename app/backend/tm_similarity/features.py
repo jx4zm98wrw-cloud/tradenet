@@ -11,6 +11,7 @@ class MarkFeatures:
     logo_phash: str | None  # 16-char hex pHash, precomputed; None = no usable logo
     nice_classes: list[str]  # same element type the routes pass from Trademark.nice_classes
     vienna_codes: list[str]
+    logo_kind: str | None = None  # 'figurative' | 'wordmark' | None — specimen routing (Track 1)
 
 
 @dataclass(frozen=True)

@@ -396,6 +396,7 @@ async def similar_marks(
         logo_phash=m.logo_phash,
         nice_classes=m.nice_classes or [],
         vienna_codes=m.vienna_codes or [],
+        logo_kind=m.logo_kind,
     )
 
     scored: list[tuple[Trademark, float, str]] = []
@@ -408,6 +409,7 @@ async def similar_marks(
                 logo_phash=r.logo_phash,
                 nice_classes=r.nice_classes or [],
                 vienna_codes=r.vienna_codes or [],
+                logo_kind=r.logo_kind,
             ),
             weights=weights,
         )

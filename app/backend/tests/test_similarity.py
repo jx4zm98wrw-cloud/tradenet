@@ -216,7 +216,7 @@ def test_visual_falls_back_to_typographic_when_no_logos() -> None:
     """Neither mark has a stored pHash. Engine returns the typographic JW
     score on the wordmark text, with confidence='typographic' so the UI
     can warn the user that this isn't a real visual match."""
-    vs = visual_similarity(None, None, "MONTINIS", "MONTANIS")
+    vs = visual_similarity(None, None, None, None, "MONTINIS", "MONTANIS")
     assert vs.confidence == "typographic"
     assert vs.score >= 0.85  # similar text
 
@@ -228,13 +228,13 @@ def test_visual_typographic_uses_token_level_jw() -> None:
     because of letter frequency). Token-level pairing must agree with
     the examiner's read: two visually distinct multi-word wordmarks
     score well below 0.50."""
-    vs = visual_similarity(None, None, "OMBRES TENDRES", "MAYBELLINE SPOT RESCUE")
+    vs = visual_similarity(None, None, None, None, "OMBRES TENDRES", "MAYBELLINE SPOT RESCUE")
     assert vs.confidence == "typographic"
     assert vs.score < 0.50, f"expected <0.50, got {vs.score}"
 
 
 def test_visual_returns_none_signal_for_blank_marks() -> None:
-    vs = visual_similarity(None, None, "", "")
+    vs = visual_similarity(None, None, None, None, "", "")
     assert vs.confidence == "none"
     assert vs.score == 0.0
 
@@ -244,7 +244,7 @@ def test_visual_one_sided_phash_falls_to_typographic() -> None:
     comparison needs BOTH hashes (the `if a_phash and b_phash` branch),
     so a single-sided pHash can't produce a perceptual signal and the
     engine falls back to typographic JW on the wordmark text."""
-    vs = visual_similarity("ffffffffffffffff", None, "ALPHA", "ALPHA")
+    vs = visual_similarity("ffffffffffffffff", None, None, None, "ALPHA", "ALPHA")
     assert vs.confidence == "typographic"
 
 
