@@ -12,7 +12,7 @@ build-backend = "setuptools.build_meta"
 # sys.path.insert hacks. Docker still uses PYTHONPATH=/srv/backend.
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["api*", "worker*", "tm_extractor*", "image_extractor*", "scripts*"]
+include = ["api*", "worker*", "tm_extractor*", "image_extractor*", "scripts*", "tm_similarity*"]
 
 [tool.ruff]
 line-length = 110
