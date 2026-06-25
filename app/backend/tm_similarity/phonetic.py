@@ -5,6 +5,7 @@ import unicodedata
 
 import jellyfish
 
+from .double_metaphone import double_metaphone
 from .vn_phonetic import is_vietnamese, vn_phonetic_key
 
 # ---------------------------------------------------------------------------
@@ -122,17 +123,53 @@ def _token_jw(a: str, b: str) -> float:
 _PHONETIC_LENGTH_TOLERANCE = 0.8
 
 
+def _codeset(token: str) -> tuple[str, ...]:
+    """The 1-2 non-empty Double Metaphone codes for a token, else ("",).
+
+    The secondary code captures an alternate pronunciation (THOMAS/TOMAS share
+    a primary; JOAQUIN/WAKEEN match only via the secondary). Empty fallback
+    keeps the token in the best-pair denominator without ever matching.
+    """
+    return tuple(c for c in double_metaphone(token) if c) or ("",)
+
+
+def _best_pair_codeset_jw(short: list[tuple[str, ...]], long: list[tuple[str, ...]]) -> float:
+    """Greedy best-pairing JW between two lists of DM code-sets.
+
+    Mirrors `_best_pair_jw` (average over the longer list so unpaired tokens
+    drag the score down) but each token is a code-SET: the per-pair score is
+    the MAX Jaro-Winkler over the cross-product of the two sets, so an alternate
+    pronunciation on either side can match.
+    """
+    if not short or not long:
+        return 0.0
+    used = [False] * len(long)
+    pair_scores: list[float] = []
+    for a_codes in short:
+        best, best_idx = 0.0, -1
+        for i, b_codes in enumerate(long):
+            if used[i]:
+                continue
+            s = max(jellyfish.jaro_winkler_similarity(x, y) for x in a_codes for y in b_codes)
+            if s > best:
+                best, best_idx = s, i
+        if best_idx >= 0:
+            used[best_idx] = True
+        pair_scores.append(best)
+    return sum(pair_scores) / len(long)
+
+
 def phonetic_similarity(a: str | None, b: str | None) -> float:
     """Return token-level Jaro-Winkler phonetic similarity in [0, 1].
 
     Weighted blend of two signals, both computed at the *token* level:
       - Raw JW (70% weight) — best-pair JW between tokens of the two marks,
         on diacritic-normalised uppercase strings.
-      - Phonetic-code JW (30% weight) — same best-pair scheme on a phonetic
-        code per token. The code is the Vietnamese key (vn_phonetic_key) when
-        both marks read as Vietnamese, else the English Metaphone code.
-        Catches sound-alikes like NEUREX/NEUROFAX (English) and GIA/DA (VN,
-        Northern d/gi -> /z/ merger) where surface spellings diverge.
+      - Phonetic-code JW (30% weight) — best-pair scheme on a phonetic code per
+        token. Vietnamese marks use the VN key (vn_phonetic_key); all others use
+        vendored Double Metaphone, comparing each token's (primary, secondary)
+        code-set by best cross-product JW. Catches GIA/DA (VN /z/ merger) and
+        THOMAS/TOMAS, JOAQUIN/WAKEEN (English alternate pronunciations).
 
     Why token-level matters:
     Whole-string Jaro-Winkler over multi-word marks ("OMBRES TENDRES"
@@ -169,19 +206,24 @@ def phonetic_similarity(a: str | None, b: str | None) -> float:
     la, lb = len(na.replace(" ", "")), len(nb.replace(" ", ""))
     length_factor = min(1.0, (min(la, lb) / max(la, lb)) / _PHONETIC_LENGTH_TOLERANCE) if la and lb else 1.0
 
-    # 30% phonetic component, language-routed. Both marks Vietnamese -> compare
-    # VN phonetic keys (same syllabic space; mirrors Track 1's "both figurative"
-    # gate). Otherwise the original English-Metaphone path, unchanged. Encoding
-    # per token (not the whole string) preserves word boundaries either way.
+    # 30% phonetic component, language-routed. Vietnamese -> VN key (Track 2);
+    # otherwise vendored Double Metaphone (Track 3a). DM emits a (primary,
+    # secondary) pair, so each token is a code-SET and the per-pair score is the
+    # best cross-product JW — catching alternate pronunciations (THOMAS/TOMAS,
+    # JOAQUIN/WAKEEN) single Metaphone collapsed wrong.
     if is_vietnamese(a) and is_vietnamese(b):
         a_codes = [k for k in (vn_phonetic_key(tok) for tok in _tokens(na)) if k]
         b_codes = [k for k in (vn_phonetic_key(tok) for tok in _tokens(nb)) if k]
+        if not a_codes or not b_codes:
+            return round(raw * length_factor, 3)
+        short, long = (a_codes, b_codes) if len(a_codes) <= len(b_codes) else (b_codes, a_codes)
+        phon = _best_pair_jw(short, long)
     else:
-        a_codes = [c for c in (jellyfish.metaphone(tok) for tok in _tokens(na)) if c]
-        b_codes = [c for c in (jellyfish.metaphone(tok) for tok in _tokens(nb)) if c]
-    if not a_codes or not b_codes:
-        return round(raw * length_factor, 3)
-    short, long = (a_codes, b_codes) if len(a_codes) <= len(b_codes) else (b_codes, a_codes)
-    phon = _best_pair_jw(short, long)
+        a_sets = [_codeset(tok) for tok in _tokens(na)]
+        b_sets = [_codeset(tok) for tok in _tokens(nb)]
+        if not a_sets or not b_sets:
+            return round(raw * length_factor, 3)
+        short_s, long_s = (a_sets, b_sets) if len(a_sets) <= len(b_sets) else (b_sets, a_sets)
+        phon = _best_pair_codeset_jw(short_s, long_s)
 
     return round((0.7 * raw + 0.3 * phon) * length_factor, 3)

@@ -7,12 +7,13 @@ from __future__ import annotations
 
 from .classes import class_overlap, vienna_overlap
 from .composite import DEFAULT_WEIGHTS, CompositeScore, composite_score, resolve_weights
+from .double_metaphone import double_metaphone
 from .features import MarkFeatures, ScoreResult
 from .phonetic import normalize_vn, phonetic_similarity
 from .visual import VisualConfidence, VisualScore, visual_similarity
 from .vn_phonetic import is_vietnamese, vn_phonetic_key
 
-SIMILARITY_VERSION = "1.2"
+SIMILARITY_VERSION = "1.3"
 
 __all__ = [
     "DEFAULT_WEIGHTS",
@@ -24,6 +25,7 @@ __all__ = [
     "VisualScore",
     "class_overlap",
     "composite_score",
+    "double_metaphone",
     "is_vietnamese",
     "normalize_vn",
     "phonetic_similarity",
