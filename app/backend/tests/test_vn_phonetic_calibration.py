@@ -12,10 +12,10 @@ from tm_similarity.phonetic import phonetic_similarity
 
 # (a, b, min_expected) — should be FLAGGED as phonetically confusable.
 HIGH_CONFUSION = [
-    ("GIA HƯNG", "DA HƯNG", 0.60),   # Northern d/gi -> /z/  (was 0.50 under Metaphone)
-    ("TRANG", "CHANG", 0.78),        # ch/tr -> /tɕ/         (was 0.73)
-    ("LAKA", "LACCA", 0.80),         # IP-Vietnam short-mark case
-    ("MEKO", "MECO", 0.85),          # IP-Vietnam short-mark case
+    ("GIA HƯNG", "DA HƯNG", 0.60),  # Northern d/gi -> /z/  (was 0.50 under Metaphone)
+    ("TRANG", "CHANG", 0.78),  # ch/tr -> /tɕ/         (was 0.73)
+    ("LAKA", "LACCA", 0.80),  # IP-Vietnam short-mark case
+    ("MEKO", "MECO", 0.85),  # IP-Vietnam short-mark case
 ]
 
 # (a, b, max_expected) — must NOT over-merge (toneless over-merge early-warning).
