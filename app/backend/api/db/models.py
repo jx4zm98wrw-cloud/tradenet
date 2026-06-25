@@ -263,6 +263,9 @@ class Trademark(Base):
     # Populated by the worker once the image extractor has run (Phase 2);
     # remains NULL for rows ingested before image extraction.
     logo_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    logo_phash: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )  # precomputed hex pHash for the similarity engine (no index — loaded per-row, never queried by)
 
     # Priority / related
     priority_300: Mapped[str | None] = mapped_column(Text, nullable=True)  # (300)
