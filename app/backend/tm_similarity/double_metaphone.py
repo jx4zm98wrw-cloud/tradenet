@@ -38,7 +38,6 @@ BSD-3 license (retained per its terms):
 
 from __future__ import annotations
 
-# -*- coding: utf-8 -*-
 import unicodedata
 
 
