@@ -241,6 +241,18 @@ def _resolve_logo_path(section: dict, image_subdir_rel: str, image_root: Path) -
     return None
 
 
+def _phash_for_logo(image_root: Path, logo_path: str | None) -> str | None:
+    """Perceptual hash of the resolved logo PNG, or None when there's no logo."""
+    if not logo_path:
+        return None
+    # Lazy import: api._phash pulls in Pillow + imagehash. The API process
+    # imports worker.ingest indirectly via routes (see _session_factory) and
+    # must not pay that cost at boot — mirrors the lazy image_extractor import.
+    from api._phash import compute_logo_phash
+
+    return compute_logo_phash(image_root / logo_path)
+
+
 def _purge_trademarks(session: Session, gazette_id: uuid.UUID) -> int:
     """Delete every Trademark row for the given gazette and commit.
 
@@ -403,7 +415,9 @@ def ingest_pdf(gazette_id: str) -> dict:
             logo_path = (
                 _resolve_logo_path(section, image_subdir_rel, image_root) if image_subdir_rel else None
             )
-            batch.append(section_to_trademark(gazette.id, rt, section, logo_path=logo_path))
+            trademark = section_to_trademark(gazette.id, rt, section, logo_path=logo_path)
+            trademark.logo_phash = _phash_for_logo(image_root, logo_path)
+            batch.append(trademark)
             if len(batch) >= batch_size:
                 session.add_all(batch)
                 session.commit()
