@@ -266,6 +266,8 @@ class Trademark(Base):
     logo_phash: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # precomputed hex pHash for the similarity engine (no index — loaded per-row, never queried by)
+    logo_kind: Mapped[str | None] = mapped_column(Text, nullable=True)
+    """'figurative' | 'wordmark' | NULL — specimen routing for the visual axis (Track 1)."""
 
     # Priority / related
     priority_300: Mapped[str | None] = mapped_column(Text, nullable=True)  # (300)
