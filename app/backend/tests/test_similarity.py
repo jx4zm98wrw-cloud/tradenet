@@ -543,7 +543,7 @@ def test_phash_boost_does_not_mutate_default_weights() -> None:
     composite_score(
         phonetic=0.0, visual=0.95, semantic=0.0, class_o=1.0, vienna_o=0.0, visual_confidence="phash"
     )
-    assert DEFAULT_WEIGHTS == before
+    assert before == DEFAULT_WEIGHTS
     assert DEFAULT_WEIGHTS["visual"] == 0.15
 
 
@@ -563,12 +563,8 @@ def test_typographic_soundalikes_unchanged_by_3c() -> None:
     """Regression guard: sound-alike pairs are typographic, so Track 3c must leave
     them byte-identical to v1.4 — LIPITOR/LIPITAR stays Low, MONTINIS/MONTANIS
     stays Possible. This is the whole point of gating on confidence."""
-    lipitor = composite_score(
-        0.557, 0.675, 0.0, 1.0, 0.0, visual_confidence="typographic"
-    )
-    montinis = composite_score(
-        0.945, 0.921, 0.0, 1.0, 0.0, visual_confidence="typographic"
-    )
+    lipitor = composite_score(0.557, 0.675, 0.0, 1.0, 0.0, visual_confidence="typographic")
+    montinis = composite_score(0.945, 0.921, 0.0, 1.0, 0.0, visual_confidence="typographic")
     assert lipitor.composite == pytest.approx(0.425)
     assert lipitor.verdict == "Low risk"
     assert montinis.composite == pytest.approx(0.669)
