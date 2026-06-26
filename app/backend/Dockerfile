@@ -16,6 +16,12 @@ RUN apt-get update \
         build-essential libpq-dev \
  && rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip past the base image's 24.0, which carries CVE-2025-8869,
+# CVE-2026-1703, CVE-2026-3219, CVE-2026-6357 (malicious-wheel / archive- &
+# symlink-extraction fixes). 26.1.2 is the highest fixed-version among them.
+# Bump when Trivy flags a newer pip CVE.
+RUN pip install --upgrade "pip==26.1.2"
+
 COPY requirements.txt .
 RUN pip wheel --wheel-dir=/wheels -r requirements.txt
 
@@ -38,7 +44,10 @@ WORKDIR /srv/backend
 
 COPY --from=build /wheels /wheels
 COPY requirements.txt .
-RUN pip install --no-index --find-links=/wheels -r requirements.txt \
+# Upgrade the image's bundled pip past 24.0 (same CVEs as the build stage) so the
+# runtime image Trivy scans ships a patched pip; then install app deps offline.
+RUN pip install --upgrade "pip==26.1.2" \
+ && pip install --no-index --find-links=/wheels -r requirements.txt \
  && rm -rf /wheels
 
 # Application code (chown to non-root user)
