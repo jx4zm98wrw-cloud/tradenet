@@ -22,7 +22,7 @@ def test_none_and_empty_return_defaults():
 
 
 def test_full_override_normalises_to_one():
-    w = resolve_weights({"phonetic": 1.0, "visual": 0.0, "class": 0.0, "vienna": 0.0})
+    w = resolve_weights({"phonetic": 1.0, "visual": 0.0, "semantic": 0.0, "class": 0.0, "vienna": 0.0})
     assert w["phonetic"] == pytest.approx(1.0)
     assert sum(w.values()) == pytest.approx(1.0)
 

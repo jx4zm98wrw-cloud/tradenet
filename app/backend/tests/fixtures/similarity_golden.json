@@ -23,27 +23,32 @@
   ],
   "composite": [
     [
-      0.562,
-      "Possible conflict",
-      "warn"
-    ],
-    [
-      0.379,
+      0.47,
       "Low risk",
       "ok"
     ],
     [
-      0.935,
+      0.308,
+      "Low risk",
+      "ok"
+    ],
+    [
+      0.8,
       "Likely conflict",
       "stamp"
     ],
     [
-      0.341,
+      0.296,
       "Low risk",
       "ok"
     ],
     [
-      0.356,
+      0.289,
+      "Low risk",
+      "ok"
+    ],
+    [
+      0.378,
       "Low risk",
       "ok"
     ]

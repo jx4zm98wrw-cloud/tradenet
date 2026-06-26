@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tm_similarity import MarkFeatures, score
+from tm_similarity import MarkFeatures, resolve_weights, score
 
 from .._status import derive_status
 from ..db import Trademark, get_session
@@ -35,11 +35,13 @@ from .today import DEMO_TODAY
 router = APIRouter(prefix="/api/v1/compare", tags=["compare"])
 
 
-# Public default — the design README's 40/30/30 from a 3-signal model;
-# adding vienna as a 4th signal redistributes to 40/25/20/15.
+# Public default — phonetic-protective 5-axis split (Track 3b-2). The 4 public
+# axes sum to 0.85; resolve_weights() injects the semantic axis at 0.15 (the
+# engine default) at score time, so the effective engine weights match
+# DEFAULT_WEIGHTS {phonetic .35, visual .15, semantic .15, class .20, vienna .15}.
 DEFAULT_WEIGHTS = {
-    "phonetic": 0.40,
-    "visual": 0.25,
+    "phonetic": 0.35,
+    "visual": 0.15,
     "classOverlap": 0.20,
     "viennaOverlap": 0.15,
 }
@@ -55,6 +57,7 @@ class PairScore(BaseModel):
     markId: str
     phonetic: float
     visual: float
+    semantic: float
     classOverlap: float
     viennaOverlap: float
     composite: float
@@ -162,6 +165,7 @@ def _score_pair(anchor: Trademark, other: Trademark, w: dict[str, float]) -> Pai
             nice_classes=anchor.nice_classes or [],
             vienna_codes=anchor.vienna_codes or [],
             logo_kind=anchor.logo_kind,
+            mark_embedding=anchor.mark_embedding,
         ),
         MarkFeatures(
             mark_text=o_text,
@@ -169,13 +173,15 @@ def _score_pair(anchor: Trademark, other: Trademark, w: dict[str, float]) -> Pai
             nice_classes=other.nice_classes or [],
             vienna_codes=other.vienna_codes or [],
             logo_kind=other.logo_kind,
+            mark_embedding=other.mark_embedding,
         ),
-        weights=composite_w,
+        weights=resolve_weights(composite_w),
     )
     return PairScore(
         markId=str(other.id),
         phonetic=round(result.phonetic, 3),
         visual=round(result.visual, 3),
+        semantic=round(result.semantic, 3),
         classOverlap=round(result.class_overlap, 3),
         viennaOverlap=round(result.vienna_overlap, 3),
         composite=result.composite,

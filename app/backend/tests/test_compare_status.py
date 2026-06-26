@@ -93,3 +93,16 @@ async def test_compare_includes_real_status(client: AsyncClient) -> None:
     pending = marks[str(_MARK2)]
     assert pending["status_label"] == "Pending"
     assert pending["status_tone"] == "warn"
+
+
+@pytest.mark.asyncio
+async def test_compare_returns_semantic_zero_without_embeddings(client: AsyncClient) -> None:
+    r = await client.post(
+        "/api/v1/compare",
+        json={"markIds": [str(_MARK1), str(_MARK2)]},
+    )
+    assert r.status_code == 200, r.text
+    scores = r.json()["scores"]
+    assert scores, "expected at least one pair score"
+    # both seeded marks have NULL mark_embedding -> no semantic signal
+    assert scores[0]["semantic"] == 0.0

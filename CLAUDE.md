@@ -164,9 +164,10 @@ claude_csvbuilder/
 │   │   │                           SQLAlchemy/filesystem). Reads a
 │   │   │                           `MarkFeatures` DTO (mark_text + precomputed
 │   │   │                           `trademarks.logo_phash` hex + nice_classes +
-│   │   │                           vienna_codes) → `ScoreResult` via `score()`.
-│   │   │                           Axis-per-file (phonetic/visual/classes/
-│   │   │                           composite) + features (DTOs) + `__init__`
+│   │   │                           vienna_codes + `mark_embedding` bytes) →
+│   │   │                           `ScoreResult` via `score()`.
+│   │   │                           Axis-per-file (phonetic/visual/semantic/
+│   │   │                           classes/composite) + features (DTOs) + `__init__`
 │   │   │                           (public API, `SIMILARITY_VERSION`). The
 │   │   │                           visual axis does pure integer Hamming on the
 │   │   │                           stored hex pHash — the pHash is computed by
@@ -383,12 +384,29 @@ recompute-and-compare, `EMBED_VERSION`; `ids=`-scoped, same shape as
 `backfill_logo_phash`). **Backfill-only** — the ingest worker does NOT populate
 it (its source `mark_name` is itself backfill-derived): **run it after
 `backfill_mark_name`, and re-run after a fresh ingest** (same caveat as
-`mark_name`/`vn_grant_date`/entity-clean). The feature store has **no scoring
-effect yet** — it is consumed by Track 3b-2 (the semantic axis + 5-axis weight
-reallocation), which reads the stored vector into `MarkFeatures` and does pure
-cosine. `sentence-transformers` is a backfill-only dependency (pulls in torch;
-grows the worker image — accepted). See
+`mark_name`/`vn_grant_date`/entity-clean). The feature store is consumed by the
+**Track 3b-2 semantic axis** (below), which reads the stored vector into
+`MarkFeatures` and does pure cosine. `sentence-transformers` is a backfill-only
+dependency (pulls in torch; grows the worker image — accepted). See
 `docs/superpowers/specs/2026-06-25-mark-embedding-infrastructure-design.md`.
+
+### Semantic axis (Track 3b-2)
+
+`tm_similarity/semantic.py:semantic_similarity(a_bytes, b_bytes)` is the 5th
+axis: it decodes the stored `trademarks.mark_embedding` bytea (768 L2-normalised
+float32) with stdlib `array` (no numpy — the engine stays stdlib + jellyfish)
+and returns a **floor-calibrated cosine** `max(0, (cos - SEMANTIC_FLOOR)/(1 -
+SEMANTIC_FLOOR))` (`SEMANTIC_FLOOR = 0.50`, calibrated vs real LaBSE; the marked
+`TM_RUN_MODEL_TESTS=1` test in `tests/test_semantic.py` validates/tunes it). NULL
+embedding → 0.0. `composite.py` adds it to `mark_score` and `mark_strength`
+(independent evidence like a pHash visual match) with phonetic-protective
+`DEFAULT_WEIGHTS` `{phonetic .35, visual .15, semantic .15, class .20, vienna
+.15}`; verdict bands + the class-overlap guard are unchanged. `SIMILARITY_VERSION`
+is 1.4. **Deployment caveat:** adding a weighted axis lowers composites for pairs
+with no semantic match (some borderline Possible→Low), and until
+`backfill_mark_embedding` has populated the corpus every pair scores `sem=0` —
+**run the embedding backfill (after `backfill_mark_name`) before/with rollout.**
+See `docs/superpowers/specs/2026-06-26-semantic-axis-design.md`.
 
 ### Visual axis routing (Track 1)
 

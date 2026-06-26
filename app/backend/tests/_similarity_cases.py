@@ -19,11 +19,12 @@ OVERLAP_CASES = [
     ([], ["1"]),
 ]
 
-# (phonetic, visual, class_o, vienna_o, visual_confidence)
+# (phonetic, visual, semantic, class_o, vienna_o, visual_confidence)
 COMPOSITE_CASES = [
-    (0.60, 0.63, 1.0, 0.0, "phash"),
-    (0.14, 0.63, 1.0, 0.0, "phash"),
-    (0.90, 0.90, 1.0, 1.0, "phash"),
-    (0.49, 0.20, 1.0, 0.0, "typographic"),
-    (0.16, 0.59, 1.0, 0.0, "phash"),
+    (0.60, 0.63, 0.00, 1.0, 0.0, "phash"),
+    (0.14, 0.63, 0.00, 1.0, 0.0, "phash"),
+    (0.90, 0.90, 0.00, 1.0, 1.0, "phash"),
+    (0.49, 0.20, 0.00, 1.0, 0.0, "typographic"),
+    (0.16, 0.59, 0.00, 1.0, 0.0, "phash"),
+    (0.10, 0.10, 0.85, 1.0, 0.0, "typographic"),  # semantic-driven (translation equiv)
 ]
