@@ -62,9 +62,14 @@ git commit -m "test(visual): bake baselines on $(uname -s)"
 
 After committing baselines, subsequent runs with `PLAYWRIGHT_VISUAL=1` enforce the diff. Any visual change of >1% pixel ratio fails.
 
-### Enabling in CI
+### In CI — advisory, not gating
 
-Add `PLAYWRIGHT_VISUAL: "1"` to the `e2e` job's `env:` block in `.github/workflows/ci.yml` once baselines exist. The HTML report artifact already surfaces visual diffs on failure (uses the existing upload step).
+The `e2e` job runs Playwright in **two steps**:
+
+1. **`Run Playwright suite (functional)`** — gating. `PLAYWRIGHT_VISUAL` is unset, so the visual specs self-skip; a red here is a real regression (broken login, mis-wired API, client-routing break) and blocks merge.
+2. **`Run visual regression (advisory)`** — `continue-on-error: true` with `PLAYWRIGHT_VISUAL=1`, running only `visual.spec.ts`. A pixel diff here does **not** fail the job or block merge — an intentional UI change is *expected* to fail it until the baseline is re-baked. The HTML report + traces are still uploaded (the diagnostic upload steps fire on `steps.visual.outcome == 'failure'`), so the diff is available for manual review.
+
+When a visual diff is intentional, re-bake and commit the baseline (see the one-time bake above, run on the CI runner image) — that turns the advisory step green again. Do **not** re-add `PLAYWRIGHT_VISUAL` to the job-level `env:` block; it belongs only on the advisory step.
 
 ## What's intentionally not covered
 

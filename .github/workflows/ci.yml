@@ -275,11 +275,6 @@ jobs:
       PLAYWRIGHT_ADMIN_EMAIL: playwright@ci.local
       # 32+ chars to satisfy the schema's min-length validator.
       PLAYWRIGHT_ADMIN_PASSWORD: ci-playwright-password-1234567890
-      # Opt-in for tests/e2e/visual.spec.ts — baselines under
-      # visual.spec.ts-snapshots/ were baked on the same runner image
-      # (mcr.microsoft.com/playwright:v1.60.0-noble) that ubuntu-latest
-      # uses, so font hinting + sub-pixel rendering match.
-      PLAYWRIGHT_VISUAL: "1"
 
     steps:
       - uses: actions/checkout@v6
@@ -383,7 +378,11 @@ jobs:
         working-directory: app/frontend
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run Playwright suite
+      # Functional smoke — GATING. With PLAYWRIGHT_VISUAL unset the visual
+      # specs self-skip (see tests/e2e/visual.spec.ts), so a red here means a
+      # real regression: broken login, mis-wired API contract, client-routing
+      # break. This is the check that must stay green to merge.
+      - name: Run Playwright suite (functional)
         working-directory: app/frontend
         env:
           # The frontend is already running on :3000 from the step
@@ -392,9 +391,30 @@ jobs:
           PLAYWRIGHT_SKIP_WEBSERVER: "1"
         run: pnpm test:e2e
 
+      # Visual regression — ADVISORY (continue-on-error). Pixel baselines under
+      # visual.spec.ts-snapshots/ were baked on the same runner image
+      # (mcr.microsoft.com/playwright:v1.60.0-noble) ubuntu-latest uses, so font
+      # hinting + sub-pixel rendering match. An intentional UI change is EXPECTED
+      # to fail this until the baseline is regenerated, so it must NOT red the
+      # gating check or block merge. The HTML report + traces (uploaded below on
+      # any visual failure) carry the pixel diff for manual review; regenerate a
+      # stale baseline with `PLAYWRIGHT_VISUAL=1 pnpm test:e2e --update-snapshots
+      # visual` on the CI runner image and commit visual.spec.ts-snapshots/.
+      - name: Run visual regression (advisory)
+        id: visual
+        continue-on-error: true
+        working-directory: app/frontend
+        env:
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
+          PLAYWRIGHT_VISUAL: "1"
+        run: pnpm test:e2e visual
+
       # ---- Diagnostics on failure ----
       - name: Upload Playwright HTML report on failure
-        if: failure()
+        # Fire on a gating failure OR an advisory visual diff (the visual step
+        # is continue-on-error, so the job stays green — `failure()` alone would
+        # never upload the pixel-diff report).
+        if: failure() || steps.visual.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
@@ -405,7 +425,8 @@ jobs:
         # `trace: retain-on-failure` in playwright.config.ts saves the
         # full timeline (DOM snapshots, network, console) for failing
         # tests. Worth their weight in gold when debugging flakes.
-        if: failure()
+        # Include advisory visual diffs (continue-on-error keeps the job green).
+        if: failure() || steps.visual.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
           name: playwright-traces
