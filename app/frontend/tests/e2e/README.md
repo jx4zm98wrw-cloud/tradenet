@@ -71,6 +71,21 @@ The `e2e` job runs Playwright in **two steps**:
 
 When a visual diff is intentional, re-bake and commit the baseline (see the one-time bake above, run on the CI runner image) — that turns the advisory step green again. Do **not** re-add `PLAYWRIGHT_VISUAL` to the job-level `env:` block; it belongs only on the advisory step.
 
+#### Cheap re-bake: reuse the CI artifact (no local Linux stack needed)
+
+You don't have to stand up the noble stack yourself to get a Linux baseline. When the advisory step fails, Playwright saves the freshly-captured screenshot to `test-results/<test>/<name>-actual.png`, and CI uploads that directory as the `playwright-traces` artifact. That `-actual.png` **is** what `--update-snapshots` would write — same noble runner, same font hinting — so it can be committed verbatim:
+
+```bash
+# Find the run whose advisory step captured the diff (e.g. main HEAD, or your PR)
+gh run download <run-id> -n playwright-traces -D /tmp/pw
+# Copy the actual → the committed baseline (filename keeps the -chromium-linux suffix)
+cp /tmp/pw/*search-empty*/search-empty-actual.png \
+   tests/e2e/visual.spec.ts-snapshots/search-empty-chromium-linux.png
+git add tests/e2e/visual.spec.ts-snapshots/search-empty-chromium-linux.png
+```
+
+Sanity-check before committing: the artifact's `-expected.png` should equal the baseline you're replacing, and if the run retried, both attempts' `-actual.png` should be byte-identical (a stable render, not a flake).
+
 ## What's intentionally not covered
 
 - **Specific gazette content**. Search/detail/compare tests use whatever is in the DB; they skip cleanly if there are <1 / <2 marks. Adding a "minimum seeded data" fixture is a separate task.
