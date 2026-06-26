@@ -528,6 +528,7 @@ export type PairScore = {
   markId: string;
   phonetic: number;
   visual: number;
+  semantic: number;      // cross-language / conceptual meaning (LaBSE cosine); 0 when a mark has no stored embedding
   classOverlap: number;
   viennaOverlap: number;
   composite: number;

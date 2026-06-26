@@ -165,6 +165,10 @@ function ComparePage() {
               />
             ))}
           </CmpRow>
+          <CmpRow label="Semantic (meaning, cross-language)" n={N}>
+            <span className="text-mute">—</span>
+            {others.map((m, i) => <ScoreInline key={m.id} value={data.scores[i].semantic} />)}
+          </CmpRow>
           <CmpRow label="Class overlap (Nice, Jaccard)" n={N}>
             <span className="text-mute">—</span>
             {others.map((m, i) => <ScoreInline key={m.id} value={data.scores[i].classOverlap} />)}
@@ -262,11 +266,17 @@ function ComparePage() {
 function ScorecardBand({
   anchor, scores, marks, weights,
 }: { anchor: Trademark; scores: PairScore[]; marks: Trademark[]; weights: Record<string, number> }) {
+  // The compare API returns the 4 public axes normalised to sum 1.0; the engine
+  // then injects a fixed 15% semantic axis. Reconstruct the displayed 5-axis
+  // split: the public axes share the remaining 85%, semantic is the fixed 15%.
+  const SEMANTIC_SHARE = 0.15;
+  const pubScale = 1 - SEMANTIC_SHARE;
   const w = {
-    phonetic: weights.phonetic ?? 0.4,
-    visual: weights.visual ?? 0.25,
-    classOverlap: weights.classOverlap ?? 0.2,
-    viennaOverlap: weights.viennaOverlap ?? 0.15,
+    phonetic: (weights.phonetic ?? 0.35) * pubScale,
+    visual: (weights.visual ?? 0.15) * pubScale,
+    semantic: SEMANTIC_SHARE,
+    classOverlap: (weights.classOverlap ?? 0.2) * pubScale,
+    viennaOverlap: (weights.viennaOverlap ?? 0.15) * pubScale,
   };
   const otherNames = marks
     .filter((m) => m.id !== anchor.id)
@@ -283,9 +293,10 @@ function ScorecardBand({
         </h2>
         <p className="text-[12.5px] text-mute mt-1.5">
           Composite = {pct(w.phonetic)}% phonetic · {pct(w.visual)}% visual (pHash) ·{" "}
-          {pct(w.classOverlap)}% class · {pct(w.viennaOverlap)}% Vienna. Verdict requires both
-          composite ≥ threshold AND sight-or-sound similarity (examiner conjunction rule) —
-          class overlap alone is not enough.
+          {pct(w.semantic)}% semantic (meaning) · {pct(w.classOverlap)}% class ·{" "}
+          {pct(w.viennaOverlap)}% Vienna. Verdict requires both composite ≥ threshold AND
+          sight, sound, or meaning similarity (examiner conjunction rule) — class overlap alone
+          is not enough.
         </p>
       </div>
       <div className="px-5 py-4 grid gap-4" style={{ gridTemplateColumns: `repeat(${scores.length}, minmax(0,1fr))` }}>
@@ -308,6 +319,7 @@ function ScorecardBand({
                   value={s.visual}
                   hint={visualConfidenceHint(s.visualConfidence)}
                 />
+                <ScoreBar label="Semantic" value={s.semantic} />
                 <ScoreBar label="Class" value={s.classOverlap} />
                 <ScoreBar label="Vienna" value={s.viennaOverlap} />
               </div>
