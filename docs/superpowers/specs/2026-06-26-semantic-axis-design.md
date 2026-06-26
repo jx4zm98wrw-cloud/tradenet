@@ -18,8 +18,18 @@ Double Metaphone). 3b-1 stored an L2-normalised 768-float32 LaBSE embedding of e
 in `trademarks.mark_embedding` (`bytea`). 3b-2 adds the **meaning** axis: cosine similarity of two
 marks' embeddings, surfacing confusion that sound/sight axes are blind to — above all cross-language
 translation equivalents IP Vietnam examiners weigh. Decisions taken at design time (2026-06-26):
-weight split `phon .30 / vis .20 / sem .15 / class .20 / vienna .15`; ship the frontend axis row with
-the engine change (no transparency gap).
+weight split `phon .35 / vis .15 / sem .15 / class .20 / vienna .15` (phonetic-protective — semantic's
+budget comes mostly from visual, keeping phonetic recall close to today, the engine's core job);
+ship the frontend axis row with the engine change (no transparency gap).
+
+**Behaviour-shift caveat (accepted, documented):** adding a weighted axis to a fixed-threshold
+weighted sum lowers composites for pairs with *no* semantic match (the common case) — e.g. golden
+case 0 (`phon .60, vis .63, sem 0`) flips `Possible → Low risk`. Headline conflicts still flag; only
+borderline sound/sight-only pairs slip. The phonetic-protective split limits this for phonetic-dominant
+pairs. **Deployment hazard:** until 3b-1's backfill has populated `mark_embedding` across the corpus,
+every pair has `sem = 0` and composites drop uniformly — **run `backfill_mark_embedding` (after
+`backfill_mark_name`) before/with the 3b-2 rollout.** Verdict-threshold recalibration is out of scope
+(a later track if recall regresses); weights remain per-matter tunable.
 
 ## Current state (what we change)
 
@@ -81,9 +91,10 @@ time** and validated by a marked test:
 
 ### 4. `composite.py` — 5-axis reweight
 
-- `DEFAULT_WEIGHTS = {"phonetic": 0.30, "visual": 0.20, "semantic": 0.15, "class": 0.20, "vienna":
-  0.15}` (sums to 1.0; 0.65 mark / 0.35 goods ratio preserved; phonetic stays dominant; semantic
-  smallest as the newest, lowest-confidence signal).
+- `DEFAULT_WEIGHTS = {"phonetic": 0.35, "visual": 0.15, "semantic": 0.15, "class": 0.20, "vienna":
+  0.15}` (sums to 1.0; 0.65 mark / 0.35 goods ratio preserved). Phonetic-protective: semantic's 0.15
+  is drawn mostly from visual (0.25→0.15), keeping phonetic (0.40→0.35) close to today so the engine's
+  core phonetic-conflict recall is least disturbed; visual and semantic tie at 0.15.
 - `composite_score(phonetic, visual, semantic, class_o, vienna_o, weights=None,
   visual_confidence="phash")` — **`semantic` inserted as the 3rd positional arg** (after visual,
   before class_o), matching the mark→goods reading order.
