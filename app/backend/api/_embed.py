@@ -42,9 +42,11 @@ def compute_mark_embeddings(texts: list[str | None], *, encoder: Encoder | None 
     each result is L2-normalised and serialised exactly as the single path does;
     None/blank inputs map to None outputs (same rule as `compute_mark_embedding`).
 
-    Byte-identical to calling `compute_mark_embedding` per text: transformer
-    sentence embeddings are independent of batch composition (masked attention +
-    masked mean-pooling ignore padding), so batching is a throughput-only change.
+    Numerically equivalent (not byte-identical) to calling `compute_mark_embedding`
+    per text: CPU batched matmul accumulates float32 in a different order than
+    batch-of-1, so a row can differ by ~1e-7 — irrelevant to the cosine the semantic
+    axis computes. Throughput-only change; mark_embedding is numerically-stable, not
+    byte-stable (the backfill may rewrite rows on re-run — encode cost is unchanged).
     """
     out: list[bytes | None] = [None] * len(texts)
     kept = [(i, t) for i, t in enumerate(texts) if t and t.strip()]
