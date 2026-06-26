@@ -5,14 +5,11 @@ from typing import Literal
 
 from .visual import VisualConfidence
 
-DEFAULT_WEIGHTS = {"phonetic": 0.40, "visual": 0.25, "class": 0.20, "vienna": 0.15}
-"""Per-matter overrides land here. The README design called for 40/30/30
-across phonetic/visual/class; adding Vienna as a 4th signal redistributes:
-phonetic stays 40 (the dominant signal in name-confusion cases),
-visual drops to 25 to make room for vienna at 15, class stays at 20.
-A trademark professional working a specific matter (e.g. pharma where
-phonetics dominate) should tune these per matter — exactly the design's
-'tunable per matter' requirement."""
+DEFAULT_WEIGHTS = {"phonetic": 0.35, "visual": 0.15, "semantic": 0.15, "class": 0.20, "vienna": 0.15}
+"""Phonetic-protective 5-axis split (Track 3b-2). Semantic's 0.15 is drawn
+mostly from visual (0.25->0.15), keeping phonetic (0.40->0.35) close to prior
+behaviour so phonetic-conflict recall is least disturbed. 0.65 mark / 0.35
+goods ratio preserved. Per-matter tunable via resolve_weights."""
 
 
 def resolve_weights(overrides: dict[str, float] | None) -> dict[str, float]:
@@ -24,8 +21,8 @@ def resolve_weights(overrides: dict[str, float] | None) -> dict[str, float]:
     validate identically.
 
     - None / empty → DEFAULT_WEIGHTS (a fresh copy).
-    - Only the four known keys (phonetic/visual/class/vienna) are honoured;
-      unknown keys are ignored and missing keys inherit their default.
+    - Only the five known keys (phonetic/visual/semantic/class/vienna) are
+      honoured; unknown keys are ignored and missing keys inherit their default.
     - Non-numeric / negative values are dropped (fall back to the default for
       that key); a non-positive total falls back entirely to DEFAULT_WEIGHTS.
     """
@@ -52,16 +49,19 @@ class CompositeScore:
 def composite_score(
     phonetic: float,
     visual: float,
+    semantic: float,
     class_o: float,
     vienna_o: float,
     weights: dict[str, float] | None = None,
     visual_confidence: VisualConfidence = "phash",
 ) -> CompositeScore:
-    """Composite conflict score + verdict.
+    """Composite conflict score + verdict across 5 axes.
 
     The composite is a sum of two contributions:
-      - mark_score    = w_phon * phonetic + w_vis * visual   (the sight-or-sound axis)
-      - goods_score   = w_class * class_o + w_vienna * vienna_o   (the goods-relatedness axis)
+      - mark_score    = w_phon*phonetic + w_vis*visual + w_sem*semantic
+                        (the sight / sound / meaning axis)
+      - goods_score   = w_class*class_o + w_vienna*vienna_o
+                        (the goods-relatedness axis)
 
     They are NOT simply added with full weight. Trademark confusion
     requires similar marks AND related goods, multiplicatively — Apple
@@ -70,18 +70,25 @@ def composite_score(
     + clearly different marks → minimal conflict score.
 
     So `goods_score` is dampened by mark strength. With no real
-    sight-or-sound signal the goods axis contributes ~0 (class overlap
-    alone can't carry a "conflict score"). At mark_strength ≥ 0.7 the
-    goods axis contributes fully.
+    sight / sound / meaning signal the goods axis contributes ~0 (class
+    overlap alone can't carry a "conflict score"). At mark_strength ≥ 0.7
+    the goods axis contributes fully.
 
       composite = mark_score + goods_score * min(1, mark_strength / 0.7)
 
-    `mark_strength` uses the same rule as the conjunction guard:
-      - `'phash'` visual: max(phonetic, visual) — they're independent signals.
-      - `'typographic'` / `'none'`: phonetic only — typographic visual is
-        JW on the same wordmark text the phonetic raw saw, not independent.
+    `semantic` (cross-language / conceptual meaning) is independent
+    evidence like a pHash visual match — a translation-equivalent pair
+    (e.g. APPLE vs POMME) can be aurally and visually unrelated yet
+    confusingly similar in meaning — so it enters `mark_strength` and
+    lets the goods axis count. `mark_strength` therefore takes the max of
+    the independent axes:
+      - `'phash'` visual: max(phonetic, semantic, visual) — all independent.
+      - `'typographic'` / `'none'`: max(phonetic, semantic) — typographic
+        visual is JW on the same wordmark text the phonetic raw saw, not
+        independent, so it does NOT enter mark_strength.
 
-    Verdict bands (applied after the math above):
+    Verdict bands (applied after the math above; UNCHANGED from the 4-axis
+    version):
       Likely:   composite >= 0.70, mark_strength >= 0.70, class >= 0.30
       Possible: composite >= 0.50, mark_strength >= 0.50, class >= 0.20
       else:     Low risk
@@ -103,12 +110,16 @@ def composite_score(
     """
     w = weights or DEFAULT_WEIGHTS
 
-    mark_score = w["phonetic"] * phonetic + w["visual"] * visual
+    mark_score = w["phonetic"] * phonetic + w["visual"] * visual + w["semantic"] * semantic
     goods_score = w["class"] * class_o + w["vienna"] * vienna_o
 
-    # Conjunction signal: pHash visual is independent evidence; typographic
-    # / none is just JW on the wordmark text and shouldn't double-count.
-    mark_strength = max(phonetic, visual) if visual_confidence == "phash" else phonetic
+    # Conjunction signal: phonetic + semantic are always independent evidence;
+    # pHash visual is too, but typographic / none is just JW on the wordmark
+    # text and shouldn't double-count.
+    candidates = [phonetic, semantic]
+    if visual_confidence == "phash":
+        candidates.append(visual)
+    mark_strength = max(candidates)
 
     # Goods-dampener ramp:
     #   mark_strength <= 0.30  → goods contribute 0 (Jaro-Winkler baseline

@@ -10,10 +10,11 @@ from .composite import DEFAULT_WEIGHTS, CompositeScore, composite_score, resolve
 from .double_metaphone import double_metaphone
 from .features import MarkFeatures, ScoreResult
 from .phonetic import normalize_vn, phonetic_similarity
+from .semantic import semantic_similarity
 from .visual import VisualConfidence, VisualScore, visual_similarity
 from .vn_phonetic import is_vietnamese, vn_phonetic_key
 
-SIMILARITY_VERSION = "1.3"
+SIMILARITY_VERSION = "1.4"
 
 __all__ = [
     "DEFAULT_WEIGHTS",
@@ -31,6 +32,7 @@ __all__ = [
     "phonetic_similarity",
     "resolve_weights",
     "score",
+    "semantic_similarity",
     "vienna_overlap",
     "visual_similarity",
     "vn_phonetic_key",
@@ -41,10 +43,11 @@ def score(a: MarkFeatures, b: MarkFeatures, *, weights: dict[str, float] | None 
     """Score one pair of marks across all axes; assemble the full ScoreResult."""
     phon = phonetic_similarity(a.mark_text, b.mark_text)
     vis = visual_similarity(a.logo_phash, b.logo_phash, a.logo_kind, b.logo_kind, a.mark_text, b.mark_text)
+    sem = semantic_similarity(a.mark_embedding, b.mark_embedding)
     class_o = class_overlap(a.nice_classes, b.nice_classes)
     vienna_o = vienna_overlap(a.vienna_codes, b.vienna_codes)
     cs = composite_score(
-        phon, vis.score, class_o, vienna_o, weights=weights, visual_confidence=vis.confidence
+        phon, vis.score, sem, class_o, vienna_o, weights=weights, visual_confidence=vis.confidence
     )
     return ScoreResult(
         composite=cs.composite,
@@ -52,6 +55,7 @@ def score(a: MarkFeatures, b: MarkFeatures, *, weights: dict[str, float] | None 
         verdict_tone=cs.verdict_tone,
         phonetic=phon,
         visual=vis.score,
+        semantic=sem,
         visual_confidence=vis.confidence,
         class_overlap=class_o,
         vienna_overlap=vienna_o,

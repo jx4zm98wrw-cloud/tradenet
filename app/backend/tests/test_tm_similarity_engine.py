@@ -27,8 +27,12 @@ def test_class_and_vienna_match_golden():
 
 def test_composite_matches_golden():
     got = [
-        [(cs := t.composite_score(p, v, c, vi, visual_confidence=vc)).composite, cs.verdict, cs.verdict_tone]
-        for p, v, c, vi, vc in COMPOSITE_CASES
+        [
+            (cs := t.composite_score(p, v, s, c, vi, visual_confidence=vc)).composite,
+            cs.verdict,
+            cs.verdict_tone,
+        ]
+        for p, v, s, c, vi, vc in COMPOSITE_CASES
     ]
     assert got == GOLDEN["composite"]
 
@@ -47,4 +51,5 @@ def test_score_assembles_result():
     b = t.MarkFeatures(mark_text="Gemy", logo_phash=None, nice_classes=["11"], vienna_codes=[])
     r = t.score(a, b)
     assert r.phonetic == t.phonetic_similarity("Gemy", "Gemy")
+    assert r.semantic == 0.0  # no embeddings -> no semantic signal
     assert r.verdict in {"Likely conflict", "Possible conflict", "Low risk"}
