@@ -24,13 +24,14 @@ from collections.abc import Sequence
 from sqlalchemy import bindparam, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from api._embed import Encoder, compute_mark_embedding
+from api._embed import Encoder, compute_mark_embeddings
 from api.db.models import Trademark
 
 log = logging.getLogger("mark_embedding.backfill")
 
 EMBED_VERSION = 1
-_CHUNK = 1000
+_CHUNK = 1000  # DB write batch (rows per UPDATE flush)
+_ENCODE_BATCH = 256  # texts per encoder call — saturates CPU vs the old batch-of-1
 
 
 async def backfill_mark_embedding(
@@ -38,8 +39,10 @@ async def backfill_mark_embedding(
 ) -> dict[str, int]:
     """Resolve + write mark_embedding for every trademark with a mark_name (or just `ids`).
 
-    Returns {"scanned": int, "updated": int, "unchanged": int}. `encoder` is passed
-    through to compute_mark_embedding (tests inject a fake; production uses LaBSE).
+    Returns {"scanned": int, "updated": int, "unchanged": int}. Rows are encoded in
+    chunks of `_ENCODE_BATCH` via compute_mark_embeddings (one encoder call per
+    chunk — batched throughput; byte-identical output to the per-row path). `encoder`
+    is passed through (tests inject a fake; production uses LaBSE).
     """
     stmt = select(
         Trademark.id,
@@ -53,17 +56,19 @@ async def backfill_mark_embedding(
     stats = {"scanned": 0, "updated": 0, "unchanged": 0}
     pending: list[dict[str, object]] = []
 
-    for row in rows:
-        stats["scanned"] += 1
-        want = compute_mark_embedding(row.mark_name, encoder=encoder)
-        if want == row.mark_embedding:
-            stats["unchanged"] += 1
-            continue
-        pending.append({"b_id": row.id, "mark_embedding": want})
-        if len(pending) >= _CHUNK:
-            await _flush(session, pending)
-            stats["updated"] += len(pending)
-            pending.clear()
+    for start in range(0, len(rows), _ENCODE_BATCH):
+        chunk = rows[start : start + _ENCODE_BATCH]
+        wants = compute_mark_embeddings([row.mark_name for row in chunk], encoder=encoder)
+        for row, want in zip(chunk, wants, strict=True):
+            stats["scanned"] += 1
+            if want == row.mark_embedding:
+                stats["unchanged"] += 1
+                continue
+            pending.append({"b_id": row.id, "mark_embedding": want})
+            if len(pending) >= _CHUNK:
+                await _flush(session, pending)
+                stats["updated"] += len(pending)
+                pending.clear()
 
     if pending:
         await _flush(session, pending)

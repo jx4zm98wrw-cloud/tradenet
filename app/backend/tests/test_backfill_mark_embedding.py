@@ -13,6 +13,7 @@ import pytest_asyncio
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from api._embed import compute_mark_embedding
 from api.db import Gazette, GazetteStatus, GazetteType, RecordType, Trademark
 from api.settings import get_settings
 from scripts.backfill_mark_embedding import backfill_mark_embedding
@@ -20,6 +21,7 @@ from scripts.backfill_mark_embedding import backfill_mark_embedding
 _GZ = uuid.UUID("e3000000-0000-4000-8000-0000000000e1")
 _WITH = uuid.UUID("e3000000-0000-4000-8000-0000000000e2")
 _WITHOUT = uuid.UUID("e3000000-0000-4000-8000-0000000000e3")
+_M = [uuid.UUID(f"e3000000-0000-4000-8000-0000000000{n:02x}") for n in range(0xA0, 0xA3)]
 _DIM = 768
 
 
@@ -96,4 +98,39 @@ async def test_backfill_sets_idempotent_and_skips_null_name():
         stats2 = await backfill_mark_embedding(s, ids=[_WITH, _WITHOUT], encoder=_fake_encoder)
         assert stats2["updated"] == 0  # idempotent
         assert stats2["unchanged"] == 1
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_backfill_chunks_preserve_order_across_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Force multiple encode chunks (3 rows, batch of 2) so the chunk loop must
+    # stitch results back to the right rows. Each row's stored bytes must equal
+    # the single-text embedding of its OWN name — proving order preservation.
+    monkeypatch.setattr("scripts.backfill_mark_embedding._ENCODE_BATCH", 2)
+    names = ["ALPHA", "BRAVO", "CHARLIE"]
+    engine = create_async_engine(get_settings().database_url)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    async with Session() as s:
+        for mid, name in zip(_M, names, strict=True):
+            s.add(
+                Trademark(
+                    id=mid,
+                    gazette_id=_GZ,
+                    record_type=RecordType.A,
+                    application_number=f"EM-{name}",
+                    mark_name=name,
+                    publication_date_441=date(2099, 1, 1),
+                )
+            )
+        await s.commit()
+
+        stats = await backfill_mark_embedding(s, ids=list(_M), encoder=_fake_encoder)
+        assert stats == {"scanned": 3, "updated": 3, "unchanged": 0}
+        for mid, name in zip(_M, names, strict=True):
+            row = (await s.execute(select(Trademark).where(Trademark.id == mid))).scalar_one()
+            assert row.mark_embedding == compute_mark_embedding(name, encoder=_fake_encoder)
+
+    async with Session() as s:
+        stats2 = await backfill_mark_embedding(s, ids=list(_M), encoder=_fake_encoder)
+        assert stats2 == {"scanned": 3, "updated": 0, "unchanged": 3}  # idempotent across chunks
     await engine.dispose()
