@@ -105,7 +105,7 @@ function TextSearchInput({
     ? "Sound-alike: NEUREX, NEUR*, *FAX… (Soundex / Metaphone applied automatically)"
     : mode === "vienna"
     ? "Vienna codes e.g. 02.01.01, 26.01.18 (separate with comma or space)"
-    : "Trademark name, applicant, mark, application number…";
+    : "Trademark name, mark, application number…";
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
@@ -119,15 +119,6 @@ function TextSearchInput({
         placeholder={placeholder}
         className="flex-1 bg-transparent outline-none text-[15px] text-ink placeholder:text-mute mx-3"
       />
-      {mode === "text" && (
-        <div className="hidden md:flex items-center gap-1.5 shrink-0">
-          {["applicant:", "class:", "agent:"].map((k) => (
-            <span key={k} className="font-mono text-[11px] bg-paper-3 border border-line rounded px-1.5 py-0.5 text-mute">
-              {k}
-            </span>
-          ))}
-        </div>
-      )}
     </form>
   );
 }
