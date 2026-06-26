@@ -267,7 +267,7 @@ def test_composite_possible_conflict_threshold() -> None:
     """Moderate phonetic + good class overlap = warrants attorney review."""
     c = composite_score(phonetic=0.7, visual=0.6, semantic=0.0, class_o=1.0, vienna_o=0.0)
     # boosted (phash, visual>=0.50): mark = 0.3043*0.7 + 0.2609*0.6 = 0.369
-    # goods = 0.1739*1.0 = 0.174; composite = 0.544 (still Possible band)
+    # goods = 0.1739*1.0 = 0.174; composite = 0.543 (still Possible band)
     assert 0.50 <= c.composite < 0.70
     assert c.verdict == "Possible conflict"
 
