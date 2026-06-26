@@ -1,0 +1,27 @@
+[project]
+name = "tnqa"
+version = "0.1.0"
+description = "Tradenet Search — standalone self-running QA suite (plug-in/plug-out, zero app coupling)"
+requires-python = ">=3.11"
+# Deliberately minimal + self-contained. This module talks to the app ONLY over
+# HTTP (httpx) and to Postgres READ-ONLY for ground truth (psycopg). It never
+# imports api/worker/app code. Delete the qa/ tree and the app is unchanged.
+dependencies = [
+    "httpx>=0.27",
+    "pyyaml>=6.0",
+    "psycopg[binary]>=3.2",
+]
+
+[project.scripts]
+tnqa = "tnqa.run:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
