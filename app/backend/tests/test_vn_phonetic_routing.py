@@ -29,7 +29,7 @@ def test_foreign_pair_unchanged_metaphone_path():
 
 
 def test_version_bumped():
-    assert t.SIMILARITY_VERSION == "1.4"
+    assert t.SIMILARITY_VERSION == "1.5"
 
 
 def test_new_symbols_exported():
