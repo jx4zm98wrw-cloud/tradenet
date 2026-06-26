@@ -387,7 +387,13 @@ it (its source `mark_name` is itself backfill-derived): **run it after
 `mark_name`/`vn_grant_date`/entity-clean). The feature store is consumed by the
 **Track 3b-2 semantic axis** (below), which reads the stored vector into
 `MarkFeatures` and does pure cosine. `sentence-transformers` is a backfill-only
-dependency (pulls in torch; grows the worker image — accepted). See
+dependency (pulls in torch; grows the worker image — accepted). The backfill
+**batch-encodes** marks (configurable `_ENCODE_BATCH`, default 256, per encoder
+call instead of one-at-a-time) to saturate the CPU — a throughput-only change
+(~4h→<1h full-corpus run); `api/_embed.py:compute_mark_embedding` now delegates
+to a batch `compute_mark_embeddings`, output bytes are unchanged (`EMBED_VERSION`
+still 1, existing embeddings stay valid), and batch==single byte-equivalence is
+enforced by a marked real-model test. See
 `docs/superpowers/specs/2026-06-25-mark-embedding-infrastructure-design.md`.
 
 ### Semantic axis (Track 3b-2)
