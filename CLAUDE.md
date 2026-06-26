@@ -368,8 +368,12 @@ backfill after a fresh ingest/enrichment.** Serialized on `TrademarkOut`, so
 search/cmdk/compare/exports/watchlists/today all get it with no per-payload
 join. The frontend `markDisplay` (`lib/mark-display.ts`) resolves the wordmark
 as `markText ?? mark_name ?? mark_sample` and renders `"(figurative mark)"`
-(never the applicant) when none exists. Display-only: search ranking still
-matches `mark_sample`/`applicant_name` (`search.py`). See
+(never the applicant) when none exists. Search now ALSO recalls + ranks on
+`mark_name` (augmenting `mark_sample`/`applicant_name` in `build_trademark_where` +
+`search.py`, backed by GIN-trgm + dmetaphone indexes on `lower(mark_name)`, migration
+`20260626_0032`), so a mark found only by its resolved display name (e.g. `Joshida`,
+empty `mark_sample`) is no longer missed. Augment (not swap) keeps fresh-ingest marks
+(NULL `mark_name`) searchable via `mark_sample`. See
 `docs/superpowers/specs/2026-06-24-mark-name-resolution-design.md`.
 
 ### Mark embedding feature store (Track 3b-1)
