@@ -2,8 +2,12 @@
 
 import * as React from "react";
 import { Icon } from "@/components/icons";
-import { FilterChip } from "@/components/ui";
+import { FilterChip, IconButton } from "@/components/ui";
 import { type SearchMode, type NiceMode } from "@/lib/api";
+
+/** Step the similarity threshold by `d`, rounded to 2 decimals and clamped to [0, 1]. */
+const stepThreshold = (v: number, d: number): number =>
+  Math.min(1, Math.max(0, Math.round((v + d) * 100) / 100));
 
 /** Search query band — full-width white surface above the body grid.
  *  Mode tabs · input row (text / image / vienna) · similarity slider · filter chips. */
@@ -295,13 +299,29 @@ function Extras({
     <div className="mt-3 flex items-center gap-4 flex-wrap">
       <div className="flex items-center gap-2 text-xs">
         <span className="text-mute">Similarity ≥</span>
+        <IconButton
+          title="Lower threshold by 5%"
+          aria-label="Lower similarity threshold"
+          disabled={threshold <= 0}
+          onClick={() => onThresholdChange(stepThreshold(threshold, -0.05))}
+        >
+          −
+        </IconButton>
         <input
           type="range"
-          min={0.4} max={0.99} step={0.01}
+          min={0} max={1} step={0.01}
           value={threshold}
           onChange={(e) => onThresholdChange(parseFloat(e.target.value))}
           className="w-40 accent-stamp"
         />
+        <IconButton
+          title="Raise threshold by 5%"
+          aria-label="Raise similarity threshold"
+          disabled={threshold >= 1}
+          onClick={() => onThresholdChange(stepThreshold(threshold, 0.05))}
+        >
+          +
+        </IconButton>
         <span className="font-mono font-semibold text-stamp tabular w-9 text-right">
           {Math.round(threshold * 100)}%
         </span>
