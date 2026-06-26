@@ -51,13 +51,15 @@ of `composite_score`, before the `mark_score` math:
 
 ```python
 PHASH_VISUAL_BOOST = 2.0
-"""A genuine perceptual (pHash) visual match is independent evidence; a
-typographic visual is JW on the wordmark text, correlated with phonetic. Boost
-the visual weight ONLY for pHash-confidence pairs, then renormalise the five
-weights for this pair. Typographic / none are unchanged."""
+PHASH_BOOST_FLOOR = 0.50
+"""A genuine perceptual (pHash) *match* is independent evidence; a typographic
+visual is JW on the wordmark text, correlated with phonetic. Boost the visual
+weight ONLY when the visual signal is a pHash comparison AND that comparison
+actually matched (`visual >= PHASH_BOOST_FLOOR`), then renormalise the five
+weights for this pair. Typographic / none, and pHash non-matches, are unchanged."""
 
 w = weights or DEFAULT_WEIGHTS
-if visual_confidence == "phash":
+if visual_confidence == "phash" and visual >= PHASH_BOOST_FLOOR:
     w = dict(w)                       # copy: never mutate the caller's / module-global weights
     w["visual"] *= PHASH_VISUAL_BOOST
     total = sum(w.values())
@@ -86,9 +88,13 @@ the verdict bands — is **byte-identical** to v1.4.
   LIPITOR/LIPITAR at visual 0.675) *further* below threshold pre-backfill — the opposite of the
   recall goal. The minor double-counting of typographic visual with phonetic is accepted; recall
   protection wins. Only `"phash"` is boosted; `"typographic"` and `"none"` are unchanged.
-- **No gating threshold (YAGNI).** A *weak* pHash match (e.g. 0.25) times a boosted weight is
-  still a small contribution → no spurious verdict change. The boost is on the weight, so low
-  scores stay low. No minimum-score tunable is introduced.
+- **Gated on the visual SCORE, not just confidence (`PHASH_BOOST_FLOOR = 0.50`).** The boost
+  rewards a real perceptual *match*. Gating matters in BOTH directions: a weak pHash score times a
+  boosted weight can't manufacture a spurious flag (the score stays low), but — the case that
+  forces the gate — boosting the weight of a *low-scoring* visual axis would **steal weight from
+  phonetic**, diluting a strong name match. A figurative-classified pair that shares a name but not
+  a logo (`phonetic` high, `visual ≈ 0`, confidence `phash`) would otherwise lose recall. Below the
+  floor, weights are left exactly as v1.4. The floor matches the "Possible" mark-signal threshold.
 
 ### Behavioral impact (boost = 2.0 → visual 0.15 → ~0.26 effective after renorm)
 
@@ -130,12 +136,16 @@ point of the design.
 3. **Other pHash scenarios unchanged in verdict:** the existing pHash guard test and the all-strong
    Likely test keep their verdicts (composite numbers rise slightly; update the inline arithmetic
    comments / any asserted composite value).
-4. **Per-matter compose:** a watchlist with a custom (e.g. visual-light) weight set still receives a
+4. **Per-matter compose:** a watchlist with a custom (e.g. visual-heavy) weight set still receives a
    *proportional* phash boost — the multiplier composes with `resolve_weights` output, not just
-   `DEFAULT_WEIGHTS`.
-5. **Golden regen:** regenerate only the pHash-confidence entries in `tests/fixtures/similarity_golden.json`
+   `DEFAULT_WEIGHTS` (custom visual-heavy phash 0.707 vs the same pair typographic 0.38).
+5. **Floor guard (no dilution):** a pHash-confidence pair whose visual score is below the floor is
+   NOT boosted — the existing `test_composite_per_matter_weights_override` (phon 1.0, visual 0.0,
+   phash-default) stays **0.85 / Likely**, proving a perceptual non-match does not steal weight from
+   phonetic. (Without the floor this test would drop to 0.773.)
+6. **Golden regen:** regenerate only the pHash-confidence entries in `tests/fixtures/similarity_golden.json`
    / `COMPOSITE_CASES`; typographic / none goldens stay byte-identical.
-6. **Version-pin tests (explicitly in scope — do not let targeted pytest miss them):**
+7. **Version-pin tests (explicitly in scope — do not let targeted pytest miss them):**
    `tests/test_double_metaphone.py::test_version_and_export` and
    `tests/test_vn_phonetic_routing.py::test_version_bumped` pin `SIMILARITY_VERSION` and must move
    `1.4` → `1.5`. These are the exact files a targeted run missed during the 3b-2 CI pass; the plan
@@ -168,10 +178,11 @@ are figurative/nameless with semantic 0 anyway).
 
 ## Decomposition (for the plan)
 
-1. **`composite.py`**: add `PHASH_VISUAL_BOOST` + the confidence-gated copy-on-write boost/renorm
-   block; verdict/`mark_strength`/dampener untouched. Unit tests: figurative-twin flip to Possible,
-   pHash guard/all-strong verdicts stable, copy-on-write does not mutate `DEFAULT_WEIGHTS`,
-   per-matter custom weights boosted proportionally.
+1. **`composite.py`**: add `PHASH_VISUAL_BOOST` + `PHASH_BOOST_FLOOR` + the score-gated
+   copy-on-write boost/renorm block; verdict/`mark_strength`/dampener untouched. Unit tests:
+   figurative-twin flip to Possible, pHash guard/all-strong verdicts stable, copy-on-write does not
+   mutate `DEFAULT_WEIGHTS`, per-matter custom weights boosted proportionally, and a pHash pair with
+   visual below the floor is NOT boosted (no dilution).
 2. **Sound-alike regression guards**: assert LIPITOR (0.425/Low) and MONTINIS (0.669/Possible) are
    byte-identical to v1.4.
 3. **Goldens + version**: regenerate pHash golden entries; bump `SIMILARITY_VERSION` to `1.5`;
