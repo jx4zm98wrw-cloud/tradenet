@@ -17,6 +17,7 @@ from api.settings import get_settings
 
 _GZ = uuid.UUID("e0000000-0000-4000-8000-0000000000c1")
 _MARK1 = uuid.UUID("e0000000-0000-4000-8000-0000000000c2")
+_MARK2 = uuid.UUID("e0000000-0000-4000-8000-0000000000c3")
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -52,6 +53,19 @@ async def seed() -> AsyncIterator[None]:
                 publication_date_441=date(2099, 1, 1),
             )
         )
+        # Fresh-ingest mark: has a wordmark but its mark_name hasn't been backfilled yet.
+        s.add(
+            Trademark(
+                id=_MARK2,
+                gazette_id=_GZ,
+                record_type=RecordType.A,
+                application_number="MN-2099-2",
+                mark_sample="FRESHWIDGET",
+                mark_name=None,
+                applicant_name="ACME CO",
+                publication_date_441=date(2099, 1, 1),
+            )
+        )
         await s.commit()
     yield
     async with Session() as s:
@@ -70,3 +84,39 @@ async def test_search_serializes_mark_name(client: AsyncClient) -> None:
     assert r.status_code == 200
     hit = next(it for it in r.json()["items"] if it["mark"]["application_number"] == "MN-2099-1")
     assert hit["mark"]["mark_name"] == "TRADAGUI"
+
+
+@pytest.mark.asyncio
+async def test_text_search_finds_mark_name_only_mark(client: AsyncClient) -> None:
+    # TRADAGUI lives only in mark_name (mark_sample is NULL, applicant has no "tradagui").
+    # Before this fix the search indexed only mark_sample/applicant_name → 0 hits.
+    r = await client.get(
+        "/api/v1/search/trademarks",
+        params={"q": "tradagui", "mode": "text", "threshold": 0.4, "gazette_id": str(_GZ), "limit": 50},
+    )
+    assert r.status_code == 200
+    appnos = [it["mark"]["application_number"] for it in r.json()["items"]]
+    assert "MN-2099-1" in appnos
+
+
+@pytest.mark.asyncio
+async def test_phonetic_search_finds_mark_name_only_mark(client: AsyncClient) -> None:
+    r = await client.get(
+        "/api/v1/search/trademarks",
+        params={"q": "tradagui", "mode": "phonetic", "threshold": 0.4, "gazette_id": str(_GZ), "limit": 50},
+    )
+    assert r.status_code == 200
+    appnos = [it["mark"]["application_number"] for it in r.json()["items"]]
+    assert "MN-2099-1" in appnos
+
+
+@pytest.mark.asyncio
+async def test_text_search_still_finds_mark_sample_only_mark(client: AsyncClient) -> None:
+    # Augment, not swap: a fresh-ingest mark (mark_sample set, mark_name NULL) must still be found.
+    r = await client.get(
+        "/api/v1/search/trademarks",
+        params={"q": "freshwidget", "mode": "text", "threshold": 0.4, "gazette_id": str(_GZ), "limit": 50},
+    )
+    assert r.status_code == 200
+    appnos = [it["mark"]["application_number"] for it in r.json()["items"]]
+    assert "MN-2099-2" in appnos
