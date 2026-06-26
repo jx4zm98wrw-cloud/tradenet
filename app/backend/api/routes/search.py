@@ -242,9 +242,11 @@ async def search_trademarks(
         ql = q.lower()
         # Recall = trigram-similar OR same Double-Metaphone code. The dmetaphone
         # equality path catches sound-alikes that share no trigram with the query
-        # but encode to the same phonemes (the pure-trigram recall gap). Both
-        # paths are index-backed (GIN trgm + btree dmetaphone from migrations
-        # 0012/0013); the Python engine reranks the union precisely.
+        # but encode to the same phonemes (the pure-trigram recall gap). The
+        # mark_sample / applicant_name arms are index-backed (GIN trgm + btree
+        # dmetaphone from migrations 0012/0013); the mark_name arms get their
+        # matching GIN-trgm + dmetaphone indexes from migration 0032. The Python
+        # engine reranks the union precisely.
         dmeta_q = func.dmetaphone(ql)
         recall_clauses = [
             *where,
@@ -257,9 +259,10 @@ async def search_trademarks(
                 func.dmetaphone(func.lower(Trademark.mark_name)) == dmeta_q,
             ),
         ]
-        # Best trigram similarity across either target column. A NULL column
-        # yields NULL similarity, which greatest() skips — so A-files (no
-        # mark_sample) rank purely on applicant_name and vice-versa.
+        # Best trigram similarity across all three target columns (mark_sample /
+        # mark_name / applicant_name). A NULL column yields NULL similarity, which
+        # greatest() skips — so an A-file with no mark_sample still ranks on
+        # whichever of mark_name / applicant_name is populated.
         trgm_rank = func.greatest(
             func.similarity(func.lower(Trademark.mark_sample), ql),
             func.similarity(func.lower(Trademark.applicant_name), ql),
