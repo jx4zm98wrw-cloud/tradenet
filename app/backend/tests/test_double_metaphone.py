@@ -68,5 +68,5 @@ def test_vn_pair_unchanged_by_track3a():
 
 
 def test_version_and_export():
-    assert t.SIMILARITY_VERSION == "1.4"
+    assert t.SIMILARITY_VERSION == "1.5"
     assert t.double_metaphone("THOMAS") == ("TMS", "")

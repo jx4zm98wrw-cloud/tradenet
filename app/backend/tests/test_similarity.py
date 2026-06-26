@@ -256,10 +256,8 @@ def test_composite_likely_conflict_threshold() -> None:
     """All four signals strong → 'Likely conflict' (examiner would cite
     this in an office action)."""
     c = composite_score(phonetic=1.0, visual=0.8, semantic=0.0, class_o=1.0, vienna_o=0.5)
-    # mark_score = 0.35*1.0 + 0.15*0.8 + 0.15*0 = 0.47
-    # goods      = 0.20*1.0 + 0.15*0.5 = 0.275
-    # mark_strength 1.0 → goods_factor 1.0
-    # composite = 0.47 + 0.275 = 0.745
+    # boosted (phash, visual>=0.50): mark = 0.3043*1.0 + 0.2609*0.8 = 0.513
+    # goods = 0.1739*1.0 + 0.1304*0.5 = 0.239; composite = 0.752
     assert c.composite >= 0.70
     assert c.verdict == "Likely conflict"
     assert c.verdict_tone == "stamp"
@@ -268,10 +266,8 @@ def test_composite_likely_conflict_threshold() -> None:
 def test_composite_possible_conflict_threshold() -> None:
     """Moderate phonetic + good class overlap = warrants attorney review."""
     c = composite_score(phonetic=0.7, visual=0.6, semantic=0.0, class_o=1.0, vienna_o=0.0)
-    # mark_score = 0.35*0.7 + 0.15*0.6 = 0.335
-    # goods      = 0.20*1.0 = 0.20
-    # mark_strength 0.7 → goods_factor 1.0
-    # composite = 0.335 + 0.20 = 0.535
+    # boosted (phash, visual>=0.50): mark = 0.3043*0.7 + 0.2609*0.6 = 0.369
+    # goods = 0.1739*1.0 = 0.174; composite = 0.543 (still Possible band)
     assert 0.50 <= c.composite < 0.70
     assert c.verdict == "Possible conflict"
 
@@ -314,7 +310,7 @@ def test_composite_conjunction_guard_class_too_low() -> None:
     conflict. Identical names in unrelated industries (APPLE Records vs
     APPLE Computer in 1976) don't legally confuse consumers."""
     c = composite_score(phonetic=1.0, visual=1.0, semantic=0.0, class_o=0.0, vienna_o=0.0)
-    # class_o=0 → goods=0, so composite = mark_score = 0.35*1.0 + 0.15*1.0 = 0.50
+    # boosted (phash, visual>=0.50): class_o=0 → goods=0, composite = mark = 0.3043*1.0 + 0.2609*1.0 = 0.565
     # composite meets the 0.50 band and mark_strength 1.0 >= 0.50,
     # BUT the class guard (class_o >= 0.20) fails → Low risk
     assert c.verdict == "Low risk"
@@ -407,18 +403,12 @@ def test_composite_figurative_phash_visual_alone_is_low_risk() -> None:
     assert c.verdict == "Low risk"
 
 
-def test_composite_figurative_phash_visual_with_shared_vienna_now_low_after_reweight() -> None:
-    """The genuine figurative-look-alike case: two nameless marks with
-    near-identical logos (pHash visual ~0.95) that ALSO share Vienna codes —
-    which is the norm, since Vienna codes ARE the classification of a mark's
-    figurative elements, so real visual twins almost always share them.
-
-    Under the v1.4 phonetic-protective reweight (visual 0.25 → 0.15) this
-    sight-only pair — no phonetic and no semantic signal — dropped from
-    0.587 to 0.492, just under the 0.50 floor → now 'Low risk'. This is the
-    documented "borderline sight-only pair slips" behaviour shift from the
-    weight reallocation: with the visual axis carrying less weight, a pair
-    with nothing but visual + vienna no longer clears the Possible band."""
+def test_composite_figurative_phash_twin_flags_possible_after_3c_boost() -> None:
+    """A nameless figurative look-alike: near-identical logo (pHash 0.95) sharing
+    Vienna codes, no transcribed name (phonetic/semantic 0). Under v1.4 the flat
+    0.15 visual weight sank it to 0.492 (Low). Track 3c boosts a genuine pHash
+    match's visual weight x2 (renormalised), lifting the composite to 0.552 ->
+    Possible. Sight-only, so Possible (not Likely) is the correct severity."""
     c = composite_score(
         phonetic=0.0,
         visual=0.95,
@@ -427,11 +417,12 @@ def test_composite_figurative_phash_visual_with_shared_vienna_now_low_after_rewe
         vienna_o=1.0,
         visual_confidence="phash",
     )
-    # mark_score = 0.15*0.95 = 0.1425
-    # goods = 0.20*1.0 + 0.15*1.0 = 0.35
-    # mark_strength 0.95 (phash) → goods_factor 1.0
-    # composite = 0.1425 + 0.35 = 0.492 < 0.50 → Low risk
-    assert c.verdict == "Low risk"
+    # boosted weights (visual 0.15*2=0.30, renorm /1.15): visual 0.2609
+    # mark = 0.2609*0.95 = 0.248; goods = 0.1739*1.0 + 0.1304*1.0 = 0.304
+    # mark_strength 0.95 (phash) -> goods_factor 1.0; composite = 0.248 + 0.304 = 0.552
+    assert c.composite == pytest.approx(0.552)
+    assert c.verdict == "Possible conflict"
+    assert c.verdict_tone == "warn"
 
 
 def test_phash_visual_does_satisfy_conjunction_guard() -> None:
@@ -529,3 +520,52 @@ def test_goods_dampener_pharma_shared_dominant_word_slips_to_low_after_reweight(
     # goods = 0.20*0.643 = 0.129
     # composite = 0.296 + 0.129 = 0.425 < 0.50 → Low risk
     assert c.verdict == "Low risk"
+
+
+def test_phash_below_floor_does_not_boost_or_dilute() -> None:
+    """A pHash comparison that did NOT match (visual < PHASH_BOOST_FLOOR) must not
+    boost the visual weight — otherwise it would steal weight from phonetic. A pair
+    with a strong name (phonetic 1.0) but dissimilar logos (visual 0.0, phash) keeps
+    its v1.4 composite."""
+    c = composite_score(
+        phonetic=1.0, visual=0.0, semantic=0.0, class_o=1.0, vienna_o=0.0, visual_confidence="phash"
+    )
+    # visual 0.0 < 0.50 floor -> no boost -> v1.4 weights:
+    # mark = 0.35*1.0 = 0.35; goods = 0.20*1.0 = 0.20; composite = 0.55
+    assert c.composite == pytest.approx(0.55)
+    assert c.verdict == "Possible conflict"
+
+
+def test_phash_boost_does_not_mutate_default_weights() -> None:
+    """The boost copies weights before scaling; DEFAULT_WEIGHTS (the module global
+    used when weights is None) must be unchanged after a phash score."""
+    before = dict(DEFAULT_WEIGHTS)
+    composite_score(
+        phonetic=0.0, visual=0.95, semantic=0.0, class_o=1.0, vienna_o=0.0, visual_confidence="phash"
+    )
+    assert before == DEFAULT_WEIGHTS
+    assert DEFAULT_WEIGHTS["visual"] == 0.15
+
+
+def test_phash_boost_composes_with_per_matter_weights() -> None:
+    """The boost is a multiplier on whatever base weights apply — including a
+    watchlist override — not a fixed weight. A visual-heavy matter's phash pair
+    scores far above the same pair scored typographic."""
+    custom = {"phonetic": 0.20, "visual": 0.40, "semantic": 0.0, "class": 0.25, "vienna": 0.15}
+    phash = composite_score(0.1, 0.90, 0.0, 1.0, 0.0, weights=custom, visual_confidence="phash")
+    typo = composite_score(0.1, 0.90, 0.0, 1.0, 0.0, weights=custom, visual_confidence="typographic")
+    assert phash.composite == pytest.approx(0.707)
+    assert typo.composite == pytest.approx(0.38)
+    assert phash.composite > typo.composite
+
+
+def test_typographic_soundalikes_unchanged_by_3c() -> None:
+    """Regression guard: sound-alike pairs are typographic, so Track 3c must leave
+    them byte-identical to v1.4 — LIPITOR/LIPITAR stays Low, MONTINIS/MONTANIS
+    stays Possible. This is the whole point of gating on confidence."""
+    lipitor = composite_score(0.557, 0.675, 0.0, 1.0, 0.0, visual_confidence="typographic")
+    montinis = composite_score(0.945, 0.921, 0.0, 1.0, 0.0, visual_confidence="typographic")
+    assert lipitor.composite == pytest.approx(0.425)
+    assert lipitor.verdict == "Low risk"
+    assert montinis.composite == pytest.approx(0.669)
+    assert montinis.verdict == "Possible conflict"

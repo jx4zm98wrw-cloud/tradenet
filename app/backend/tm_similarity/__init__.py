@@ -14,7 +14,7 @@ from .semantic import semantic_similarity
 from .visual import VisualConfidence, VisualScore, visual_similarity
 from .vn_phonetic import is_vietnamese, vn_phonetic_key
 
-SIMILARITY_VERSION = "1.4"
+SIMILARITY_VERSION = "1.5"
 
 __all__ = [
     "DEFAULT_WEIGHTS",

@@ -423,6 +423,21 @@ is 1.1. **Re-run `scripts/backfill_logo_kind.py` after a fresh ingest** (same ca
 as logo_phash / mark_name / vn_grant_date). See
 `docs/superpowers/specs/2026-06-25-visual-axis-routing-recalibration-design.md`.
 
+### Confidence-aware visual weight (Track 3c)
+
+**Track 3c:** the visual axis weight is now confidence-aware. In
+`tm_similarity/composite.py`, when `visual_confidence == "phash"` AND the visual
+score is a real match (`visual >= PHASH_BOOST_FLOOR`, 0.50), the visual weight is
+multiplied by `PHASH_VISUAL_BOOST` (2.0 → 0.15 to ~0.26 effective after per-pair
+renormalisation); typographic / none, and pHash non-matches, are unchanged. This
+closes the permanent figurative-twin recall gap from 3b-2 (a nameless near-identical
+logo: Low → Possible, composite 0.492 → 0.552) without touching sound-alike recall
+(LIPITOR/LIPITAR and MONTINIS/MONTANIS are byte-identical, being typographic). The
+score-floor gate prevents a low-scoring pHash axis from stealing weight from
+phonetic. `mark_strength`, the goods dampener, and the verdict bands are unchanged.
+SIMILARITY_VERSION is 1.5. **Schema-free** — engine-only, no column/migration/route/
+frontend change. See `docs/superpowers/specs/2026-06-26-confidence-aware-visual-weight-design.md`.
+
 ### Phonetic axis routing (Track 2)
 
 **Track 2 (phonetic axis):** the 30% phonetic sub-component is now

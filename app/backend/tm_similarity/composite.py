@@ -11,6 +11,15 @@ mostly from visual (0.25->0.15), keeping phonetic (0.40->0.35) close to prior
 behaviour so phonetic-conflict recall is least disturbed. 0.65 mark / 0.35
 goods ratio preserved. Per-matter tunable via resolve_weights."""
 
+PHASH_VISUAL_BOOST = 2.0
+PHASH_BOOST_FLOOR = 0.50
+"""Track 3c: a genuine perceptual (pHash) *match* is independent evidence and is
+weighted more than a text-derived typographic visual. Boost the visual weight only
+when the visual signal is a pHash comparison AND that comparison actually matched
+(`visual >= PHASH_BOOST_FLOOR`), then renormalise the five weights for this pair.
+Gating on the score (not just confidence) matters: boosting a low-scoring visual
+axis would steal weight from phonetic and dilute a strong name match."""
+
 
 def resolve_weights(overrides: dict[str, float] | None) -> dict[str, float]:
     """Merge per-matter weight overrides over DEFAULT_WEIGHTS and renormalise to 1.
@@ -109,6 +118,13 @@ def composite_score(
     visually misleading.
     """
     w = weights or DEFAULT_WEIGHTS
+    if visual_confidence == "phash" and visual >= PHASH_BOOST_FLOOR:
+        # Real perceptual match: weight the independent visual evidence higher,
+        # then renormalise. Copy first — never mutate the caller's / module-global dict.
+        w = dict(w)
+        w["visual"] *= PHASH_VISUAL_BOOST
+        total = sum(w.values())
+        w = {k: v / total for k, v in w.items()}
 
     mark_score = w["phonetic"] * phonetic + w["visual"] * visual + w["semantic"] * semantic
     goods_score = w["class"] * class_o + w["vienna"] * vienna_o
