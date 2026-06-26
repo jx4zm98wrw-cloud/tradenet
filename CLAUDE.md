@@ -368,13 +368,17 @@ backfill after a fresh ingest/enrichment.** Serialized on `TrademarkOut`, so
 search/cmdk/compare/exports/watchlists/today all get it with no per-payload
 join. The frontend `markDisplay` (`lib/mark-display.ts`) resolves the wordmark
 as `markText ?? mark_name ?? mark_sample` and renders `"(figurative mark)"`
-(never the applicant) when none exists. Search now ALSO recalls + ranks on
-`mark_name` (augmenting `mark_sample`/`applicant_name` in `build_trademark_where` +
+(never the applicant) when none exists. Search recalls + ranks on the resolved
+mark name (`mark_sample`/`mark_name`) + the ID numbers in `build_trademark_where` +
 `search.py`, backed by GIN-trgm + dmetaphone indexes on `lower(mark_name)`, migration
-`20260626_0032`), so a mark found only by its resolved display name (e.g. `Joshida`,
+`20260626_0032`, so a mark found only by its resolved display name (e.g. `Joshida`,
 empty `mark_sample`) is no longer missed. Augment (not swap) keeps fresh-ingest marks
-(NULL `mark_name`) searchable via `mark_sample`. See
-`docs/superpowers/specs/2026-06-24-mark-name-resolution-design.md`.
+(NULL `mark_name`) searchable via `mark_sample`. The default free-text `q` is
+**mark-only**: it does NOT match `applicant_name` (dropped from the text + phonetic
+`q` paths) — applicant/class/agent filtering is via the left-sidebar facet params
+(`applicant`/`nice_class`/`ip_agency`), not the search box. See
+`docs/superpowers/specs/2026-06-24-mark-name-resolution-design.md` and
+`docs/superpowers/specs/2026-06-26-search-applicant-prefix-design.md`.
 
 ### Mark embedding feature store (Track 3b-1)
 
