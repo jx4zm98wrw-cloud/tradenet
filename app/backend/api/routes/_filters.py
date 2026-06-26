@@ -107,6 +107,7 @@ def build_trademark_where(
             or_(
                 func.lower(Trademark.applicant_name).like(like),
                 func.lower(Trademark.mark_sample).like(like),
+                func.lower(Trademark.mark_name).like(like),
                 Trademark.application_number.ilike(like),
                 Trademark.certificate_number.ilike(like),
                 Trademark.madrid_number.ilike(like),

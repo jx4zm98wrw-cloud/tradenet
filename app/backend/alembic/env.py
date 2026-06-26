@@ -27,8 +27,10 @@ target_metadata = Base.metadata
 _MANUAL_INDEXES = {
     "ix_trademarks_mark_sample_trgm",
     "ix_trademarks_applicant_name_trgm",
+    "ix_trademarks_mark_name_trgm",
     "ix_trademarks_mark_sample_dmeta",
     "ix_trademarks_applicant_name_dmeta",
+    "ix_trademarks_mark_name_dmeta",
     "ix_trademarks_mark_category",
     "ix_trademarks_lineage_key",
     "ix_madrid_records_designated_countries",

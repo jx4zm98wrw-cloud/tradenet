@@ -94,7 +94,7 @@ def _score(
         # fall back to applicant_name only when there's literally no
         # wordmark (most A-files lack mark_sample but have applicants).
         # No jitter — the real signal carries its own ordering.
-        target = mark.mark_sample or mark.applicant_name
+        target = mark.mark_sample or mark.mark_name or mark.applicant_name
         return round(phonetic_similarity(q, target), 3)
 
     if mode == "vienna" and vienna_query:
@@ -128,8 +128,16 @@ def _score(
     base = 0.6
     if q:
         ql = q.lower()
-        wordmark = (mark.mark_sample or "").lower()
-        bag = wordmark + " " + (mark.applicant_name or "").lower()
+        wordmark = (mark.mark_sample or mark.mark_name or "").lower()
+        bag = " ".join(
+            t
+            for t in (
+                (mark.mark_sample or "").lower(),
+                (mark.mark_name or "").lower(),
+                (mark.applicant_name or "").lower(),
+            )
+            if t
+        )
         # ID/number fields are matched by build_trademark_where too (application
         # / certificate / madrid number). A query that hits one is an identifier
         # lookup, not a fuzzy name match — score it as strong as a wordmark hit
@@ -234,25 +242,31 @@ async def search_trademarks(
         ql = q.lower()
         # Recall = trigram-similar OR same Double-Metaphone code. The dmetaphone
         # equality path catches sound-alikes that share no trigram with the query
-        # but encode to the same phonemes (the pure-trigram recall gap). Both
-        # paths are index-backed (GIN trgm + btree dmetaphone from migrations
-        # 0012/0013); the Python engine reranks the union precisely.
+        # but encode to the same phonemes (the pure-trigram recall gap). The
+        # mark_sample / applicant_name arms are index-backed (GIN trgm + btree
+        # dmetaphone from migrations 0012/0013); the mark_name arms get their
+        # matching GIN-trgm + dmetaphone indexes from migration 0032. The Python
+        # engine reranks the union precisely.
         dmeta_q = func.dmetaphone(ql)
         recall_clauses = [
             *where,
             or_(
                 func.lower(Trademark.mark_sample).op("%")(ql),
                 func.lower(Trademark.applicant_name).op("%")(ql),
+                func.lower(Trademark.mark_name).op("%")(ql),
                 func.dmetaphone(func.lower(Trademark.mark_sample)) == dmeta_q,
                 func.dmetaphone(func.lower(Trademark.applicant_name)) == dmeta_q,
+                func.dmetaphone(func.lower(Trademark.mark_name)) == dmeta_q,
             ),
         ]
-        # Best trigram similarity across either target column. A NULL column
-        # yields NULL similarity, which greatest() skips — so A-files (no
-        # mark_sample) rank purely on applicant_name and vice-versa.
+        # Best trigram similarity across all three target columns (mark_sample /
+        # mark_name / applicant_name). A NULL column yields NULL similarity, which
+        # greatest() skips — so an A-file with no mark_sample still ranks on
+        # whichever of mark_name / applicant_name is populated.
         trgm_rank = func.greatest(
             func.similarity(func.lower(Trademark.mark_sample), ql),
             func.similarity(func.lower(Trademark.applicant_name), ql),
+            func.similarity(func.lower(Trademark.mark_name), ql),
         )
         recall_stmt = (
             select(Trademark)
