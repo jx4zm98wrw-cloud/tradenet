@@ -1,8 +1,10 @@
 """Scored search — extends /api/trademarks with a similarity score per result.
 
 Per-mode scoring:
-  - text:     substring strength against wordmark / applicant (mock — text
-              mode is a literal-match search, not a similarity search).
+  - text:     match-quality bucket vs the resolved wordmark (exact 0.98 /
+              substring 0.92 / token 0.78 / prefix 0.76) — a literal search, so
+              the score is deterministic (no jitter) and the threshold filters by
+              bucket; `total` is the post-threshold count, like phonetic.
   - phonetic: REAL Jaro-Winkler + Metaphone via tm_similarity. NEUROFAX
               correctly surfaces NEUREX (both encode NRKS-family).
   - vienna:   REAL Jaccard overlap of the user's selected figurative codes
@@ -42,6 +44,13 @@ SearchMode = Literal["text", "phonetic", "image", "vienna"]
 # rerank stays fast. Marks whose true phonetic match shares no trigram with the
 # query are the known recall gap; widening it is a Metaphone-key-index follow-up.
 PHONETIC_RECALL_CAP = 1000
+
+# Text mode is a similarity search too (the threshold filters by match-quality
+# bucket), so its "how many match" count is post-threshold — which means scoring
+# every WHERE-match, not just a pagination window. Cap it the same way phonetic is
+# capped: a real brand query matches far fewer than this; a pathological 1-char
+# query is bounded.
+TEXT_RECALL_CAP = 1000
 
 # Widen pg_trgm's `%` operator below its 0.3 default: recall should be permissive
 # (the reranker decides), and short brand names often sit at 0.15–0.30 similarity
@@ -156,8 +165,11 @@ def _score(
             base = 0.78
         elif wordmark[:3] == ql[:3]:
             base = 0.76
-    s = base + _jitter(str(mark.id))
-    return round(max(0.0, min(0.999, s)), 2)
+    # No jitter: text mode is a literal search, so the score IS the match-quality
+    # bucket (exact 0.98 / substring 0.92 / token 0.78 / prefix 0.76 / 0.60).
+    # This keeps the threshold deterministic — equally-relevant matches share a
+    # bucket and never straddle the slider by random ±0.04 noise.
+    return round(base, 2)
 
 
 @router.get("/trademarks", response_model=SearchResultsOut)
@@ -316,15 +328,22 @@ async def search_trademarks(
         # image): scores are 1.0 or a coverage fraction; date order is stable.
         stmt = stmt.order_by(Trademark.publication_date_441.desc().nulls_last(), Trademark.id)
 
-    # Over-fetch so we can post-filter by threshold without ruining pagination.
-    fetch_limit = max(limit + offset, limit) * 2
+    # A text query is a similarity search: like phonetic, the honest "how many
+    # match" count is post-threshold, not the raw WHERE count — otherwise the
+    # header/footer claim more marks than the grid renders once the threshold
+    # filters any out. So for text we score ALL matches (capped) and report the
+    # survivors. Filter-only (no q → every score is 1.0) and vienna/image keep the
+    # full WHERE count + an over-fetch window so their pagination stays correct.
+    is_text_query = mode == "text" and bool(q)
+    fetch_limit = TEXT_RECALL_CAP if is_text_query else max(limit + offset, limit) * 2
     rows = list((await session.execute(stmt.limit(fetch_limit))).scalars().all())
-    total = (await session.execute(cnt_stmt)).scalar_one()
 
     scored = [(m, _score(m, q, mode, has_vienna=has_vienna, vienna_query=norm_vienna)) for m in rows]
     scored = [(m, s) for (m, s) in scored if s >= threshold]
     if sort == "similarity":
         scored.sort(key=lambda x: (-x[1], str(x[0].id)))
+
+    total = len(scored) if is_text_query else (await session.execute(cnt_stmt)).scalar_one()
 
     page = scored[offset : offset + limit]
     return SearchResultsOut(
