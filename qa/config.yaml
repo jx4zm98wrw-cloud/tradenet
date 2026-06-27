@@ -58,3 +58,31 @@ budget:
 claims:
   s1_operators: [phonetic, fuzzy, substring, diacritic_in_phonetic]
   exploratory_operators: [wildcard, boolean]   # report as S3 findings, not S1
+
+# Census (full 238k iteration). Connection budget: Postgres max_connections=100.
+# Each in-flight census mark holds ~1 API DB connection; the C3 oracle holds one
+# from db_pool. concurrency + db_pool + the prod instance's pool must stay < 100.
+# Sized for the 8-worker test instance: 32 + 20 + ~20(prod) + overhead ≈ 75.
+census:
+  concurrency: 32        # in-flight marks
+  chunk_size: 2000       # keyset page size
+  page_limit: 100        # hits per search page
+  top_n: 5               # C4 rank window
+  pagewalk_cap: 300      # C3 full dup/gap walk only up to this many hits
+  db_pool: 20            # read-only connections for C3 DB counts
+
+# Stress / load ramp. Each level held for warmup + steady-state window.
+stress:
+  # 10/100/1000 are the mandated headline levels; 25/50 added to locate the
+  # saturation knee between 10 and 100.
+  levels: [10, 25, 50, 100, 1000]
+  warmup_s: 3.0
+  window_s: 12.0
+  mix_per_kind: 12
+  throttled_concurrency: 80
+  # The production limiter is 120/minute (fixed window). The window must run long
+  # enough to push cumulative requests past 120 within a minute so 429s engage.
+  throttled_window_s: 25.0
+  slo_p95_typical_s: 3.0
+  slo_p95_broad_s: 5.0
+  error_rate_saturation: 0.01

@@ -1,0 +1,54 @@
+# Confusable-pair oracle for the similarity suite (qa/src/tnqa/similarity.py).
+#
+# Two kinds, labelled:
+#   curated   — DISTINCT real marks (different application_number) that an examiner
+#               would plausibly call confusable. The trustworthy, NON-CIRCULAR oracle.
+#               Mined from real pg_trgm neighbours, then hand-kept where the pair is
+#               a genuine clearance conflict (truncation, added initial, spacing,
+#               typo, sound-alike). Recall = does a phonetic search for one surface
+#               the other (both directions)?
+#   synthetic — engine-style perturbation of ONE real mark; `query`/`query_b` carry
+#               the perturbed strings and BOTH appnos are that same mark. Tests
+#               "does a one-edit variant surface the original?" — inherently circular
+#               (the engine vs its own transform), reported separately for contrast.
+#
+# Fields: a/b (display names), a_appno/b_appno (real IP VIETNAM application numbers),
+# label, axis, note; optional query/query_b override the search string for a/b.
+
+pairs:
+  # ---- curated: added leading initial (very common clearance trap) ----
+  - {a: "NEWSUN", a_appno: "4-2025-38079", b: "NEWSUN N", b_appno: "4-2025-43833", label: curated, axis: addition, note: "trailing initial"}
+  - {a: "VISION", a_appno: "4-2025-15430", b: "V VISION", b_appno: "4-2025-14470", label: curated, axis: addition, note: "leading initial"}
+  - {a: "VOLTO", a_appno: "4-2025-41319", b: "V VOLTO", b_appno: "4-2025-02359", label: curated, axis: addition, note: "leading initial"}
+  - {a: "ECAMY", a_appno: "4-2022-39015", b: "E ECAMY", b_appno: "4-2025-59135", label: curated, axis: addition, note: "leading initial"}
+  - {a: "KUOTA", a_appno: "4-2025-25242", b: "K KUOTA", b_appno: "4-2024-09746", label: curated, axis: addition, note: "leading initial"}
+  - {a: "ARTEMIS", a_appno: "4-2022-40583", b: "A ARTEMIS", b_appno: "4-2024-45968", label: curated, axis: addition, note: "leading initial"}
+  - {a: "VINMOTION", a_appno: "4-2025-03053", b: "V VINMOTION", b_appno: "4-2025-28142", label: curated, axis: addition, note: "leading initial"}
+  - {a: "TOMEN", a_appno: "4-2024-07402", b: "TM TOMEN", b_appno: "4-2026-11098", label: curated, axis: addition, note: "leading initials"}
+
+  # ---- curated: spacing / joining ----
+  - {a: "TRITONGEAR", a_appno: "4-2023-31562", b: "TRITON GEAR", b_appno: "4-2023-31563", label: curated, axis: spacing, note: "join vs split"}
+  - {a: "sevendegree", a_appno: "4-2025-30418", b: "SEVEN DEGREE", b_appno: "4-2025-30348", label: curated, axis: spacing, note: "join vs split"}
+  - {a: "SAN SAN", a_appno: "4-2025-32324", b: "Sansan", b_appno: "4-2024-42694", label: curated, axis: spacing, note: "join vs split"}
+
+  # ---- curated: added trailing word ----
+  - {a: "SILK CLOUD", a_appno: "4-2026-12399", b: "SILK CLOUD TM", b_appno: "4-2026-06423", label: curated, axis: addition, note: "trailing token"}
+  - {a: "Secret Garden", a_appno: "4-2026-04084", b: "SECRET GARDEN HOTEL", b_appno: "4-2025-41899", label: curated, axis: addition, note: "trailing word"}
+  - {a: "KYROSA", a_appno: "4-2023-00082", b: "KYROSA BAB", b_appno: "4-2023-15545", label: curated, axis: addition, note: "trailing token"}
+
+  # ---- curated: typo / one-edit / sound-alike (distinct real marks) ----
+  - {a: "KAISON", a_appno: "4-2025-47388", b: "KAISO", b_appno: "4-2024-55950", label: curated, axis: truncation, note: "dropped final letter"}
+  - {a: "INDOCY", a_appno: "4-2024-29951", b: "INDOCYN", b_appno: "4-2023-23532", label: curated, axis: truncation, note: "added final letter"}
+  - {a: "RENSOU", a_appno: "4-2024-19342", b: "RENSO", b_appno: "4-2019-43217", label: curated, axis: truncation, note: "dropped final letter"}
+  - {a: "CHARIT", a_appno: "4-2026-11088", b: "Charity", b_appno: "4-2024-50947", label: curated, axis: truncation, note: "truncated word"}
+  - {a: "OSAKAR", a_appno: "4-2021-02813", b: "Osaka", b_appno: "4-2025-11743", label: curated, axis: truncation, note: "added final letter"}
+  - {a: "Cooange", a_appno: "4-2025-37411", b: "C cooange", b_appno: "4-2025-23172", label: curated, axis: addition, note: "leading initial"}
+  - {a: "ASKAI", a_appno: "4-2024-38367", b: "a AskAI", b_appno: "4-2024-62582", label: curated, axis: addition, note: "initial + case"}
+
+  # ---- synthetic: perturbation -> expect the ORIGINAL mark back (circular) ----
+  - {a: "VISION", a_appno: "4-2025-15430", b: "VISION", b_appno: "4-2025-15430", query: "VISJON", query_b: "VISIOON", label: synthetic, axis: letter_swap, note: "vowel swap / doubling"}
+  - {a: "ARTEMIS", a_appno: "4-2024-45968", b: "ARTEMIS", b_appno: "4-2024-45968", query: "ARTEMISS", query_b: "ARTEMIZ", label: synthetic, axis: typo, note: "double / final swap"}
+  - {a: "TOMEN", a_appno: "4-2024-07402", b: "TOMEN", b_appno: "4-2024-07402", query: "TOMENN", query_b: "TOMAN", label: synthetic, axis: typo, note: "doubling / vowel"}
+  - {a: "VOLTO", a_appno: "4-2025-41319", b: "VOLTO", b_appno: "4-2025-41319", query: "VOLTOH", query_b: "WOLTO", label: synthetic, axis: sound_alike, note: "V/W swap"}
+  - {a: "KUOTA", a_appno: "4-2025-25242", b: "KUOTA", b_appno: "4-2025-25242", query: "QUOTA", query_b: "KUOTAH", label: synthetic, axis: sound_alike, note: "K/QU swap"}
+  - {a: "ECAMY", a_appno: "4-2022-39015", b: "ECAMY", b_appno: "4-2022-39015", query: "EKAMY", query_b: "ECAMI", label: synthetic, axis: sound_alike, note: "C/K + final vowel"}

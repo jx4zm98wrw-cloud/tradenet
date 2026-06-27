@@ -364,10 +364,19 @@ def build_report(store: RunStore, summaries: list[dict] | None = None) -> str:
 # CLI
 # --------------------------------------------------------------------------- #
 def main(argv: list[str] | None = None) -> int:
+    import os
+
     ap = argparse.ArgumentParser(prog="tnqa", description="Tradenet Search QA suite")
-    ap.add_argument("command", choices=["smoke", "run", "report"])
+    ap.add_argument("command",
+                    choices=["smoke", "run", "report", "census", "stress", "similarity"])
     ap.add_argument("--run-dir", default=None, help="existing results/run-<ts> to resume/report")
     ap.add_argument("--budget-s", type=int, default=None, help="override wall-clock budget (s)")
+    ap.add_argument("--base-url", default=None,
+                    help="override target (census/stress default to the unthrottled test instance)")
+    ap.add_argument("--max-marks", type=int, default=None,
+                    help="census: cap the number of marks (validation slice; omit = full 238k)")
+    ap.add_argument("--levels", default=None,
+                    help="stress: comma-separated concurrency levels (default 10,100,1000)")
     args = ap.parse_args(argv)
     cfg = load_config()
 
@@ -379,12 +388,50 @@ def main(argv: list[str] | None = None) -> int:
         p = pathlib.Path(args.run_dir)
         run_dir = p if p.is_absolute() else root / args.run_dir
     else:
-        run_dir = root / f"run-{_now_ts()}"
+        prefix = {"census": "census", "stress": "stress", "similarity": "sim"}.get(args.command, "run")
+        run_dir = root / f"{prefix}-{_now_ts()}"
     store = RunStore(run_dir)
 
     if args.command == "report":
         (run_dir / "report.md").write_text(build_report(store))
         print(f"report → {run_dir / 'report.md'}")
+        return 0
+
+    if args.command == "census":
+        import asyncio
+
+        from .census import build_census_report, run_census
+
+        base = args.base_url or os.environ.get("TNQA_TEST_URL") or cfg.base_url
+        print(f"== CENSUS == target={base} max_marks={args.max_marks or 'ALL'} run_dir={run_dir}")
+        summary = asyncio.run(run_census(cfg, store, base, max_marks=args.max_marks))
+        (run_dir / "census_report.md").write_text(build_census_report(store, summary))
+        print(f"\nCENSUS DONE → {run_dir / 'census_report.md'}")
+        print(" ", {k: v for k, v in summary.items() if k != "tallies"})
+        return 0
+
+    if args.command == "stress":
+        import asyncio
+
+        from .stress import build_stress_report, run_stress
+
+        levels = [int(x) for x in args.levels.split(",")] if args.levels else None
+        test_url = args.base_url or os.environ.get("TNQA_TEST_URL") or cfg.base_url
+        print(f"== STRESS == unthrottled={test_url} throttled={cfg.base_url} run_dir={run_dir}")
+        report = asyncio.run(run_stress(cfg, store, test_url, cfg.base_url, levels=levels))
+        (run_dir / "stress_report.md").write_text(build_stress_report(report))
+        print(f"\nSTRESS DONE → {run_dir / 'stress_report.md'}")
+        return 0
+
+    if args.command == "similarity":
+        from .similarity import build_similarity_report, run_similarity
+
+        base = args.base_url or cfg.base_url
+        print(f"== SIMILARITY == target={base} run_dir={run_dir}")
+        report = run_similarity(cfg, store, base)
+        (run_dir / "similarity_report.md").write_text(build_similarity_report(report))
+        print(f"\nSIMILARITY DONE → {run_dir / 'similarity_report.md'}")
+        print(" ", {k: report[k] for k in ("recall", "precision", "f1", "n_pairs") if k in report})
         return 0
 
     # command == run

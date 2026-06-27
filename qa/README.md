@@ -46,6 +46,56 @@ python -m tnqa.run report    # (re)generate report.md from cases.jsonl any time
 `run` re-runs the smoke gate first and **aborts if it's red** (never burns the budget
 on a misconfigured target). Override the wall-clock budget with `--budget-s 600`.
 
+## Heavyweight suites — census / stress / similarity
+
+Three extra subcommands cover the full-coverage, load, and confusable-similarity
+work. They use an **async httpx** client (`tnqa/asyncclient.py`) for throughput and
+default to an **unthrottled local test instance** (see below) via `--base-url` or the
+`TNQA_TEST_URL` env var. All thresholds live in `config.yaml` (`census:`/`stress:`/
+`similarity:` sections).
+
+```bash
+# Full census — exercise EVERY mark (~238,149) via a resumable keyset cursor on
+# application_number. C1 self-recall · C2 appno/madrid lookup · C3 count integrity
+# (+ bounded dup/gap page-walk) · C4 top-N rank. Resumable; flushes per-case JSONL +
+# evidence on failure; reports TRUE population rates. --max-marks N runs a slice.
+python -m tnqa.run census  --base-url http://localhost:8001 [--max-marks 5000] [--run-dir census-full]
+
+# Stress / load — closed-loop async ramp over a fixed query mix at concurrency
+# 10/100/1000 (config adds 25/50 to find the knee). Per level: throughput, p50/p95/
+# p99/max, error-by-class, saturation point. Also an informational 429/Retry-After
+# ramp against the throttled instance.
+python -m tnqa.run stress  --base-url http://localhost:8001 [--levels 10,25,50,100,1000]
+
+# Confusable similarity — curated vs synthetic pairs (data/confusable-pairs.yaml);
+# measures RECALL (variant surfaces the mate) AND PRECISION (top-N relevance) -> F1.
+python -m tnqa.run similarity --base-url http://localhost:8001
+```
+
+**Resume a census:** re-run with the same `--run-dir <name>` — completed marks
+(by case-id) and the keyset checkpoint in `state.json` are skipped/restored.
+
+### Lifting the rate limiter (test instance only)
+
+Census throughput and the stress capacity ceiling need the production limiter
+(`120/minute`) off. Do NOT change production defaults — instead launch a **second
+uvicorn** with the limit overridden via env (zero source edits, reversible by
+killing the process). `TM_ENV=test` selects `NullPool` so connections track
+in-flight load instead of being hoarded — search/auth behaviour is unchanged.
+
+```bash
+cd app/backend
+TM_ENV=test TM_RATE_LIMIT_DEFAULT=100000000/minute TM_RATE_LIMIT_UPLOAD=100000000/minute \
+TM_DATABASE_URL=postgresql+asyncpg://tm:tm@localhost:5435/tm \
+TM_DATABASE_URL_SYNC=postgresql+psycopg2://tm:tm@localhost:5435/tm \
+TM_REDIS_URL=redis://localhost:6380/0 \
+uvicorn api.main:app --port 8001 --workers 8 --no-access-log    # test instance on :8001
+```
+
+Postgres `max_connections=100` is the binding constraint: keep `census.concurrency
++ census.db_pool + the prod instance's pool` under it (the shipped census config —
+32 + 20 — leaves headroom).
+
 ## Adaptive sampling (no hard-coded n)
 
 Each group's headline metric (recall / pass-rate) is treated as a binomial proportion
