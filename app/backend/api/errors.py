@@ -19,11 +19,18 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+import sqlalchemy.exc
+from asyncpg.exceptions import TooManyConnectionsError
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
+
+# Graceful-backpressure retry hint (seconds). DB saturation clears in well
+# under a second once in-flight queries drain, so a small value keeps healthy
+# clients responsive while still telling load generators / proxies to back off.
+SATURATION_RETRY_AFTER_SECONDS = 1
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
@@ -78,6 +85,44 @@ def register_exception_handlers(app: FastAPI) -> None:
                 details=exc.errors(),
             ),
         )
+
+    # --- DB saturation -> graceful backpressure (503 + Retry-After) ---------
+    # Under high concurrency the DB layer saturates and raises one of two
+    # operational (NOT bug) exceptions: a QueuePool acquire timeout
+    # (`sqlalchemy.exc.TimeoutError`) or a Postgres connection-ceiling refusal
+    # (`asyncpg ... TooManyConnectionsError`, raw on the NullPool connect path).
+    # Left to the generic handler below these become a 500-storm; they mean
+    # "at capacity, retry shortly", which is exactly HTTP 503 + Retry-After.
+    # Registering handlers for these specific classes takes precedence over the
+    # bare-Exception handler (Starlette matches by closest type in the MRO).
+    def _saturation(request: Request) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=_envelope(
+                code="service_unavailable",
+                message="The service is temporarily at capacity. Please retry shortly.",
+                request_id=getattr(request.state, "request_id", None),
+            ),
+            headers={"Retry-After": str(SATURATION_RETRY_AFTER_SECONDS)},
+        )
+
+    @app.exception_handler(sqlalchemy.exc.TimeoutError)
+    async def _pool_timeout(request: Request, exc: sqlalchemy.exc.TimeoutError):
+        return _saturation(request)
+
+    @app.exception_handler(TooManyConnectionsError)
+    async def _too_many_connections(request: Request, exc: TooManyConnectionsError):
+        return _saturation(request)
+
+    @app.exception_handler(sqlalchemy.exc.OperationalError)
+    async def _operational(request: Request, exc: sqlalchemy.exc.OperationalError):
+        # Defensive: in code paths where SQLAlchemy WRAPS the driver error
+        # (e.g. a pre-ping reconnect), the connection-ceiling refusal surfaces
+        # as OperationalError(orig=TooManyConnectionsError). Treat only that as
+        # backpressure; re-raise anything else so it falls through to a 500.
+        if isinstance(getattr(exc, "orig", None), TooManyConnectionsError):
+            return _saturation(request)
+        raise exc
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception):
