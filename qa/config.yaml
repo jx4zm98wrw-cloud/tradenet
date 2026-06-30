@@ -1,0 +1,88 @@
+# Tradenet Search QA — suite configuration. All thresholds/params live here, not
+# buried as magic numbers. Overridable per-key via env (TNQA_*) where noted.
+
+schema:
+  # Response mapping for GET /api/v1/search/trademarks (SearchResultsOut).
+  search_path: /api/v1/search/trademarks
+  items: items            # result list
+  total: total            # post-threshold count for text queries
+  score: score            # items[].score
+  mark_name: mark.mark_name          # "trademark_name"
+  mark_sample: mark.mark_sample       # "mark"
+  application_number: mark.application_number
+  madrid_number: mark.madrid_number
+  # matcher + ordering knobs
+  mode_param: mode                    # text | phonetic | image | vienna
+  sort_param: sort                    # similarity (ranked) | publication-desc (plain)
+  threshold_param: threshold
+  ranked_sort: similarity
+  plain_sort: publication-desc
+  # The API caps a text query's `total` at TEXT_RECALL_CAP (scores all matches up
+  # to this, post-threshold). A-07's oracle must expect min(db_count, this).
+  text_recall_cap: 1000
+
+thresholds:
+  recall_exact: 0.95
+  recall_similar: 0.90
+  precision: 0.90
+  latency_p95_typical_s: 3.0
+  latency_p95_broad_s: 5.0
+
+sampling:
+  confidence_z: 1.96      # 95%
+  margin: 0.03            # ±3% CI half-width target
+  batch_size: 50
+  floor_n: 200            # never stop a group earlier
+  ceiling_n: 1500         # per-group cap
+  rng_seed: 20260627      # reproducibility; recorded in state.json
+  latency_min_n: 300
+  latency_p95_stability: 0.05   # rolling p95 stable within ±5% over 3 batches
+
+strata:
+  # NOTE: no "field" axis — q is a single unified box (no per-field text search).
+  source: [domestic, madrid]                       # from mark_category prefix
+  script: [latin, vn_diacritic, cjk, cyrillic]
+  length: [short, medium, long]
+  matcher: [text, phonetic]
+  oversample: [cjk, cyrillic, madrid]              # rare strata, min cell count enforced
+  min_cell_n: 20
+
+budget:
+  wall_clock_default_s: 14400   # 4h default
+  wall_clock_cap_s: 18000       # 5h hard cap
+  report_snapshot_every_s: 900  # regenerate report.md every 15 min
+  state_flush_every_batch: true
+
+# Severity gate: Tradenet positions as a professional clearance tool, so a missed
+# similar mark is the cardinal defect. These matchers are S1-if-broken.
+claims:
+  s1_operators: [phonetic, fuzzy, substring, diacritic_in_phonetic]
+  exploratory_operators: [wildcard, boolean]   # report as S3 findings, not S1
+
+# Census (full 238k iteration). Connection budget: Postgres max_connections=100.
+# Each in-flight census mark holds ~1 API DB connection; the C3 oracle holds one
+# from db_pool. concurrency + db_pool + the prod instance's pool must stay < 100.
+# Sized for the 8-worker test instance: 32 + 20 + ~20(prod) + overhead ≈ 75.
+census:
+  concurrency: 32        # in-flight marks
+  chunk_size: 2000       # keyset page size
+  page_limit: 100        # hits per search page
+  top_n: 5               # C4 rank window
+  pagewalk_cap: 300      # C3 full dup/gap walk only up to this many hits
+  db_pool: 20            # read-only connections for C3 DB counts
+
+# Stress / load ramp. Each level held for warmup + steady-state window.
+stress:
+  # 10/100/1000 are the mandated headline levels; 25/50 added to locate the
+  # saturation knee between 10 and 100.
+  levels: [10, 25, 50, 100, 1000]
+  warmup_s: 3.0
+  window_s: 12.0
+  mix_per_kind: 12
+  throttled_concurrency: 80
+  # The production limiter is 120/minute (fixed window). The window must run long
+  # enough to push cumulative requests past 120 within a minute so 429s engage.
+  throttled_window_s: 25.0
+  slo_p95_typical_s: 3.0
+  slo_p95_broad_s: 5.0
+  error_rate_saturation: 0.01

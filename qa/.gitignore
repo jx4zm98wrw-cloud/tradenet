@@ -1,0 +1,7 @@
+# Standalone QA module — never commit run artifacts, secrets, or the venv.
+results/
+.env
+.venv/
+__pycache__/
+*.egg-info/
+*.pyc
