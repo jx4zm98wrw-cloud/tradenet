@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tm_similarity import phonetic_similarity
 
+from .._dedup import dedup_key_expr, representative_marks
 from ..db import RecordType, Trademark, get_session
 from ..schemas import TrademarkOut
 from ._filters import build_trademark_where, normalize_vienna_code, vienna_code_match
@@ -364,40 +365,42 @@ async def search_trademarks(
         )
 
     # ---- All other modes: filter in SQL, score the over-fetch window -------
-    stmt = select(Trademark)
-    cnt_stmt = select(func.count()).select_from(Trademark)
-    if where:
-        stmt = stmt.where(and_(*where))
-        cnt_stmt = cnt_stmt.where(and_(*where))
-
-    if sort == "publication-desc":
-        stmt = stmt.order_by(Trademark.publication_date_441.desc().nulls_last(), Trademark.id)
-    elif sort == "applicant-asc":
-        stmt = stmt.order_by(Trademark.applicant_name.asc().nulls_last(), Trademark.id)
-    elif sort == "class-count":
-        stmt = stmt.order_by(func.cardinality(Trademark.nice_classes).desc().nulls_last(), Trademark.id)
-    else:
-        # similarity sort without a phonetic target (filter-only / vienna /
-        # image): scores are 1.0 or a coverage fraction; date order is stable.
-        stmt = stmt.order_by(Trademark.publication_date_441.desc().nulls_last(), Trademark.id)
-
     # A text query is a similarity search: like phonetic, the honest "how many
     # match" count is post-threshold, not the raw WHERE count — otherwise the
     # header/footer claim more marks than the grid renders once the threshold
-    # filters any out. So for text we score ALL matches (capped) and report the
-    # survivors. Filter-only (no q → every score is 1.0) and vienna/image keep the
-    # full WHERE count + an over-fetch window so their pagination stays correct.
+    # filters any out. So text scores ALL (capped) matches and reports the
+    # survivors, deduping application/registration row pairs in Python
+    # (_dedup_marks below — the #129 text/phonetic path).
+    #
+    # Filter-only / vienna / image have no `q` target (every score is 1.0 or a
+    # coverage fraction), so they paginate the SQL window directly. There the
+    # row pairs must be collapsed in SQL — via the DISTINCT-ON `representative_
+    # marks` view — so BOTH the rows AND the count are deduped: one card per
+    # mark, total = unique-mark count (was double-counting app+reg rows). The
+    # view keeps the most-advanced row, mirroring _dedup_pref.
     is_text_query = mode == "text" and bool(q)
+    base: Any = Trademark if is_text_query else representative_marks(where)
+    stmt = select(base)
+    # The deduped view already carries `where` inside its subquery; only the raw
+    # text path applies it to the outer select.
+    if is_text_query and where:
+        stmt = stmt.where(and_(*where))
+
+    if sort == "publication-desc":
+        stmt = stmt.order_by(base.publication_date_441.desc().nulls_last(), base.id)
+    elif sort == "applicant-asc":
+        stmt = stmt.order_by(base.applicant_name.asc().nulls_last(), base.id)
+    elif sort == "class-count":
+        stmt = stmt.order_by(func.cardinality(base.nice_classes).desc().nulls_last(), base.id)
+    else:
+        # similarity sort without a phonetic target (filter-only / vienna /
+        # image): scores are 1.0 or a coverage fraction; date order is stable.
+        stmt = stmt.order_by(base.publication_date_441.desc().nulls_last(), base.id)
+
     fetch_limit = TEXT_RECALL_CAP if is_text_query else max(limit + offset, limit) * 2
     rows = list((await session.execute(stmt.limit(fetch_limit))).scalars().all())
 
-    # A text query scores ALL (capped) matches in Python and reports
-    # total = len(scored), so collapse application/registration (and Madrid
-    # registration/renewal) row pairs into one result BEFORE scoring/paging —
-    # a single mark renders one card and total counts unique marks. Filter-only
-    # / vienna / image paginate in SQL with a raw COUNT (no q target), so they
-    # keep their per-row window; the duplicate-card bug is specific to the
-    # text/phonetic similarity paths exercised by a mark/number search.
+    # Text/phonetic collapse the recall window in Python (cheap; the #129 path).
     if is_text_query:
         rows = _dedup_marks(rows)
 
@@ -406,7 +409,16 @@ async def search_trademarks(
     if sort == "similarity":
         scored.sort(key=lambda x: (-x[1], str(x[0].id)))
 
-    total = len(scored) if is_text_query else (await session.execute(cnt_stmt)).scalar_one()
+    if is_text_query:
+        total = len(scored)
+    else:
+        # COUNT(DISTINCT dedup_key) over the WHERE == the number of rows the
+        # DISTINCT-ON view yields == unique marks; a single aggregate, so the
+        # count scales without materialising the deduped set.
+        cnt_stmt = select(func.count(func.distinct(dedup_key_expr()))).select_from(Trademark)
+        if where:
+            cnt_stmt = cnt_stmt.where(and_(*where))
+        total = (await session.execute(cnt_stmt)).scalar_one()
 
     page = scored[offset : offset + limit]
     return SearchResultsOut(
