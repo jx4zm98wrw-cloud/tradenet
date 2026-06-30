@@ -9,10 +9,11 @@ import uuid
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import and_, desc, func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import RecordType, Trademark, get_session
+from .._dedup import representative_marks
+from ..db import RecordType, get_session
 from ..db.models import MadridRecord
 from ._filters import build_trademark_where
 from .stats import NICE_LABELS, CountBucket
@@ -66,15 +67,17 @@ async def facet_countries(
     session: AsyncSession = Depends(get_session),
 ) -> list[CountBucket]:
     where = build_trademark_where(**filters, exclude="country")
+    # Count UNIQUE marks, not raw gazette rows: a mark with both an application
+    # and a registration row would otherwise be tallied twice. The deduped view
+    # carries `where` in its subquery and yields one (most-advanced) row per mark.
+    rep = representative_marks(where)
     stmt = (
-        select(Trademark.applicant_country_code, func.count())
-        .where(Trademark.applicant_country_code.is_not(None))
-        .group_by(Trademark.applicant_country_code)
+        select(rep.applicant_country_code, func.count())
+        .where(rep.applicant_country_code.is_not(None))
+        .group_by(rep.applicant_country_code)
         .order_by(desc(func.count()))
         .limit(limit)
     )
-    if where:
-        stmt = stmt.where(and_(*where))
     rows = (await session.execute(stmt)).all()
     return [CountBucket(key=cc, count=n) for cc, n in rows]
 
@@ -89,16 +92,17 @@ async def facet_nice_classes(
     EXCEPT the `nice_class` filter itself.
     """
     where = build_trademark_where(**filters, exclude="nice_class")
-    cls_col = func.unnest(Trademark.nice_classes).label("cls")
+    # Unnest the deduped view's class lists so each unique mark contributes its
+    # classes once (raw rows would double-count a mark present as app + reg).
+    rep = representative_marks(where)
+    cls_col = func.unnest(rep.nice_classes).label("cls")
     stmt = (
         select(cls_col, func.count())
-        .where(Trademark.nice_classes.is_not(None))
+        .where(rep.nice_classes.is_not(None))
         .group_by(cls_col)
         .order_by(desc(func.count()))
         .limit(limit)
     )
-    if where:
-        stmt = stmt.where(and_(*where))
     rows = (await session.execute(stmt)).all()
     return [CountBucket(key=cls, label=NICE_LABELS.get(cls, ""), count=n) for cls, n in rows]
 
@@ -118,15 +122,16 @@ async def facet_applicants(
     L'OREAL, CÔNG TY CỔ PHẦN …).
     """
     where = build_trademark_where(**filters, exclude="applicant")
+    # Count unique marks per applicant (one most-advanced row per mark), so the
+    # rail matches the deduped result total rather than raw gazette appearances.
+    rep = representative_marks(where)
     stmt = (
-        select(Trademark.applicant_name, func.count())
-        .where(Trademark.applicant_name.is_not(None))
-        .group_by(Trademark.applicant_name)
+        select(rep.applicant_name, func.count())
+        .where(rep.applicant_name.is_not(None))
+        .group_by(rep.applicant_name)
         .order_by(desc(func.count()))
         .limit(limit)
     )
-    if where:
-        stmt = stmt.where(and_(*where))
     rows = (await session.execute(stmt)).all()
     return [CountBucket(key=name, count=n) for name, n in rows]
 
@@ -153,13 +158,12 @@ async def facet_mark_categories(
     express because it folds Madrid registrations into B_domestic.
     """
     where = build_trademark_where(**filters, exclude="mark_category")
-    stmt = (
-        select(Trademark.mark_category, func.count())
-        .group_by(Trademark.mark_category)
-        .order_by(desc(func.count()))
-    )
-    if where:
-        stmt = stmt.where(and_(*where))
+    # Group by the deduped view's category so each unique mark lands in ONE
+    # bucket — its most-advanced row's category. A mark present as both an
+    # application and a registration row counts once under domestic_registration
+    # (not once under each), so the buckets sum to the deduped result total.
+    rep = representative_marks(where)
+    stmt = select(rep.mark_category, func.count()).group_by(rep.mark_category).order_by(desc(func.count()))
     rows = (await session.execute(stmt)).all()
     return [CountBucket(key=cat, label=MARK_CATEGORY_LABELS.get(cat, cat), count=n) for cat, n in rows]
 
@@ -179,10 +183,12 @@ async def facet_vn_status(
     """Count marks per VN protection status under the current filter set
     (excluding the vn_status filter itself), via the lineage_key join."""
     where = build_trademark_where(**filters, exclude="vn_status")
+    # Join the deduped view (one row per IRN) so a Madrid mark present as both a
+    # registration and a renewal row — sharing lineage_key — counts once.
+    rep = representative_marks(where)
     stmt = (
         select(MadridRecord.vn_status, func.count())
-        .join(Trademark, Trademark.lineage_key == MadridRecord.irn)
-        .where(*where)
+        .join(rep, rep.lineage_key == MadridRecord.irn)
         .group_by(MadridRecord.vn_status)
     )
     rows = (await session.execute(stmt)).all()
@@ -201,9 +207,12 @@ async def facet_granted(
     itself. Unifies domestic + Madrid grants — replaces the Madrid-only
     vn_status='granted' bucket."""
     where = build_trademark_where(**filters, exclude="granted")
-    stmt = select(func.count()).select_from(Trademark).where(Trademark.vn_grant_date.is_not(None))
-    if where:
-        stmt = stmt.where(and_(*where))
+    # Count unique granted marks over the deduped view. The grant date is
+    # resolved per mark and written to EVERY gazette row of an appno, so a raw
+    # count(*) tallied each granted mark once per row (app + reg = 2x); the
+    # representative row carries the same grant date, counted once.
+    rep = representative_marks(where)
+    stmt = select(func.count()).select_from(rep).where(rep.vn_grant_date.is_not(None))
     n = (await session.execute(stmt)).scalar_one()
     return [CountBucket(key="granted", label="Granted", count=n)]
 
@@ -223,14 +232,14 @@ async def facet_ip_agencies(
     where the user picks the exact spelling they want to match.
     """
     where = build_trademark_where(**filters, exclude="ip_agency")
+    # Count unique marks per agency (one most-advanced row per mark).
+    rep = representative_marks(where)
     stmt = (
-        select(Trademark.ip_agency, func.count())
-        .where(Trademark.ip_agency.is_not(None))
-        .group_by(Trademark.ip_agency)
+        select(rep.ip_agency, func.count())
+        .where(rep.ip_agency.is_not(None))
+        .group_by(rep.ip_agency)
         .order_by(desc(func.count()))
         .limit(limit)
     )
-    if where:
-        stmt = stmt.where(and_(*where))
     rows = (await session.execute(stmt)).all()
     return [CountBucket(key=name, count=n) for name, n in rows]
