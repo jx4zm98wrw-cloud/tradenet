@@ -75,6 +75,54 @@ def _jitter(seed: str, lo: float = -0.04, hi: float = 0.04) -> float:
     return lo + (hi - lo) * (h % 1000) / 1000.0
 
 
+# ---- Query-time result dedup -------------------------------------------------
+# The `trademarks` table holds ONE ROW PER GAZETTE APPEARANCE, so a single mark
+# can surface twice: a domestic mark appears as an A-file application row (has a
+# publication date) AND a B-file registration row (has the certificate); a Madrid
+# mark appears as a registration row AND a renewal row. Both rows are real and
+# carry distinct data, so we never delete/merge them in the DB — instead we
+# collapse them in the search RESULT SET so a single mark renders one card and
+# `total` counts unique marks. This is query-time only: it works automatically
+# for future ingests with nothing to re-run.
+
+
+def _dedup_key(m: Trademark) -> str:
+    """Group rows that represent the SAME mark.
+
+    Domestic application + registration rows share an `application_number`;
+    Madrid registration + renewal rows share a `lineage_key` (the IRN, NULL
+    appno). Figurative / no-id rows fall back to the row `id`, so distinct
+    no-id marks never collapse together.
+    """
+    return m.application_number or m.lineage_key or str(m.id)
+
+
+def _dedup_pref(m: Trademark) -> tuple[bool, bool, str]:
+    """Preference rank within a dedup group — the max wins.
+
+    Keep the most-advanced/complete record so the surviving card shows the
+    registered status: a registration (certificate present) beats a bare
+    application, then a granted row beats an ungranted one, with the row `id`
+    as a stable, deterministic final tiebreak.
+    """
+    return (bool(m.certificate_number), m.vn_grant_date is not None, str(m.id))
+
+
+def _dedup_marks(rows: list[Trademark]) -> list[Trademark]:
+    """Reduce rows to one per `_dedup_key`, keeping the preferred row per group.
+
+    First-seen key order is preserved (deterministic given the upstream SQL
+    ORDER BY); callers re-sort by score afterwards regardless.
+    """
+    best: dict[str, Trademark] = {}
+    for m in rows:
+        k = _dedup_key(m)
+        cur = best.get(k)
+        if cur is None or _dedup_pref(m) > _dedup_pref(cur):
+            best[k] = m
+    return list(best.values())
+
+
 def _score(
     mark: Trademark,
     q: str | None,
@@ -287,6 +335,11 @@ async def search_trademarks(
         # a trusted module constant, not user input, so inlining it is safe.
         await session.execute(text(f"SET LOCAL pg_trgm.similarity_threshold = {_PHONETIC_TRGM_THRESHOLD}"))
         candidates = list((await session.execute(recall_stmt)).scalars().all())
+        # Collapse application/registration (and Madrid registration/renewal) row
+        # pairs into one result BEFORE reranking, so a single mark recalled via
+        # both its gazette rows reranks and pages as one card. total is len(scored)
+        # below, so it stays consistent with the deduped item count.
+        candidates = _dedup_marks(candidates)
 
         scored = [(m, _score(m, q, mode)) for m in candidates]
         scored = [(m, s) for (m, s) in scored if s >= threshold]
@@ -337,6 +390,16 @@ async def search_trademarks(
     is_text_query = mode == "text" and bool(q)
     fetch_limit = TEXT_RECALL_CAP if is_text_query else max(limit + offset, limit) * 2
     rows = list((await session.execute(stmt.limit(fetch_limit))).scalars().all())
+
+    # A text query scores ALL (capped) matches in Python and reports
+    # total = len(scored), so collapse application/registration (and Madrid
+    # registration/renewal) row pairs into one result BEFORE scoring/paging —
+    # a single mark renders one card and total counts unique marks. Filter-only
+    # / vienna / image paginate in SQL with a raw COUNT (no q target), so they
+    # keep their per-row window; the duplicate-card bug is specific to the
+    # text/phonetic similarity paths exercised by a mark/number search.
+    if is_text_query:
+        rows = _dedup_marks(rows)
 
     scored = [(m, _score(m, q, mode, has_vienna=has_vienna, vienna_query=norm_vienna)) for m in rows]
     scored = [(m, s) for (m, s) in scored if s >= threshold]
