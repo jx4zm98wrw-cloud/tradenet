@@ -1,4 +1,4 @@
-# claude_csvbuilder
+# Tradenet
 
 Vietnamese trademark gazette workbench — parses NOIP (IP Vietnam) gazette PDFs
 into structured CSV/database rows and serves them through a small web UI.

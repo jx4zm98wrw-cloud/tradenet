@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     # ---- Filesystem ----
     upload_dir: Path = Path("/tmp/tm_uploads")
-    data_dir: Path = Path(__file__).resolve().parents[3]  # claude_csvbuilder/
+    data_dir: Path = Path(__file__).resolve().parents[3]  # project root (Tradenet/)
 
     # ---- Security ----
     # Comma-separated list of allowed CORS origins. Empty = no cross-origin allowed.
