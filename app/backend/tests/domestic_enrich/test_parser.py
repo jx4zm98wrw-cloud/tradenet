@@ -1,9 +1,26 @@
 from datetime import date
 from pathlib import Path
 
-from domestic_enrich.parser import DomesticRecord, parse
+from domestic_enrich.parser import DomesticRecord, has_unrendered_placeholder, parse
 
 FIX = Path(__file__).parent.parent / "fixtures" / "domestic"
+
+
+def test_has_unrendered_placeholder_flags_template_bindings():
+    # A record parsed from an unrendered Angular template carries literal
+    # `${...}` bindings in its field values — must be flagged.
+    rec = DomesticRecord(mark_text="${mk-l} ${mk}", applicant_name="${repeating.template.ap}")
+    assert has_unrendered_placeholder(rec) is True
+
+
+def test_has_unrendered_placeholder_clears_real_record():
+    # The real captured (rendered) fixture must NOT be flagged.
+    assert has_unrendered_placeholder(_rec("VN4202600774")) is False
+
+
+def test_has_unrendered_placeholder_flags_captured_unrendered_fixture():
+    # End-to-end: parsing the real captured unrendered page must flag it.
+    assert has_unrendered_placeholder(_rec("VN4202448776_unrendered")) is True
 
 
 def _rec(vnid: str) -> DomesticRecord:

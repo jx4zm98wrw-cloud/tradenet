@@ -6,7 +6,7 @@ from sqlalchemy import delete, select
 import domestic_enrich.enrich as enrich_mod
 from api.db.models import DomesticNotFound, DomesticRecord
 from domestic_enrich.client import FetchResult
-from domestic_enrich.enrich import EnrichOutcome, enrich_one
+from domestic_enrich.enrich import EnrichOutcome, UnrenderedTemplateError, enrich_one
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "domestic" / "VN4202600774.html"
 
@@ -26,6 +26,39 @@ async def test_enrich_one_fetches_parses_stores(db_session, tmp_path):
     ).scalar_one()
     assert row.mark_text == "VTRAVEL"
     assert row.status_code
+
+
+@pytest.mark.asyncio
+async def test_enrich_one_rejects_unrendered_template_never_stores(db_session, tmp_path, monkeypatch):
+    # Defense-in-depth: if an unrendered Angular template ever slips past the
+    # fetch-layer detector, the parsed record carries literal `${...}` field
+    # values. enrich_one must RAISE (a transient failure the sweep re-attempts)
+    # and write NOTHING to domestic_records. Use a synthetic appno (the mocked
+    # fetch ignores it) so the test never touches real dev-DB rows.
+    appno = "4-9999-88802"
+    await db_session.execute(delete(DomesticRecord).where(DomesticRecord.application_number == appno))
+    await db_session.commit()
+
+    unrendered = (
+        "<html><div class='product-form-label'>(541)</div>"
+        "<div class='product-form-details'><b>${mk-l}</b> ${mk}</div>"
+        "<div class='product-form-label'>(730)</div>"
+        "<div class='product-form-details'>${repeating.template.ap}</div></html>"
+    )
+
+    def fake_fetch(vnid, cache_dir, *, session=None, use_cache=True):
+        return FetchResult(vnid=vnid, html=unrendered, source_url="u", from_cache=False, outcome="ok")
+
+    monkeypatch.setattr(enrich_mod, "fetch_raw", fake_fetch)
+
+    with pytest.raises(UnrenderedTemplateError):
+        await enrich_one(db_session, appno, cache_dir=tmp_path)
+    await db_session.rollback()
+
+    dr = (
+        await db_session.execute(select(DomesticRecord).where(DomesticRecord.application_number == appno))
+    ).scalar_one_or_none()
+    assert dr is None
 
 
 @pytest.mark.asyncio
