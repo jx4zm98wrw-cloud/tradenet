@@ -250,6 +250,28 @@ def parse(html_src: str) -> DomesticRecord:
     return rec
 
 
+def has_unrendered_placeholder(rec: DomesticRecord) -> bool:
+    """True if any key parsed field still holds an un-interpolated ``${...}``
+    Angular binding (e.g. ``mark_text == '${mk-l} ${mk}'``).
+
+    Defensive companion to ``client._is_unrendered_template``: the fetch layer
+    already rejects unrendered templates before they are cached, but it inspects
+    the RAW body. This inspects the PARSED record — where ``<script>`` blocks are
+    already stripped, so a bare ``${`` substring is an unambiguous leak with no
+    false-positive from the page's own JS guard string. Belt-and-suspenders so a
+    future template variant can never upsert placeholder text as real data."""
+    for value in (
+        rec.mark_text,
+        rec.applicant_name,
+        rec.applicant_address,
+        rec.representative,
+        rec.status_code,
+    ):
+        if value and "${" in value:
+            return True
+    return False
+
+
 def _parse_timeline(html_src: str) -> list[dict]:
     sec = re.search(
         r"events-section(.*?)(?:description-section|claims-section|</body>)",

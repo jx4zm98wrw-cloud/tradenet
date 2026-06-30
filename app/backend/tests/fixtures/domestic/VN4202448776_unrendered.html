@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="robots" content="noindex,nofollow">
+<meta name="robots" content="none">
+<title class="notranslate">Tiêu đề trang</title>
+
+<link rel="stylesheet" type="text/css" href="/wopublish-resources/css/bootstrap.min.css" />
+<link rel="stylesheet" type="text/css" href="/wopublish-resources/css/style-common.css" />
+<link rel="stylesheet" type="text/css" href="/wopublish-resources/css/style-vn.css" />
+</head>
+<body>
+	<input style="display: none;" type="text" id="googleAnalyticsToken" value="G-CW8RP9WG1M" name="body:googleAnalyticsToken">
+	<!-- TOP BAR STARTS -->
+	<nav style="display: none;"
+		class="notranslate navbar navbar-inverse header-background">
+		<div class="container-fluid">
+			<div class="navbar-header">
+				<a class="navbar-brand" href="#"><span class="wipo-publish">IP Viet Nam</span></a>
+			</div>
+		</div>
+	</nav>
+	<!-- TOP BAR ENDS -->
+
+	<div class="detail-wrapper">
+		<div class="container">
+			<div class="row">
+				<div class="col-md-12 content">
+
+					<div class="row">
+						<div class="col-md-12">
+							<div class="row" id="ide">
+		<div class="notranslate tab-bar primary-border-color hidden">
+			<span style="display: none;" class="application-number">Nhãn hiệu Đơn : </span>
+			<ul class="nav nav-tabs product-details">
+				<li class="active"><a data-toggle="tab"
+					href="#bibliographic" aria-expanded="true"><span
+						id="biblioTabLabel"></span></a></li>
+				
+				
+				
+				<li style="" class=""><a
+					data-toggle="tab" href="#status" aria-expanded="false"><span
+						id="statusTabLabel"></span></a></li>
+				
+			</ul>
+		</div>
+		<div class="notranslate" style="display: none;">
+			<span id="patentFamilyServiceUrl">https://wipopublish.ipvietnam.gov.vn/wopublish-search/service/patentFamily/</span>
+		</div>
+		<div class="">
+			<div class="section-wrapper biblio-section">
+				<a class="accordion-section-title section-header">
+						<div class="primary-bgcolor section-indicator"></div>
+						<div class="section-label">Dữ liệu thư mục</div>
+						<div class="action-icons"></div>
+				</a>
+
+				<div class="product-details accordion-section-content"
+					id="accordion-1a">
+					<div class="product-details">
+						<div class="logoDetail">
+							<div class="detail-container">
+								<div class="row">
+									<div class="col-md-2 product-form-label">
+										<span id="logoLabel">(540) Mẫu nhãn</span>
+									</div>
+									<div class="col-md-4 product-form-detail">
+										<div><div><div> <img class="rs-LOGO img-responsive detail-img" src='https://wipopublish.ipvietnam.gov.vn/wopublish-search/service/trademarks/application/VN4202448776/logo?noLogo=true' /></div></div></div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div><div class="detail-container col-md-12"> <div class="row"><div class="col-md-2 product-form-label">Loại đơn</div><div class="col-md-4 product-form-details">${appltype}</div><div class="col-md-2 product-form-label">Loại đơn</div><div class="col-md-4 product-form-details">${applsubtype}</div></div><div class="row"><div class="col-md-2 product-form-label">(100) Số bằng và ngày cấp</div><div class="col-md-4 product-form-details"><span class="margin-right-5">${renb}</span><span>  ${renb-redt}</span></div><div class="col-md-2 product-form-label">Trạng thái</div><div class="col-md-4 product-form-details">${sta}</div></div><div class="row"><div class="col-md-2 product-form-label">(180) Ngày hết hạn</div><div class="col-md-4 product-form-details"><span class="margin-right-5"></span><span>  ${epdt}</span></div></div><div class="row"><div class="col-md-2 product-form-label">(200) Số đơn và Ngày nộp đơn</div><div class="col-md-4 product-form-details"><span class="margin-right-5">${afnb-fc}${afnb}</span><span> ${afnb-fd}</span></div><div class="col-md-2 product-form-label">(400) Số công bố và ngày công bố</div><div class="col-md-4 product-form-details">${repeating.template.pubnb}</div></div><div class="row"><div class="col-md-2 product-form-label">(541) Nhãn hiệu</div><div class="col-md-4 product-form-details"><b>${mk-l}</b> ${mk} <br/><b>${mk-sl}</b> ${mk-sn}</div><div class="col-md-2 product-form-label">(591) Màu sắc nhãn hiệu</div><div class="col-md-4 product-form-details">${mc}</div></div><div class="row"><div class="col-md-2 product-form-label">(300) Chi tiết về dữ liệu ưu tiên</div><div class="col-md-4 product-form-details">${repeating.template.prior}</div></div><div class="row"><div class="col-md-2 product-form-label">(511) Nhóm sản phẩm/dịch vụ</div><div class="col-md-10 product-form-details">${repeating.template.ni}</div></div><div class="row"><div class="col-md-2 product-form-label">(531) Phân loại hình</div><div class="col-md-10 product-form-details">${repeating.template.vn}</div></div><div class="row"><div class="col-md-2 product-form-label">(730) Chủ đơn/Chủ bằng</div><div class="col-md-10 product-form-details">${repeating.template.ap}</div></div><div class="row"><div class="col-md-2 product-form-label">(740) Đại diện SHCN</div><div class="col-md-10 product-form-details">${repeating.template.ag}</div></div><div class="row"><div class="col-md-2 product-form-label">(571) Nhãn hiệu</div><div class="col-md-10 product-form-details">${repeating.template.ddes}</div></div><div class="row"><div class="col-md-2 product-form-label">(566) Nhãn hiệu dịch thuật</div><div class="col-md-10 product-form-details">${mktr}</div></div><div class="row"><div class="col-md-2 product-form-label">(550) Kiểu của mẫu nhãn(hình/chữ/kết hợp)</div><div class="col-md-10 product-form-details">${mkfw}</div></div><div class="row"><div class="col-md-2 product-form-label">(526) Yếu tố loại trừ</div><div class="col-md-10 product-form-details">${mkdc}</div></div></div></div>
+					</div>
+				</div>
+			</div>
+			<div class="section-wrapper documents-section">
+				<a class="accordion-section-title section-header">
+						<div class="secondary-bgcolor section-indicator"></div>
+						<div class="section-label">Danh sách tài liệu</div>
+						<div class="action-icons"></div>
+				</a>
+				<div class=" product-details accordion-section-content"
+					id="accordion-2a">
+					<div>
+						<table class="table table-bordered">
+							<thead>
+								<tr>
+									<th>Loại tài liệu</th>
+									<th>Ngày</th>
+									<th>Hoạt động</th>
+								</tr>
+							</thead>
+							
+						</table>
+					</div>
+				</div>
+			</div>
+			<div class="section-wrapper events-section">
+				<a class="accordion-section-title section-header">
+						<div class="secondary-bgcolor section-indicator"></div>
+						<div class="section-label">Tiến trình xử lý</div>
+						<div class="action-icons"></div>
+				</a>		
+				<div class=" product-details accordion-section-content"
+					id="accordion-3a">
+					<div class="col-md-12"><table class="table table-bordered"><thead><tr><th class="col-md-4">Tiến trình</th><th class="col-md-4">Ngày</th><th class="col-md-4">Trạng thái</th></tr></thead><tbody>${repeating.template.mked}</tbody></table></div>
+				</div>
+			</div>
+			<div class="section-wrapper description-section">
+				<a class="accordion-section-title section-header">
+						<div class="secondary-bgcolor section-indicator"></div>
+						<div class="section-label">Bản mô tả</div>
+						<div class="action-icons"></div>
+				</a>
+				<div class=" product-details accordion-section-content"
+					id="accordion-5a">
+					<div id="tabContent" class="tab-content">
+						<div class="detail-container col-md-12">
+							<div></div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="section-wrapper claims-section">
+				<a class="accordion-section-title section-header">
+						<div class="secondary-bgcolor section-indicator"></div>
+						<div class="section-label">Yêu cầu bảo hộ</div>
+						<div class="action-icons"></div>
+				</a>
+				<div class=" product-details accordion-section-content"
+					id="accordion-6a">
+					<div id="tabContent" class="tab-content">
+						<div class="detail-container col-md-12">
+							<div></div>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<input type="text" value="http://localhost:9094/caselite/family/timeline/application/VN4202448776" name="body:detail-panel:caseliteUrlId" id="caseliteUrlId" style="display: none;" hidden="true"></input> 
+						
+						
+			<div class="section-wrapper drawings-section">
+				<a class="accordion-section-title section-header">
+						<div class="primary-bgcolor section-indicator"></div>
+						
+						<div class="action-icons"></div>
+				</a>					
+				<div class="product-details accordion-section-content"
+					id="DrawingSlideShow">
+
+					 <div class="drawings col-md-12">
+						
+					</div> 
+					<div id="popupDocumentViewer"
+						class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog"
+						aria-labelledby="myLargeModalLabel">
+						<div class="modal-dialog modal-doc-view-lg" role="document">
+							<div class="modal-content">
+								<div class="modal-header modal-body">
+									<button type="button" class="pull-right btn-sm"
+										data-dismiss="modal" aria-label="Close">
+										<span aria-hidden="true"><i class="fa fa-close"></i></span>
+									</button>
+									<div id="docViewer"></div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="col-md-12">
+			<div>
+				<h4>
+					
+				</h4>
+			</div>
+			<div id="npeInput" class="modal fade bs-example-modal-lg"
+				tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel">
+				<div class="modal-dialog modal-lg" role="document">
+					<div class="modal-content">
+						<div class="modal-header">
+							<button type="button" class="pull-right btn-sm"
+								data-dismiss="modal" aria-label="Close">
+								<span aria-hidden="true"><i class="fa fa-close"></i></span>
+							</button>
+							<h4 class="modal-title" id="myModalNpeLabel"></h4>
+						</div>
+						<div id="modal-body" class="modal-body">
+							<table id="modalTable" class="table table-bordered">
+								<thead></thead>
+								<tbody>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div id="quickLinkAppDiv" class="modal fade bs-example-modal-lg"
+				tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel">
+				<div class="modal-dialog modal-lg" role="document">
+					<div id="other-app-modal-content" class="modal-content"></div>
+				</div>
+			</div>
+			<div id="quickLinkInDiv" class="modal fade bs-example-modal-lg"
+				tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel">
+				<div class="modal-dialog modal-lg" role="document">
+					<div id="other-in-modal-content" class="modal-content"></div>
+				</div>
+			</div>
+			<div id="quickLinkDesDiv" class="modal fade bs-example-modal-lg"
+				tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel">
+				<div class="modal-dialog modal-lg" role="document">
+					<div id="other-des-modal-content" class="modal-content"></div>
+				</div>
+			</div>
+			<label style="display: none;" id="textPbnb">Số công bố</label>
+			<label style="display: none;" id="textPctApplication">Đơn PCT </label> <label style="display: none;" id="textPctFilingDate">Ngày nộp đơn </label> <label style="display: none;" id="textNpeDate">Ngày vào pha quốc gia</label> <label style="display: none;" id="textPriorities">Số ưu tiên</label> <label style="display: none;" id="caseCountryCode"></label> <label style="display: none;" id="timeLineUrl">https://wipopublish.ipvietnam.gov.vn/wopublish-search/service/patentFamily/json/VN4202448776</label>
+			<label style="display: none;" id="appNoText">Số đơn</label>
+			<label style="display: none;" id="npeHeaderText">Vào pha quốc gia của  null</label> <label style="display: none;" id="textNpeEntries">Vào pha quốc gia</label> <label style="display: none;" id="noDataMessage">Không thể nhập dữ liệu</label>
+			<input style="display: none;" id="patentFamilyData" value="" name="body:detail-panel:patentFamilyData"/> <label style="display: none;" id="notSupportedByBrowser">Trình duyệt của bạn không hỗ trợ hiển thị tài liệu. Thay vào đó, hãy tải xuống tài liệu</label>
+			<label style="display: none;" id="otherApplicationServiceUrl">https://wipopublish.ipvietnam.gov.vn/wopublish-search/service/trademarks</label> <label style="display: none;" id="languageCode">vi</label>
+		</div>
+	</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+	<div id="backtop">&#9650;</div>
+		<!-- FOOTER STARTS -->
+		<footer style="display: none;"
+			class="notranslate footer primary-bgcolor text-right">
+			<div class="pull-left">
+				<span>1.5.2</span>
+			</div>
+			<div class="pull-right">
+				<a
+					href="http://www.wipo.int/global_ip/en/activities/technicalassistance/"
+					target="_blank"><span>do WIPO cung cấp</span></a>
+			</div>
+		</footer>
+		<!-- FOOTER ENDS -->
+	</div>
+	<script>
+/*<![CDATA[*/
+
+	
+	
+	   String.prototype.toIndiaDigits= function(){
+		  var id= ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+		  return this.replace(/[0-9]/g, function(w){  return id[+w];});
+		}
+	  
+		$(function() {
+
+			//hide external links if they dont have required value in rel attr
+				$(".external-link").each(function(i, v) {
+					var relText = $(this).attr("rel");
+					if (relText != undefined && (relText.indexOf("${") >= 0 || relText == "")) {
+						$(this).find(".fa-external-link").hide();
+					}
+				});
+				$(".accordion-section-title").click(function() {
+					$(this).next().toggle();
+					if ($(this).find(".section-indicator").is(".primary-bgcolor")) {
+						$(this).find(".section-indicator").switchClass("primary-bgcolor", "secondary-bgcolor", 1);
+					} else {
+						$(this).find(".section-indicator").switchClass("secondary-bgcolor", "primary-bgcolor", 1);
+					}
+				});
+				
+			
+			$("#accordion-1a").show();
+			$("#DrawingSlideShow").show();
+		
+	    	$(".slickCarousal").slick({
+		      dots: true,
+		      customPaging : function(slider, i) {
+				
+		    	  var thumb = $(slider.$slides[i]).data();
+		    	  var languageCode = $("#languageCode").text();
+		    	  
+		    	  if(languageCode !== undefined && languageCode !== '' && languageCode==='ar'){
+		    		  
+		    		  var num = (i+1)+'';
+		    		  return '<a class="badge">'+num.toIndiaDigits()+'</a>';
+		    	  }
+		    	  
+		    	  return '<a class="badge">'+(i+1)+'</a>';
+		    },
+		      infinite: false,
+		      centerMode: true,
+		      slidesToShow: 1,
+		      slidesToScroll: 1,
+		      //adaptiveHeight: true,
+		      variableWidth: true,
+		      focusOnSelect: true,
+		      initialSlide: 1
+		    });
+	    	
+	    	$('[data-toggle="tooltip"]').tooltip();
+		});
+		
+	
+/*]]>*/
+</script>
+<!--script type="text/javascript" src="resources/js/details.min.js"></script-->
+</body>
+</html>

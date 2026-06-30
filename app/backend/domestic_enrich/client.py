@@ -11,6 +11,7 @@ Two IP VIETNAM obstacles are handled here (both verified live):
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +22,15 @@ import requests
 URL_TEMPLATE = "https://wipopublish.ipvietnam.gov.vn/wopublish-search/public/ajax/detail/trademarks?id={vnid}"
 _UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
 _VALID_MARKER = "product-form-label"
+# Un-interpolated AngularJS data binding, e.g. `${mk}`, `${repeating.template.ap}`.
+# IP VIETNAM sometimes serves the detail template BEFORE client-side rendering: the
+# body carries `product-form-label` (so it passes _VALID_MARKER) but the field
+# values are literal `${...}` placeholders. The leading `[A-Za-z]` after the brace
+# is what separates a real binding from the page's OWN JS guard string
+# `indexOf("${")` (a bare `${` followed by a quote, NOT a binding) — so a genuinely
+# rendered page never matches (verified: 0 hits across 300 live pages; 25 in the
+# unrendered template).
+_UNRENDERED = re.compile(r"\$\{[A-Za-z][\w.-]*\}")
 _CA_BUNDLE = str(Path(__file__).with_name("noip_ca_bundle.pem"))
 _MIN_DELAY_S = 1.0
 # Statuses that mean "stop", not "retry": 403 = forbidden/blocked, 429 = rate
@@ -65,6 +75,15 @@ class FetchResult:
 
 def _is_valid(status_code: int, body: str) -> bool:
     return status_code == 200 and _VALID_MARKER in body
+
+
+def _is_unrendered_template(body: str) -> bool:
+    """True if the body still carries un-interpolated Angular `${...}` bindings —
+    IP VIETNAM served the detail template before client-side rendering. Distinct from
+    the not-published skeleton: this page DOES have `product-form-label`, so it
+    fools _is_valid; the giveaway is the `${name}` placeholders in the field
+    values. Transient (a re-fetch usually gets the rendered page)."""
+    return _UNRENDERED.search(body) is not None
 
 
 def _backoff_seconds(attempt: int, base: float) -> float:
@@ -115,6 +134,19 @@ def fetch_raw(
         last_status = resp.status_code
         body = resp.text
         if _is_valid(last_status, body):
+            # HTTP 200 with the detail marker, but the Angular bindings haven't
+            # been interpolated yet (`${mk}`, `${sta}`, ...). This is a render-
+            # timing RACE, not a real detail page: a re-fetch usually returns the
+            # rendered version. Treat it like the flaky 5xx — back off and retry,
+            # and NEVER cache it (caching would poison every later run, since the
+            # work-list skips cached vnids). If it never renders within
+            # max_attempts, fall through to the RuntimeError below so the caller
+            # counts a retryable failure and re-attempts later — exactly the fix
+            # for the 81 rows that persisted `${...}` placeholders.
+            if _is_unrendered_template(body):
+                if delay and attempt < max_attempts:
+                    time.sleep(_backoff_seconds(attempt, delay))
+                continue
             path.write_text(body, encoding="utf-8")
             if delay:
                 time.sleep(_MIN_DELAY_S)

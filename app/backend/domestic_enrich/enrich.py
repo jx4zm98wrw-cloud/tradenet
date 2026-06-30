@@ -11,10 +11,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .client import fetch_raw
 from .idmap import appno_to_vnid
-from .parser import parse
+from .parser import has_unrendered_placeholder, parse
 from .store import upsert, upsert_not_found
 
 log = logging.getLogger("domestic.enrich")
+
+
+class UnrenderedTemplateError(RuntimeError):
+    """The parsed record still carries un-interpolated ``${...}`` Angular bindings
+    — IP VIETNAM served the detail template before client-side rendering. Transient,
+    not a real page: raise so the sweep counts a retryable failure and stores
+    nothing. Defense-in-depth behind ``client._is_unrendered_template`` (which
+    already rejects these before caching); this catches any variant that slips
+    past the raw-body detector."""
 
 
 class EnrichOutcome(enum.Enum):
@@ -53,6 +62,13 @@ async def enrich_one(
         return EnrichOutcome.NOT_FOUND
 
     rec = parse(fetched.html)
+    if has_unrendered_placeholder(rec):
+        # Unrendered Angular template leaked through the fetch layer. Refuse to
+        # store the `${...}` placeholders — raise a transient failure the sweep
+        # re-attempts later (the page usually renders on a retry).
+        raise UnrenderedTemplateError(
+            f"unrendered template for {application_number} (vnid {vnid}); not storing"
+        )
     rec.application_number = application_number  # key by our gazette id, not the VNID
     wrote = await upsert(session, rec, fetched.html, fetched.source_url)
     return EnrichOutcome.WROTE if wrote else EnrichOutcome.UNCHANGED

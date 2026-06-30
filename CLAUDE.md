@@ -99,6 +99,27 @@ claude_csvbuilder/
 │   │   │                           /admin/domestic (control row `mode`/
 │   │   │                           `concurrency` cols). Auto-reverts to normal +
 │   │   │                           pauses on sustained IP VIETNAM blocks.
+│   │   │                           UNRENDERED-TEMPLATE handling (render-timing
+│   │   │                           race): IP VIETNAM sometimes serves the Angular
+│   │   │                           detail TEMPLATE before client-side
+│   │   │                           interpolation — HTTP 200 that DOES carry
+│   │   │                           `product-form-label` (so it passes the
+│   │   │                           not-found marker check) but whose field
+│   │   │                           values are literal `${...}` bindings
+│   │   │                           (`${mk}`, `${sta}`, `${repeating.template.ap}`).
+│   │   │                           This is TRANSIENT, not a real page:
+│   │   │                           `client._is_unrendered_template` (regex
+│   │   │                           `\$\{[A-Za-z][\w.-]*\}` — excludes the page's
+│   │   │                           own JS guard literal `indexOf("${")`) makes
+│   │   │                           `fetch_raw` retry it like a flaky 5xx and
+│   │   │                           NEVER cache it; exhausting retries raises
+│   │   │                           RuntimeError so the sweep counts a retryable
+│   │   │                           failure. Defense-in-depth: `parser.
+│   │   │                           has_unrendered_placeholder` + `enrich.enrich_one`
+│   │   │                           raise `UnrenderedTemplateError` if a `${`
+│   │   │                           ever reaches a parsed field, so placeholders
+│   │   │                           are never upserted. (Fixed 81 rows that had
+│   │   │                           persisted `${...}` from a 2026-06-19→23 window.)
 │   │   │                           NOT-PUBLISHED handling: IP VIETNAM returns HTTP 200
 │   │   │                           + a ~2,178-byte skeleton (no `product-form-
 │   │   │                           label` marker) for app numbers it hasn't

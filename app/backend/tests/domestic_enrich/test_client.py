@@ -1,8 +1,17 @@
+from pathlib import Path
+
 import pytest
 
 from domestic_enrich.client import FetchResult, NoipBlockedError, fetch_raw
 
 _GOOD = "<html><div class='product-form-label'>(541)</div>ok</html>"
+
+# A real IP VIETNAM render-timing page: HTTP 200 WITH `product-form-label`, but the
+# Angular data bindings (`${mk}`, `${repeating.template.ap}`, ...) were served
+# before client-side interpolation, so the field values are literal `${...}`
+# placeholders. It also contains the page's own JS guard string `indexOf("${")`
+# — a bare `${` that must NOT be mistaken for an unrendered binding.
+_UNRENDERED_FIXTURE = Path(__file__).parent.parent / "fixtures" / "domestic" / "VN4202448776_unrendered.html"
 
 
 class _Resp:
@@ -116,6 +125,73 @@ def test_block_429_parses_retry_after(tmp_path):
     with pytest.raises(NoipBlockedError) as ei:
         fetch_raw("VN4202600774", tmp_path, session=t, use_cache=False, delay=0.0)
     assert ei.value.retry_after == 120.0
+
+
+class _UnrenderedThenGoodTransport:
+    """Returns N unrendered Angular-template bodies (200 + marker but `${...}`
+    bindings), then a real rendered detail page."""
+
+    def __init__(self, unrendered_before_ok: int, unrendered_body: str):
+        self.calls = 0
+        self.unrendered_before_ok = unrendered_before_ok
+        self.unrendered_body = unrendered_body
+
+    def get(self, url, headers=None, timeout=None, verify=None):
+        self.calls += 1
+        if self.calls <= self.unrendered_before_ok:
+            return _Resp(200, self.unrendered_body)
+        return _Resp(200, _GOOD)
+
+
+def test_unrendered_template_retried_then_succeeds(tmp_path):
+    # A render-timing page (200 + product-form-label but un-interpolated `${...}`)
+    # is TRANSIENT, not a real detail: it must be retried like a flaky 5xx, and
+    # the unrendered body must NEVER be cached — only the rendered page is.
+    body = _UNRENDERED_FIXTURE.read_text(encoding="utf-8")
+    t = _UnrenderedThenGoodTransport(unrendered_before_ok=2, unrendered_body=body)
+    res = fetch_raw("VN4202448776", tmp_path, session=t, use_cache=False, max_attempts=5, delay=0.0)
+    assert res.outcome == "ok"
+    assert "${" not in res.html  # the rendered page, not the template
+    assert t.calls == 3
+    assert (tmp_path / "VN4202448776.html").read_text(encoding="utf-8") == _GOOD
+
+
+class _AlwaysUnrenderedTransport:
+    def __init__(self, unrendered_body: str):
+        self.calls = 0
+        self.unrendered_body = unrendered_body
+
+    def get(self, url, headers=None, timeout=None, verify=None):
+        self.calls += 1
+        return _Resp(200, self.unrendered_body)
+
+
+def test_unrendered_template_gives_up_and_is_never_cached(tmp_path):
+    # If the page never renders within max_attempts, fetch_raw raises (so the
+    # sweep counts a retryable failure) and writes NOTHING to the on-disk cache.
+    body = _UNRENDERED_FIXTURE.read_text(encoding="utf-8")
+    t = _AlwaysUnrenderedTransport(body)
+    with pytest.raises(RuntimeError):
+        fetch_raw("VN4202448776", tmp_path, session=t, use_cache=False, max_attempts=3, delay=0.0)
+    assert t.calls == 3  # retried, not returned on the first attempt
+    assert not (tmp_path / "VN4202448776.html").exists()
+
+
+def test_rendered_page_with_js_dollar_literal_not_flagged_unrendered(tmp_path):
+    # A genuinely rendered page contains the page's own JS guard string
+    # `indexOf("${")` — a bare `${` with no binding name. That must NOT be
+    # misread as an unrendered template, or every real page would be rejected.
+    rendered = (
+        "<html><div class='product-form-label'>(541)</div>"
+        "<div class='product-form-details'>VTRAVEL</div>"
+        '<script>if (relText.indexOf("${") >= 0) {}</script></html>'
+    )
+    t = _UnrenderedThenGoodTransport(unrendered_before_ok=0, unrendered_body="")
+    # Inline transport returning the rendered page on the first call.
+    t.unrendered_body = rendered
+    res = fetch_raw("VN4202600774", tmp_path, session=t, use_cache=False, delay=0.0)
+    assert res.outcome == "ok"
+    assert t.calls == 1  # accepted immediately, no retry
 
 
 def test_backoff_grows_then_caps_low():
