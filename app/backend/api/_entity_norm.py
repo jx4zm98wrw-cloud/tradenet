@@ -12,6 +12,8 @@ from __future__ import annotations
 import re
 import unicodedata
 
+from ._applicant_note import strip_registry_note
+
 _WS_RE = re.compile(r"\s+")
 # WIPO `representative` concatenates the firm name with its postal address.
 # The address always begins at the first comma or digit-run; cut there. This is
@@ -43,7 +45,7 @@ def strip_madrid_rep_address(s: str) -> str:
     return _MADRID_ADDR_RE.split(s, maxsplit=1)[0]
 
 
-ENTITY_CLEAN_VERSION = 1
+ENTITY_CLEAN_VERSION = 2
 """Logical version of the clean-name derivation in resolve_applicant /
 resolve_representative. There is NO per-row version column — the backfill
 (scripts/backfill_entity_clean.py) is idempotent by recompute-and-compare —
@@ -84,8 +86,12 @@ def resolve_applicant(
     (`madrid_records.holder_name`) → gazette fallback
     (`trademarks.applicant_name`). The callers gate `domestic`/`madrid` by
     `mark_category`, so at most one is set per mark.
+
+    Leading IP VIETNAM processing-notes (delivery/opinion/merge markers) are stripped
+    before clean/norm so the note never reaches the display value OR the grouping
+    key — the same company can't fragment across a noted and un-noted variant.
     """
-    return _clean_and_norm(_first_nonblank(domestic, madrid, gazette))
+    return _clean_and_norm(strip_registry_note(_first_nonblank(domestic, madrid, gazette)))
 
 
 def resolve_representative(

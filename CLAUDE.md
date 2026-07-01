@@ -207,7 +207,9 @@ claude_csvbuilder/
 │   │   ├── alembic/                Migrations
 │   │   ├── scripts/                One-off scripts (smoke_ingest.py;
 │   │   │                           reconcile_domestic_not_found.py prunes orphan
-│   │   │                           domestic_not_found rows)
+│   │   │                           domestic_not_found rows;
+│   │   │                           backfill_applicant_note.py strips IP VIETNAM
+│   │   │                           registry-notes from stored applicant names)
 │   │   ├── tests/                  pytest suite (httpx + ASGI)
 │   │   ├── pyproject.toml          Lint, type-check, package config
 │   │   ├── requirements.txt        Pinned runtime deps (includes pymupdf etc. for image_extractor)
@@ -350,6 +352,28 @@ gazettes ingested after the last backfill have `NULL *_norm` and are omitted
 from the domestic panels (which filter `*_norm IS NOT NULL`) until the
 backfill is re-run — re-run `scripts/backfill_entity_clean.py` after a fresh
 ingest. See `docs/superpowers/specs/2026-06-22-entity-canonicalization-design.md`.
+
+#### Applicant registry-note stripping
+
+IP VIETNAM's registry glues an operational note onto the FRONT of the applicant
+field — a delivery instruction (`(Nhận GCN tại Cục - 0948 456 705)…`,
+`(gửi VB VP 2)…`), a third-party-opinion flag (`(có ý kiến người thứ 3)…`), or a
+correspondence-merge marker (`(ghép cv giục cấp gcn)…`). These are not part of
+the entity name: they leaked into the mark header / search cards / domestic panel
+AND fragmented canonicalization (the same company grouped under a noted vs
+un-noted `applicant_norm`). `api/_applicant_note.py:strip_registry_note` (pure
+stdlib) removes a **leading** parenthetical **only** when its content matches the
+registry-note vocabulary — so a legitimate leading `(INC)` / ISO country code and
+any mid/tail parenthetical (e.g. `CÔNG TY … ALFA (SÀI GÒN)`) are left untouched.
+Applied going forward at both ingest points — `worker/mapper.py`
+(`trademarks.applicant_name`) and `domestic_enrich/store.py`
+(`domestic_records.applicant_name`) — and in `resolve_applicant` so
+`applicant_clean`/`applicant_norm` never carry a note (`ENTITY_CLEAN_VERSION`
+bumped to 2). Existing rows were cleaned in place by
+`scripts/backfill_applicant_note.py` (idempotent, dry-run by default, `--apply`
+to write; original preserved in `trademarks.raw`) — **re-run it (then
+`backfill_entity_clean`) after a fresh ingest/enrichment.** Guarded by
+`tests/test_applicant_note.py`.
 
 ### Search grant-status filter
 
