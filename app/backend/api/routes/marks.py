@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tm_similarity import MarkFeatures, resolve_weights, score
 
+from .._dedup import dedup_key_expr, representative_marks
 from .._status import derive_status
 from ..db import RecordType, Trademark, Watchlist, get_session
 from ..db.models import DomesticRecord, MadridRecord
@@ -263,14 +264,16 @@ async def co_marks(
     m = await session.get(Trademark, id)
     if m is None or not m.applicant_name:
         return []
+    # One card per UNIQUE mark: exclude the anchor's ENTIRE dedup group (its
+    # app+reg rows share an appno — filtering `id != m.id` alone would let the
+    # anchor's other gazette row show as a co-mark of itself) and collapse the
+    # rest via the deduped view so an app+reg mark yields a single card.
+    anchor_key = m.application_number or m.lineage_key or str(m.id)
+    rep = representative_marks([Trademark.applicant_name == m.applicant_name, dedup_key_expr() != anchor_key])
     rows = (
         (
             await session.execute(
-                select(Trademark)
-                .where(Trademark.applicant_name == m.applicant_name)
-                .where(Trademark.id != m.id)
-                .order_by(desc(Trademark.publication_date_441), desc(Trademark.year), Trademark.id)
-                .limit(limit)
+                select(rep).order_by(desc(rep.publication_date_441), desc(rep.year), rep.id).limit(limit)
             )
         )
         .scalars()
@@ -451,10 +454,18 @@ async def applicant_stats(id: uuid.UUID, session: AsyncSession = Depends(get_ses
     m = await session.get(Trademark, id)
     if m is None or not m.applicant_name:
         raise HTTPException(404, "Mark not found")
-    base = select(func.count()).select_from(Trademark).where(Trademark.applicant_name == m.applicant_name)
+    # Count UNIQUE marks, not raw gazette rows: a domestic mark appears as BOTH
+    # an application (A) row and a registration (B) row sharing an appno, so raw
+    # counts double-count every granted mark — once as `active` (its reg row)
+    # AND once as `pending` (its app row). The deduped view yields one
+    # MOST-ADVANCED row per mark (certificate > granted > id), so classifying
+    # that single survivor by record_type counts each mark exactly once: an
+    # app+reg mark's survivor is its registration row → active, never pending.
+    rep = representative_marks([Trademark.applicant_name == m.applicant_name])
+    base = select(func.count()).select_from(rep)
     total = (await session.execute(base)).scalar_one()
-    pending = (await session.execute(base.where(Trademark.record_type == RecordType.A))).scalar_one()
-    active = (await session.execute(base.where(Trademark.record_type != RecordType.A))).scalar_one()
+    pending = (await session.execute(base.where(rep.record_type == RecordType.A))).scalar_one()
+    active = (await session.execute(base.where(rep.record_type != RecordType.A))).scalar_one()
     # Oppositions filed is fake (no opposition data exists in our DB yet).
     return ApplicantStats(
         name=m.applicant_name,
