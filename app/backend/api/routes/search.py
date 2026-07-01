@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tm_similarity import phonetic_similarity
 
-from .._dedup import dedup_key_expr, representative_marks
+from .._dedup import representative_marks
 from ..db import RecordType, Trademark, get_session
 from ..schemas import TrademarkOut
 from ._filters import build_trademark_where, normalize_vienna_code, vienna_code_match
@@ -411,20 +411,15 @@ async def search_trademarks(
 
     if is_text_query:
         total = len(scored)
-    elif where:
-        # Filtered: filter-then-dedup semantics — COUNT(DISTINCT dedup_key) over
-        # the WHERE == unique marks matching the filter (a filter may match a
-        # non-representative row), a single aggregate over the small filtered set.
-        cnt_stmt = (
-            select(func.count(func.distinct(dedup_key_expr()))).select_from(Trademark).where(and_(*where))
-        )
-        total = (await session.execute(cnt_stmt)).scalar_one()
     else:
-        # Unfiltered: unique-mark count == representative-row count, but a plain
-        # COUNT(*) on the indexed `is_representative` flag instead of a
-        # COUNT(DISTINCT COALESCE(...)) that hash-aggregates all 238k rows
-        # (measured 565ms -> 20ms). Same value as the DISTINCT count.
-        cnt_stmt = select(func.count()).select_from(Trademark).where(Trademark.is_representative)
+        # dedup-then-filter: COUNT the representative rows matching the filter — the
+        # SAME set `representative_marks()` yields and the facets GROUP BY over, so
+        # the result total AGREES with the sidebar facet counts. (Filter-then-dedup
+        # over-counted: a mark present as both an application and a registration
+        # matched a `mark_category=domestic_application` filter via its application
+        # row even though its representative is the registration — 96,186 facet vs
+        # 119,354 results.) Also faster: a COUNT on the indexed flag, no distinct.
+        cnt_stmt = select(func.count()).select_from(Trademark).where(Trademark.is_representative, *where)
         total = (await session.execute(cnt_stmt)).scalar_one()
 
     page = scored[offset : offset + limit]

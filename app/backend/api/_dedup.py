@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import ColumnElement, Text, and_, cast, func, select
+from sqlalchemy import ColumnElement, Text, cast, func, select
 from sqlalchemy.orm import aliased
 
 from .db import Trademark
@@ -42,36 +42,25 @@ def dedup_key_expr() -> ColumnElement[str]:
 
 
 def representative_marks(where: Sequence[Any] = ()) -> Any:
-    """A ``DISTINCT ON (dedup key)`` view of `trademarks` that keeps the
-    MOST-ADVANCED row per mark — the SQL twin of ``search._dedup_pref``
-    (certificate present > granted > id).
+    """A one-row-per-mark view of `trademarks` — the maintained `is_representative`
+    row of each dedup group (most-advanced: certificate present > granted > id) —
+    with `where` applied ON TOP of that deduped set (**dedup-then-filter**).
 
-    Returns an aliased ``Trademark`` entity backed by the DISTINCT-ON subquery,
-    so callers can ``SELECT`` / ``GROUP BY`` / ``JOIN`` its columns and
-    ``COUNT(*)`` the unique marks, with `where` applied INSIDE the subquery.
+    Returns an aliased ``Trademark`` entity so callers can ``SELECT`` / ``GROUP
+    BY`` / ``JOIN`` its columns and ``COUNT(*)`` the unique marks.
 
-    DISTINCT ON keeps the first row per key by the inner ``ORDER BY``; the key
-    must lead that ORDER BY. The remaining terms reproduce ``_dedup_pref``'s
-    max-wins tuple ``(certificate_number is not None, vn_grant_date is not None,
-    str(id))`` as DESC so the same physical row survives as in the Python paths.
+    DEDUP-THEN-FILTER (not filter-then-dedup) is deliberate: a mark is counted by
+    its REPRESENTATIVE row's attributes, so a mark present as BOTH an application
+    and a registration row is a `domestic_registration` and is NOT returned by a
+    `mark_category=domestic_application` filter. This makes the filtered result
+    total agree with the sidebar facet counts (which already group by the
+    representative) — otherwise a filter that matches a non-representative row
+    (e.g. the application row of a since-registered mark) would inflate the total.
+    Filtering the indexed `is_representative` set is also faster than the old
+    DISTINCT-ON-sort-then-filter. Requires `is_representative` to be maintained
+    (ingest worker + backfill_is_representative).
     """
-    if not where:
-        # Unfiltered: the maintained `is_representative` flag already marks exactly
-        # one row per dedup group (the SQL twin of the DISTINCT ON below), so filter
-        # the indexed boolean instead of sorting the WHOLE table — the DISTINCT ON
-        # seq-scanned 238k rows and spilled a ~19 MB external-merge sort to disk on
-        # every facet / default-search call. Semantically identical to the
-        # unfiltered DISTINCT ON (both yield the representative row of every group).
-        return aliased(Trademark, select(Trademark).where(Trademark.is_representative).subquery())
-    key = dedup_key_expr()
-    sub = select(Trademark).where(and_(*where))
-    sub = sub.distinct(key).order_by(
-        key,
-        Trademark.certificate_number.is_not(None).desc(),
-        Trademark.vn_grant_date.is_not(None).desc(),
-        cast(Trademark.id, Text).desc(),
-    )
-    return aliased(Trademark, sub.subquery())
+    return aliased(Trademark, select(Trademark).where(Trademark.is_representative, *where).subquery())
 
 
 # --- Maintenance of trademarks.is_representative -----------------------------
