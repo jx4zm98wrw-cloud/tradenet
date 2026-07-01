@@ -90,7 +90,11 @@ async def seed() -> AsyncIterator[None]:
                 record_type=RecordType.A,
                 application_number=appno,
                 applicant_name=_APPLICANT,
-                mark_sample="DEDUPSMARK",
+                # NULL mark_sample + a backfilled resolved mark_name: the real
+                # shape of a domestic/figurative mark. Co-marks must resolve the
+                # display name from mark_name, NOT fall through to the appno.
+                mark_sample=None,
+                mark_name="DEDUPSNAME",
                 certificate_number=None,
                 publication_date_441=date(2098, 1, 1),
                 vn_grant_date=date(2098, 5, 1) if granted else None,
@@ -103,7 +107,11 @@ async def seed() -> AsyncIterator[None]:
                 record_type=RecordType.B_domestic,
                 application_number=appno,
                 applicant_name=_APPLICANT,
-                mark_sample="DEDUPSMARK",
+                # NULL mark_sample + a backfilled resolved mark_name: the real
+                # shape of a domestic/figurative mark. Co-marks must resolve the
+                # display name from mark_name, NOT fall through to the appno.
+                mark_sample=None,
+                mark_name="DEDUPSNAME",
                 certificate_number=cert,
                 publication_date_441=None,
                 vn_grant_date=date(2098, 5, 1),
@@ -170,3 +178,10 @@ async def test_co_marks_returns_one_card_per_unique_mark(client: AsyncClient) ->
     ids = [c["id"] for c in cards]
     assert len(ids) == len(set(ids)), "no duplicate co-mark cards"
     assert len(cards) == 2, f"two OTHER unique marks (A1, A2), got {len(cards)} cards"
+    # Regression: the card must show the resolved MARK NAME, never the appno.
+    # These rows have NULL mark_sample, so the old chain (mark_sample -> appno)
+    # rendered the application number for every co-mark.
+    appnos = {_A1, _A2, _A3}
+    for c in cards:
+        assert c["name"] == "DEDUPSNAME", f"co-mark name must be the resolved mark, got {c['name']!r}"
+        assert c["name"] not in appnos, "co-mark name must never be the application number"

@@ -282,7 +282,13 @@ async def co_marks(
     return [
         CoMark(
             id=r.id,
-            name=r.mark_sample or r.application_number or r.certificate_number or "—",
+            # Resolved display name — same chain as the rest of this file and the
+            # frontend `markDisplay`: prefer the backfilled `mark_name`, fall back to
+            # `mark_sample` (fresh-ingest rows with NULL mark_name), then the
+            # figurative placeholder. NEVER the appno/cert number — that's an ID, not
+            # a mark, and `mark_sample` is empty for ~172k domestic + all figurative
+            # marks, so the old chain showed the appno for nearly every co-mark.
+            name=r.mark_name or r.mark_sample or "(figurative mark)",
             year=r.year,
             classes=r.nice_classes or [],
         )
