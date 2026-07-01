@@ -5,8 +5,12 @@ selected this value, how many results would I get" rather than zero.
 
 from __future__ import annotations
 
+import functools
+import time
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import date
+from typing import Any, TypeVar
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import desc, func, select
@@ -19,6 +23,51 @@ from ._filters import build_trademark_where
 from .stats import NICE_LABELS, CountBucket
 
 router = APIRouter(prefix="/api/v1/facets", tags=["facets"])
+
+
+# --- Facet response cache -----------------------------------------------------
+# The Search page fires ~7 facet counts in parallel on every visit, and the
+# DEFAULT (unfiltered) counts are near-static — they change only when a gazette
+# is ingested. Each count seq-scans the whole `representative_marks` set (~70 ms
+# isolated, but ~600 ms under the 7-way concurrent contention on one worker), so
+# an in-process TTL cache turns repeat visits into ~0 ms hits. Keyed by
+# (endpoint, limit, filter signature) so filtered facets cache independently and
+# never collide with the unfiltered defaults.
+#
+# TTL-bounded (no cross-process invalidation) — after an ingest, facet counts can
+# be up to `_FACET_TTL_S` stale. Per-worker (fine: each warms on first hit).
+_FACET_TTL_S = 120.0
+_FACET_CACHE_MAX = 512  # bound memory; clear wholesale when exceeded (rare — few filter combos)
+_facet_cache: dict[tuple[Any, ...], tuple[float, Any]] = {}
+
+_F = TypeVar("_F", bound=Callable[..., Awaitable[Any]])
+
+
+def _facet_cached(name: str) -> Callable[[_F], _F]:
+    """Decorator: TTL-cache a facet endpoint's return by (name, limit, filters).
+
+    Wraps with functools.wraps so FastAPI still resolves the original signature
+    (its dependency injection follows __wrapped__)."""
+
+    def deco(fn: _F) -> _F:
+        @functools.wraps(fn)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            filters: dict = kwargs.get("filters", {})
+            sig = tuple(sorted((k, str(v)) for k, v in filters.items() if v is not None))
+            key = (name, kwargs.get("limit"), sig)
+            now = time.monotonic()
+            hit = _facet_cache.get(key)
+            if hit is not None and hit[0] > now:
+                return hit[1]
+            result = await fn(*args, **kwargs)
+            if len(_facet_cache) >= _FACET_CACHE_MAX:
+                _facet_cache.clear()
+            _facet_cache[key] = (now + _FACET_TTL_S, result)
+            return result
+
+        return wrapper  # type: ignore[return-value]
+
+    return deco
 
 
 # Shared Query() filter signature — keep in sync with /api/search/trademarks.
@@ -61,6 +110,7 @@ def _filter_params(
 
 
 @router.get("/countries", response_model=list[CountBucket])
+@_facet_cached("countries")
 async def facet_countries(
     filters: dict = Depends(_filter_params),
     limit: int = Query(20, ge=1, le=300),
@@ -83,6 +133,7 @@ async def facet_countries(
 
 
 @router.get("/nice-classes", response_model=list[CountBucket])
+@_facet_cached("nice-classes")
 async def facet_nice_classes(
     filters: dict = Depends(_filter_params),
     limit: int = Query(45, ge=1, le=45),
@@ -108,6 +159,7 @@ async def facet_nice_classes(
 
 
 @router.get("/applicants", response_model=list[CountBucket])
+@_facet_cached("applicants")
 async def facet_applicants(
     filters: dict = Depends(_filter_params),
     limit: int = Query(20, ge=1, le=300),
@@ -148,6 +200,7 @@ MARK_CATEGORY_LABELS: dict[str, str] = {
 
 
 @router.get("/mark-categories", response_model=list[CountBucket])
+@_facet_cached("mark-categories")
 async def facet_mark_categories(
     filters: dict = Depends(_filter_params),
     session: AsyncSession = Depends(get_session),
@@ -176,6 +229,7 @@ VN_STATUS_LABELS: dict[str, str] = {
 
 
 @router.get("/vn-status", response_model=list[CountBucket])
+@_facet_cached("vn-status")
 async def facet_vn_status(
     filters: dict = Depends(_filter_params),
     session: AsyncSession = Depends(get_session),
@@ -198,6 +252,7 @@ async def facet_vn_status(
 
 
 @router.get("/granted", response_model=list[CountBucket])
+@_facet_cached("granted")
 async def facet_granted(
     filters: dict = Depends(_filter_params),
     session: AsyncSession = Depends(get_session),
@@ -218,6 +273,7 @@ async def facet_granted(
 
 
 @router.get("/ip-agencies", response_model=list[CountBucket])
+@_facet_cached("ip-agencies")
 async def facet_ip_agencies(
     filters: dict = Depends(_filter_params),
     limit: int = Query(20, ge=1, le=300),

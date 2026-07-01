@@ -12,9 +12,10 @@ point at a docker-compose-spawned Postgres dedicated to CI.
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from typing import TYPE_CHECKING
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
@@ -32,6 +33,17 @@ os.environ.setdefault("TM_REDIS_URL", "redis://localhost:6380/0")
 # across loops raises "Future attached to a different loop". Production code
 # uses QueuePool because uvicorn workers own a durable loop per process.
 os.environ.setdefault("TM_ENV", "test")
+
+
+@pytest.fixture(autouse=True)
+def _clear_facet_cache() -> Iterator[None]:
+    """Isolate the in-process facet TTL cache between tests — otherwise one test's
+    seeded counts could serve a later test with the same facet+filter signature."""
+    from api.routes import facets
+
+    facets._facet_cache.clear()
+    yield
+    facets._facet_cache.clear()
 
 
 @pytest_asyncio.fixture
