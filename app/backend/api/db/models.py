@@ -282,13 +282,15 @@ class Trademark(Base):
     mark_embedding: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     """L2-normalised 768-float32 LaBSE embedding of mark_name, as bytea. Populated
     by scripts/backfill_mark_embedding.py (backfill-only; see Track 3b-1)."""
-    is_representative: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
-    """True for the ONE most-advanced row of each dedup group (the SQL twin of
-    `_dedup.representative_marks`' DISTINCT ON: certificate present > granted >
-    id desc). Lets the unfiltered facet/search path filter on an indexed boolean
-    instead of sorting the whole table. Maintained at ingest (worker recomputes
-    the touched groups) and by scripts/backfill_is_representative.py — MUST stay in
-    sync with `dedup_key_expr()` / `_dedup_pref`."""
+    is_representative: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    """True for the ONE most-advanced row of each dedup group (certificate present >
+    granted > id desc). `representative_marks` filters this indexed boolean
+    (dedup-then-filter) instead of a DISTINCT-ON sort. Maintained at ingest (worker
+    recomputes the touched groups) and by scripts/backfill_is_representative.py —
+    MUST stay in sync with `dedup_key_expr()` / `_dedup_pref`. Defaults TRUE: a
+    freshly-inserted row is usually a brand-new mark (its own representative), so it
+    stays visible until the ingest recompute demotes any superseded sibling — a
+    graceful degradation (shows, maybe twice) vs false (invisible until backfill)."""
 
     # Priority / related
     priority_300: Mapped[str | None] = mapped_column(Text, nullable=True)  # (300)

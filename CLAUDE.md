@@ -452,18 +452,21 @@ ingests with nothing to re-run. Guarded by `tests/test_search_dedup.py`.
 
 The same dedup also covers the **filter-only / vienna / image** search paths
 (no `q` target) and **every `/facets/*` count**, via a shared SQL-level view
-(`api/_dedup.py`): `representative_marks(where)` is a `DISTINCT ON
-(COALESCE(application_number, lineage_key, id))` subquery whose `ORDER BY`
-mirrors `_dedup_pref` (certificate present > granted > `id` desc), so it yields
-exactly one most-advanced row per mark. `search_trademarks` sources the
-non-text branch from it and reports `total = COUNT(DISTINCT` dedup-key`)`;
+(`api/_dedup.py`): `representative_marks(where)` selects the ONE
+`is_representative` row of each mark and applies `where` ON TOP of that deduped
+set — **dedup-then-filter**. `search_trademarks` sources the non-text branch from
+it and reports `total = COUNT(*) WHERE is_representative AND where`;
 `routes/facets.py` GROUP-BYs / counts over it, so each unique mark is tallied
 **once under its representative row's** category/status (e.g. an app+reg mark
 counts once under `domestic_registration`, not once per row; `Granted` counts
 each granted mark once even though `vn_grant_date` is written to every gazette
-row of the appno). `dedup_key_expr()` is the SQL twin of `_dedup_key` (uses
-`NULLIF(col,'')` to match Python `or` truthiness) — the two representations must
-stay in sync. Guarded by `tests/test_search_dedup_filter_facets.py` (and
+row of the appno). **dedup-then-filter (not filter-then-dedup) is what makes the
+filtered result total agree with the sidebar facet counts**: a mark is counted by
+its REPRESENTATIVE row's attributes, so a since-registered mark is a
+`domestic_registration` and is NOT returned by a `mark_category=domestic_application`
+filter — the old filter-then-dedup matched such a mark via its still-present
+application row and over-counted (96,186 facet vs 119,354 results). Guarded by
+`tests/test_search_dedup_filter_facets.py` (and
 `tests/test_search_dedup.py` for the text/phonetic paths).
 
 **Performance — `is_representative` fast path.** The `DISTINCT ON` seq-scanned
@@ -472,10 +475,9 @@ every facet / default-search call** (~1 s each; the Search page fires ~8 in
 parallel → ~3 s to data-ready). `trademarks.is_representative` (bool, migration
 `20260701_0033`; partial index `ix_trademarks_representative WHERE
 is_representative`) precomputes the DISTINCT-ON winner — `true` on exactly the one
-most-advanced row of each dedup group. When `where` is **empty**,
-`representative_marks()` filters `WHERE is_representative` (seq-scan + hash-agg, NO
-sort — ~1 s → ~70 ms/facet, semantically identical to the unfiltered DISTINCT ON);
-a non-empty `where` keeps the DISTINCT ON over the small filtered set. The flag is
+most-advanced row of each dedup group. `representative_marks()` filters
+`WHERE is_representative AND where` for ALL queries (seq-scan + hash-agg, NO sort —
+~1 s → ~70 ms/facet); the DISTINCT-ON path is gone entirely. The flag is
 maintained by `_dedup.recompute_is_representative_sql` (the SQL twin of
 `dedup_key_expr()` / `_dedup_pref` — **keep in sync**): the ingest worker
 recomputes the touched groups after every ingest, and

@@ -31,9 +31,10 @@ from datetime import date
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from sqlalchemy import delete
+from sqlalchemy import delete, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from api._dedup import recompute_is_representative_sql
 from api.db import Gazette, GazetteStatus, GazetteType, RecordType, Trademark
 from api.settings import get_settings
 
@@ -122,6 +123,10 @@ async def seed() -> AsyncIterator[None]:
         s.add(app_row(_P2_APP, _A2, granted=True))
         s.add(reg_row(_P2_REG, _A2, "CERT-2098-E2"))
         s.add(app_row(_SOLO, _A3, granted=False))
+        await s.commit()
+        # Flag the representative row of each dedup group — representative_marks
+        # (dedup-then-filter) reads is_representative, which direct-seeded rows lack.
+        await s.execute(text(recompute_is_representative_sql(scoped_to_gazette=True)), {"gid": _GZ})
         await s.commit()
     yield
     async with Session() as s:
