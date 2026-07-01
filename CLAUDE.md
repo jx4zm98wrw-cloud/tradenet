@@ -424,11 +424,22 @@ correct. This is **query-time only**: never deletes/mutates rows (both gazette
 rows are real and carry distinct data), and works automatically for future
 ingests with nothing to re-run. Guarded by `tests/test_search_dedup.py`.
 
-Scope: the dedup covers the text/phonetic similarity paths the duplicate-card
-bug lives on. Filter-only / vienna / image searches (no `q` target) still
-paginate in SQL with a raw `COUNT` and the `/facets/*` counts are still raw row
-counts — collapsing those needs SQL-level (`DISTINCT ON`) dedup and is a
-separate follow-up.
+The same dedup also covers the **filter-only / vienna / image** search paths
+(no `q` target) and **every `/facets/*` count**, via a shared SQL-level view
+(`api/_dedup.py`): `representative_marks(where)` is a `DISTINCT ON
+(COALESCE(application_number, lineage_key, id))` subquery whose `ORDER BY`
+mirrors `_dedup_pref` (certificate present > granted > `id` desc), so it yields
+exactly one most-advanced row per mark. `search_trademarks` sources the
+non-text branch from it and reports `total = COUNT(DISTINCT` dedup-key`)`;
+`routes/facets.py` GROUP-BYs / counts over it, so each unique mark is tallied
+**once under its representative row's** category/status (e.g. an app+reg mark
+counts once under `domestic_registration`, not once per row; `Granted` counts
+each granted mark once even though `vn_grant_date` is written to every gazette
+row of the appno). `dedup_key_expr()` is the SQL twin of `_dedup_key` (uses
+`NULLIF(col,'')` to match Python `or` truthiness) — the two representations must
+stay in sync. Still query-time only, no migration. Guarded by
+`tests/test_search_dedup_filter_facets.py` (and `tests/test_search_dedup.py` for
+the text/phonetic paths).
 
 ### Mark embedding feature store (Track 3b-1)
 
