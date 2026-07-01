@@ -441,6 +441,16 @@ stay in sync. Still query-time only, no migration. Guarded by
 `tests/test_search_dedup_filter_facets.py` (and `tests/test_search_dedup.py` for
 the text/phonetic paths).
 
+The same `_dedup.py` view also backs the **mark-detail applicant portfolio**
+surfaces (`routes/marks.py`): `/api/v1/marks/{id}/applicant-stats` counts
+`totalMarks`/`activeMarks`/`pending` over `representative_marks` (each unique
+mark classified once by its most-advanced row's `record_type`, so an app+reg
+mark counts once as active, never also pending — was double-counting: e.g.
+CÔNG TY … TÂY ĐÔ LONG AN reported 41/16/25 instead of 25/16/9), and
+`/api/v1/marks/{id}/co-marks` collapses the applicant's other rows to one card
+per mark (excluding the anchor's whole `dedup_key_expr()` group). Guarded by
+`tests/test_applicant_stats_dedup.py`.
+
 ### Mark embedding feature store (Track 3b-1)
 
 `trademarks.mark_embedding` (nullable `bytea`, no index; migration
