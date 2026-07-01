@@ -15,6 +15,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, delete, text
 from sqlalchemy.orm import Session, sessionmaker
 
+from api._dedup import recompute_is_representative_sql
 from api.db.models import Gazette, GazetteStatus, GazetteType, Trademark
 from api.settings import get_settings
 from tm_extractor import ExtractorConfig, PDFProcessor
@@ -439,6 +440,13 @@ def ingest_pdf(gazette_id: str) -> dict:
             session.add_all(batch)
             session.commit()
             row_count += len(batch)
+
+        # Maintain the one-row-per-mark flag for the dedup groups this gazette
+        # touched: a new B (registration) row can become the representative of an
+        # appno already present as an A (application) row from an earlier gazette,
+        # so recompute the whole touched group — not just the new rows.
+        session.execute(text(recompute_is_representative_sql(scoped_to_gazette=True)), {"gid": gid})
+        session.commit()
 
         gazette.status = GazetteStatus.completed
         gazette.row_count = row_count
