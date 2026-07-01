@@ -401,6 +401,35 @@ empty `mark_sample`) is no longer missed. Augment (not swap) keeps fresh-ingest 
 `docs/superpowers/specs/2026-06-24-mark-name-resolution-design.md` and
 `docs/superpowers/specs/2026-06-26-search-applicant-prefix-design.md`.
 
+### Search result dedup (one card per mark)
+
+`trademarks` holds **one row per gazette appearance**, so a single mark can
+surface as two rows: a domestic mark as an A-file `domestic_application` row
+(carries the publication date) AND a B-file `domestic_registration` row
+(carries the certificate); a Madrid mark as a `madrid_registration` row AND a
+`madrid_renewal` row. ~23,164 domestic appnos have the application+registration
+pair. `/search` read `trademarks` directly and returned both, inflating
+"N trademarks match" and showing a duplicate card (e.g. `4-2025-03772`).
+
+`routes/search.py` now collapses same-mark rows in the **result set** —
+`_dedup_marks()` keys each row by `COALESCE(application_number, lineage_key,
+id)` (domestic A+B share the appno; Madrid registration+renewal share the
+`lineage_key` IRN; figurative/no-id rows stay distinct via the `id` fallback)
+and keeps the most-advanced row per key (`_dedup_pref`: certificate present >
+granted > stable `id` tiebreak), so the surviving card shows the registered
+status. Applied to BOTH similarity paths **before** scoring/paging — the text
+over-fetch (`is_text_query`) and the phonetic two-stage recall — so `total`
+(which is `len(scored)` on those paths) counts unique marks and pagination is
+correct. This is **query-time only**: never deletes/mutates rows (both gazette
+rows are real and carry distinct data), and works automatically for future
+ingests with nothing to re-run. Guarded by `tests/test_search_dedup.py`.
+
+Scope: the dedup covers the text/phonetic similarity paths the duplicate-card
+bug lives on. Filter-only / vienna / image searches (no `q` target) still
+paginate in SQL with a raw `COUNT` and the `/facets/*` counts are still raw row
+counts — collapsing those needs SQL-level (`DISTINCT ON`) dedup and is a
+separate follow-up.
+
 ### Mark embedding feature store (Track 3b-1)
 
 `trademarks.mark_embedding` (nullable `bytea`, no index; migration
