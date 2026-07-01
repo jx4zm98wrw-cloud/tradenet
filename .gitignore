@@ -3,6 +3,10 @@
 *.csv
 csv/
 
+# Unique-application exports (CSV + *_overflow.json, regenerable via
+# scripts/export_unique_applications.py) — large, never commit.
+exports/
+
 # Sidecar overflow dumps from the extractor
 *_511_overflow.txt
 
