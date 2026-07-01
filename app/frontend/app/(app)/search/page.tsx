@@ -93,12 +93,19 @@ function SearchPage() {
         // intentionally silent — facets are best-effort
       }
     };
-    api.facetsCountries(filters, 20, init).then(setCountries).catch(silent);
-    api.facetsNiceClasses(filters, 45, init).then(setClasses).catch(silent);
-    api.facetsApplicants(filters, 8, init).then(setApplicants).catch(silent);
-    api.facetsIpAgencies(filters, 8, init).then(setIpAgencies).catch(silent);
-    api.facetsMarkCategories(filters, init).then(setMarkCategories).catch(silent);
-    api.facetsGranted(filters, init).then(setGrantedFacet).catch(silent);
+    // One round-trip for all six sidebar facets (replaces 6 parallel calls that
+    // self-contended on the backend). Still best-effort + abortable.
+    api
+      .facetsAll(filters, init)
+      .then((f) => {
+        setCountries(f.countries);
+        setClasses(f.nice_classes);
+        setApplicants(f.applicants);
+        setIpAgencies(f.ip_agencies);
+        setMarkCategories(f.mark_categories);
+        setGrantedFacet(f.granted);
+      })
+      .catch(silent);
     return () => controller.abort();
   }, [filters]);
 

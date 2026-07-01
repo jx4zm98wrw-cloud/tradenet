@@ -221,6 +221,16 @@ export type StatsOverview = {
 
 export type CountBucket = { key: string; label: string | null; count: number };
 
+/** All sidebar facets in one payload (GET /api/v1/facets/all). */
+export type AllFacets = {
+  countries: CountBucket[];
+  nice_classes: CountBucket[];
+  applicants: CountBucket[];
+  ip_agencies: CountBucket[];
+  mark_categories: CountBucket[];
+  granted: CountBucket[];
+};
+
 function qs(p: Record<string, unknown>): string {
   const u = new URLSearchParams();
   for (const [k, v] of Object.entries(p)) {
@@ -593,6 +603,9 @@ export const api = {
     json<CountBucket[]>(`/api/v1/facets/mark-categories?${qs({ ...filters, offset: undefined })}`, init),
   facetsGranted: (filters: SearchParams, init?: RequestInit) =>
     json<CountBucket[]>(`/api/v1/facets/granted?${qs({ ...filters, offset: undefined })}`, init),
+  /** All sidebar facets in ONE round-trip (replaces the 6 facets* calls above). */
+  facetsAll: (filters: SearchParams, init?: RequestInit) =>
+    json<AllFacets>(`/api/v1/facets/all?${qs({ ...filters, offset: undefined })}`, init),
   statsTopApplicants: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-applicants?limit=${limit}`),
   statsTopAgents: (limit = 10) => json<CountBucket[]>(`/api/v1/stats/top-agents?limit=${limit}`),
   getMark: (id: string) => json<MarkDetail>(`/api/v1/marks/${id}`),

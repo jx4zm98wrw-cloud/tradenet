@@ -13,6 +13,7 @@ from datetime import date
 from typing import Any, TypeVar
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -299,3 +300,35 @@ async def facet_ip_agencies(
     )
     rows = (await session.execute(stmt)).all()
     return [CountBucket(key=name, count=n) for name, n in rows]
+
+
+class AllFacets(BaseModel):
+    """Every sidebar facet in one payload — see `facet_all`."""
+
+    countries: list[CountBucket]
+    nice_classes: list[CountBucket]
+    applicants: list[CountBucket]
+    ip_agencies: list[CountBucket]
+    mark_categories: list[CountBucket]
+    granted: list[CountBucket]
+
+
+@router.get("/all", response_model=AllFacets)
+async def facet_all(
+    filters: dict = Depends(_filter_params),
+    session: AsyncSession = Depends(get_session),
+) -> AllFacets:
+    """One request returning all six sidebar facets, replacing the ~6 the Search
+    page fired in parallel. Computed SEQUENTIALLY on the request's session (an
+    AsyncSession is not concurrency-safe) — which also avoids the self-contention
+    that inflated each parallel call — with every sub-call hitting the per-facet
+    TTL cache. Limits mirror the individual endpoints' frontend defaults.
+    """
+    return AllFacets(
+        countries=await facet_countries(filters=filters, limit=20, session=session),
+        nice_classes=await facet_nice_classes(filters=filters, limit=45, session=session),
+        applicants=await facet_applicants(filters=filters, limit=8, session=session),
+        ip_agencies=await facet_ip_agencies(filters=filters, limit=8, session=session),
+        mark_categories=await facet_mark_categories(filters=filters, session=session),
+        granted=await facet_granted(filters=filters, session=session),
+    )
