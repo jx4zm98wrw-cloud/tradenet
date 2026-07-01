@@ -211,7 +211,11 @@ claude_csvbuilder/
 │   │   │                           backfill_applicant_note.py strips IP VIETNAM
 │   │   │                           registry-notes from stored applicant names;
 │   │   │                           backfill_is_representative.py flags the
-│   │   │                           one-row-per-mark dedup representative)
+│   │   │                           one-row-per-mark dedup representative;
+│   │   │                           fill_registration_date_from_enrichment.py fills
+│   │   │                           missing B-file (151) dates from domestic
+│   │   │                           grant_date / Madrid registration_date — re-run
+│   │   │                           after a B-file re-ingest, mixes provenance)
 │   │   ├── tests/                  pytest suite (httpx + ASGI)
 │   │   ├── pyproject.toml          Lint, type-check, package config
 │   │   ├── requirements.txt        Pinned runtime deps (includes pymupdf etc. for image_extractor)
