@@ -10,6 +10,7 @@ from sqlalchemy import CursorResult, delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api._applicant_note import strip_registry_note
 from api.db.models import DomesticNotFound, DomesticRecord, Trademark
 
 from .parser import DomesticRecord as ParsedRecord
@@ -97,7 +98,7 @@ async def upsert(
     values = dict(
         mark_text=rec.mark_text,
         mark_type=rec.mark_type,
-        applicant_name=rec.applicant_name,
+        applicant_name=strip_registry_note(rec.applicant_name),
         applicant_address=rec.applicant_address,
         representative=rec.representative,
         colors=rec.colors,

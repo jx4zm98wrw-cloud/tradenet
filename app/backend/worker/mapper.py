@@ -12,6 +12,7 @@ import uuid
 from datetime import date
 from typing import Any
 
+from api._applicant_note import strip_registry_note
 from api.db.models import RecordType, Trademark
 from tm_extractor.constants import MISSING_COUNTRY_CODE
 
@@ -153,7 +154,7 @@ def section_to_trademark(
         territory_831=_str(s.get("(831)")),
         applicant_raw_731=_str(s.get("(731)")),
         owner_raw_732=_str(s.get("(732)")),
-        applicant_name=_str(s.get("Applicant Name")),
+        applicant_name=strip_registry_note(_str(s.get("Applicant Name"))),
         applicant_address=_str(s.get("Applicant Address")),
         applicant_country_code=_country_code(s.get("Applicant Country Code")),
         applicant_city=_str(s.get("Applicant City")),
