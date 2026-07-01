@@ -483,6 +483,14 @@ recomputes the touched groups after every ingest, and
 population. **Re-run the backfill after a bulk `backfill_vn_grant` (a tiebreaker in
 the ordering).** Guarded by `tests/test_is_representative.py`.
 
+On top of that, `routes/facets.py` wraps each of its 7 count endpoints in an
+in-process TTL cache (`_facet_cached`, `_FACET_TTL_S = 120s`, keyed by endpoint +
+`limit` + non-null filter signature) so the ~7 near-static default-facet queries
+the Search page fires in parallel become ~0 ms hits on repeat visits (they change
+only on ingest). Per-worker, TTL-bounded (facets can be up to 120 s stale after an
+ingest; no cross-process invalidation). A conftest autouse fixture clears it
+between tests. Guarded by `tests/test_facet_cache.py`.
+
 The same `_dedup.py` view also backs the **mark-detail applicant portfolio**
 surfaces (`routes/marks.py`): `/api/v1/marks/{id}/applicant-stats` counts
 `totalMarks`/`activeMarks`/`pending` over `representative_marks` (each unique
