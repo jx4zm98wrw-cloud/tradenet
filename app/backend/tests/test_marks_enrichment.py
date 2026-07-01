@@ -53,6 +53,7 @@ async def seed() -> AsyncIterator[None]:
             Trademark(
                 id=_MADRID_ID,
                 gazette_id=_GZ,
+                is_representative=True,  # distinct single marks — each its own dedup representative
                 record_type=RecordType.B_madrid,
                 madrid_number=_IRN,
                 # Future pub date so this row sorts to the top of the
@@ -67,6 +68,7 @@ async def seed() -> AsyncIterator[None]:
             Trademark(
                 id=_DOMESTIC_ID,
                 gazette_id=_GZ,
+                is_representative=True,  # distinct single marks — each its own dedup representative
                 record_type=RecordType.B_domestic,
                 certificate_number="VN12345",
                 application_number="4-2099-00001",
@@ -77,6 +79,7 @@ async def seed() -> AsyncIterator[None]:
             Trademark(
                 id=_DOMESTIC_ENRICH_ID,
                 gazette_id=_GZ,
+                is_representative=True,  # distinct single marks — each its own dedup representative
                 record_type=RecordType.A,
                 application_number=_DOMESTIC_APP_NO,
                 publication_date_441=date(2099, 2, 1),
