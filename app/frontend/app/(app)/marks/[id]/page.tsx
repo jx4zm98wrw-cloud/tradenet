@@ -385,7 +385,7 @@ export default function MarkDetailPage() {
                   <Stat n={stats.oppositionsFiled} label="oppositions" />
                 </div>
                 <Link
-                  href={`/search?q=${encodeURIComponent(stats.name)}`}
+                  href={`/search?applicant=${encodeURIComponent(stats.name)}`}
                   className="block text-xs text-stamp hover:text-stamp-deep font-medium mt-2"
                 >
                   View all {formatNumber(stats.totalMarks)} marks →
