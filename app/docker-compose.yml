@@ -44,6 +44,12 @@ x-worker-base: &worker-base
 services:
   postgres:
     image: postgres:16-alpine
+    # Raise work_mem well above Postgres' 4MB default so sort/hash nodes over the
+    # 238k-row `trademarks` table stay in memory instead of spilling to a temp
+    # file on disk (a filtered DISTINCT-ON dedup sort would spill ~19MB at 4MB).
+    # Dev-stack tuning only (few connections); safe at this scale. Takes effect on
+    # the next `docker compose up` (recreate) of the postgres service.
+    command: ["postgres", "-c", "work_mem=64MB", "-c", "maintenance_work_mem=256MB"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tm}
