@@ -38,7 +38,7 @@ jobs:
       TM_REDIS_URL: redis://localhost:6379/0
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6
         with: { version: 10 }
@@ -108,7 +108,7 @@ jobs:
     name: Security audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with: { version: 10 }
       # No `cache: pnpm` here — this job runs `pnpm audit` (which queries
@@ -156,7 +156,7 @@ jobs:
       security-events: write
       actions: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Build backend image
         # Build context = app/backend so the COPY layers match the prod build
@@ -277,7 +277,7 @@ jobs:
       PLAYWRIGHT_ADMIN_PASSWORD: ci-playwright-password-1234567890
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # ---- Backend setup ----
       - uses: actions/setup-python@v6
