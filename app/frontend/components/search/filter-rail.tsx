@@ -213,7 +213,7 @@ export function FilterRail({
         })}
       </RailGroup>
 
-      <RailGroup title="Grant date" subtitle="Filters by VN grant date (granted marks only).">
+      <RailGroup title="Grant date">
         <div className="grid grid-cols-2 gap-2 px-1">
           <DateField
             label="From"
@@ -295,19 +295,6 @@ export function FilterRail({
         <div className="grid grid-cols-2 gap-2 px-1">
           <DateField label="From" value={null} />
           <DateField label="To" value={null} />
-        </div>
-        <div className="flex gap-1 flex-wrap mt-2 px-1">
-          {["This week", "This month", "Last 90 days", "YTD"].map((p) => (
-            <button
-              key={p}
-              type="button"
-              className={`text-[11px] px-2 py-1 rounded border border-line hover:bg-paper-2 ${
-                p === "Last 90 days" ? "bg-stamp-2 border-stamp-line text-stamp" : "bg-surface text-ink-2"
-              }`}
-            >
-              {p}
-            </button>
-          ))}
         </div>
       </RailGroup>
     </aside>
