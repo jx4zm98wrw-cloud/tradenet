@@ -68,8 +68,15 @@ def _json_default(o: object) -> object:
 
 
 def _export(
-    conn, table: str, key_col: str, universe_sql: str, base_cols: list[str],
-    join_sql: str, extra: dict[str, str], out_path: pathlib.Path, json_path: pathlib.Path,
+    conn,
+    table: str,
+    key_col: str,
+    universe_sql: str,
+    base_cols: list[str],
+    join_sql: str,
+    extra: dict[str, str],
+    out_path: pathlib.Path,
+    json_path: pathlib.Path,
 ) -> tuple[int, int, int]:
     """Export the COMPLETE unique universe (every distinct key from `trademarks`),
     LEFT JOIN the enrichment table so not-yet-enriched applications still appear
@@ -82,20 +89,15 @@ def _export(
     The key column comes from the universe `u` (always present); other enrichment
     columns come from `e` (NULL when unenriched). Returns (rows, enriched, overflow).
     """
-    select_cols = [
-        f"u.{key_col} AS {c}" if c == key_col else f"e.{c}" for c in base_cols
-    ]
+    select_cols = [f"u.{key_col} AS {c}" if c == key_col else f"e.{c}" for c in base_cols]
     select = (
-        ", ".join(select_cols)
-        + ", " + ", ".join(extra.values())
-        + f", (e.{key_col} IS NOT NULL) AS enriched"
+        ", ".join(select_cols) + ", " + ", ".join(extra.values()) + f", (e.{key_col} IS NOT NULL) AS enriched"
     )
     headers = base_cols + list(extra.keys()) + ["enriched"]
     cur = conn.cursor(name=f"export_{table}")  # server-side: stream without loading all
     cur.itersize = 5000
     cur.execute(
-        f"SELECT {select} FROM ({universe_sql}) u "
-        f"LEFT JOIN {table} e ON e.{key_col} = u.{key_col} {join_sql}"
+        f"SELECT {select} FROM ({universe_sql}) u LEFT JOIN {table} e ON e.{key_col} = u.{key_col} {join_sql}"
     )
     n = enriched = 0
     overflow: list[dict] = []
@@ -108,7 +110,7 @@ def _export(
             big = [i for i, c in enumerate(cells) if isinstance(c, str) and len(c) > _CELL_LIMIT]
             if big:
                 # full untruncated record (structured) -> sidecar JSON
-                overflow.append(dict(zip(headers, row)))
+                overflow.append(dict(zip(headers, row, strict=True)))
                 for i in big:
                     cells[i] = f"[overflow: {len(cells[i])} chars -> {jb}]"
             w.writerow(cells)
@@ -157,8 +159,15 @@ def main(argv: list[str] | None = None) -> int:
     dom_path = out_dir / "unique_domestic_applications.csv"
     dom_json = out_dir / "unique_domestic_applications_overflow.json"
     n_dom, e_dom, o_dom = _export(
-        conn, "domestic_records", "application_number", dom_universe, dom_cols, dom_join,
-        dom_extra, dom_path, dom_json,
+        conn,
+        "domestic_records",
+        "application_number",
+        dom_universe,
+        dom_cols,
+        dom_join,
+        dom_extra,
+        dom_path,
+        dom_json,
     )
 
     # --- Madrid: EVERY unique IRN (universe = trademarks.lineage_key) + enrichment ---
@@ -177,15 +186,26 @@ def main(argv: list[str] | None = None) -> int:
     mad_path = out_dir / "unique_madrid_applications.csv"
     mad_json = out_dir / "unique_madrid_applications_overflow.json"
     n_mad, e_mad, o_mad = _export(
-        conn, "madrid_records", "irn", mad_universe, mad_cols, mad_join,
-        mad_extra, mad_path, mad_json,
+        conn,
+        "madrid_records",
+        "irn",
+        mad_universe,
+        mad_cols,
+        mad_join,
+        mad_extra,
+        mad_path,
+        mad_json,
     )
 
     conn.close()
-    print(f"domestic: {n_dom} unique ({e_dom} enriched, {n_dom - e_dom} unenriched, "
-          f"{o_dom} overflow->json) -> {dom_path}")
-    print(f"madrid:   {n_mad} unique ({e_mad} enriched, {n_mad - e_mad} unenriched, "
-          f"{o_mad} overflow->json) -> {mad_path}")
+    print(
+        f"domestic: {n_dom} unique ({e_dom} enriched, {n_dom - e_dom} unenriched, "
+        f"{o_dom} overflow->json) -> {dom_path}"
+    )
+    print(
+        f"madrid:   {n_mad} unique ({e_mad} enriched, {n_mad - e_mad} unenriched, "
+        f"{o_mad} overflow->json) -> {mad_path}"
+    )
     if o_dom:
         print(f"  domestic overflow JSON ({o_dom} full records): {dom_json}")
     if o_mad:
