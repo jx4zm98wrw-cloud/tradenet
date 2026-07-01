@@ -411,13 +411,20 @@ async def search_trademarks(
 
     if is_text_query:
         total = len(scored)
+    elif where:
+        # Filtered: filter-then-dedup semantics — COUNT(DISTINCT dedup_key) over
+        # the WHERE == unique marks matching the filter (a filter may match a
+        # non-representative row), a single aggregate over the small filtered set.
+        cnt_stmt = (
+            select(func.count(func.distinct(dedup_key_expr()))).select_from(Trademark).where(and_(*where))
+        )
+        total = (await session.execute(cnt_stmt)).scalar_one()
     else:
-        # COUNT(DISTINCT dedup_key) over the WHERE == the number of rows the
-        # DISTINCT-ON view yields == unique marks; a single aggregate, so the
-        # count scales without materialising the deduped set.
-        cnt_stmt = select(func.count(func.distinct(dedup_key_expr()))).select_from(Trademark)
-        if where:
-            cnt_stmt = cnt_stmt.where(and_(*where))
+        # Unfiltered: unique-mark count == representative-row count, but a plain
+        # COUNT(*) on the indexed `is_representative` flag instead of a
+        # COUNT(DISTINCT COALESCE(...)) that hash-aggregates all 238k rows
+        # (measured 565ms -> 20ms). Same value as the DISTINCT count.
+        cnt_stmt = select(func.count()).select_from(Trademark).where(Trademark.is_representative)
         total = (await session.execute(cnt_stmt)).scalar_one()
 
     page = scored[offset : offset + limit]

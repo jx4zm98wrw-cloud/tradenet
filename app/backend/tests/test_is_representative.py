@@ -143,3 +143,25 @@ async def test_exactly_one_flag_per_dedup_group(seed: async_sessionmaker) -> Non
         for key, flag in rows:
             per_group[key] = per_group.get(key, 0) + (1 if flag else 0)
     assert set(per_group.values()) == {1}, f"each group has exactly one rep, got {per_group}"
+
+
+@pytest.mark.asyncio
+async def test_representative_count_equals_distinct_dedup_count(seed: async_sessionmaker) -> None:
+    """The unfiltered total swap is valid: COUNT(*) WHERE is_representative equals
+    COUNT(DISTINCT dedup_key) over the same rows (search.py uses the former)."""
+    from sqlalchemy import func
+
+    async with seed() as s:
+        await s.execute(text(recompute_is_representative_sql(scoped_to_gazette=True)), {"gid": _GZ})
+        await s.commit()
+        rep_count = (
+            await s.execute(
+                select(func.count()).where(Trademark.gazette_id == _GZ, Trademark.is_representative.is_(True))
+            )
+        ).scalar_one()
+        distinct_count = (
+            await s.execute(
+                select(func.count(func.distinct(dedup_key_expr()))).where(Trademark.gazette_id == _GZ)
+            )
+        ).scalar_one()
+    assert rep_count == distinct_count == 3
