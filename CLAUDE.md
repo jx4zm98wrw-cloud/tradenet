@@ -209,7 +209,9 @@ claude_csvbuilder/
 │   │   │                           reconcile_domestic_not_found.py prunes orphan
 │   │   │                           domestic_not_found rows;
 │   │   │                           backfill_applicant_note.py strips IP VIETNAM
-│   │   │                           registry-notes from stored applicant names)
+│   │   │                           registry-notes from stored applicant names;
+│   │   │                           backfill_is_representative.py flags the
+│   │   │                           one-row-per-mark dedup representative)
 │   │   ├── tests/                  pytest suite (httpx + ASGI)
 │   │   ├── pyproject.toml          Lint, type-check, package config
 │   │   ├── requirements.txt        Pinned runtime deps (includes pymupdf etc. for image_extractor)
@@ -461,9 +463,25 @@ counts once under `domestic_registration`, not once per row; `Granted` counts
 each granted mark once even though `vn_grant_date` is written to every gazette
 row of the appno). `dedup_key_expr()` is the SQL twin of `_dedup_key` (uses
 `NULLIF(col,'')` to match Python `or` truthiness) — the two representations must
-stay in sync. Still query-time only, no migration. Guarded by
-`tests/test_search_dedup_filter_facets.py` (and `tests/test_search_dedup.py` for
-the text/phonetic paths).
+stay in sync. Guarded by `tests/test_search_dedup_filter_facets.py` (and
+`tests/test_search_dedup.py` for the text/phonetic paths).
+
+**Performance — `is_representative` fast path.** The `DISTINCT ON` seq-scanned
+all 238k `trademarks` rows and spilled a ~19 MB external-merge **sort to disk on
+every facet / default-search call** (~1 s each; the Search page fires ~8 in
+parallel → ~3 s to data-ready). `trademarks.is_representative` (bool, migration
+`20260701_0033`; partial index `ix_trademarks_representative WHERE
+is_representative`) precomputes the DISTINCT-ON winner — `true` on exactly the one
+most-advanced row of each dedup group. When `where` is **empty**,
+`representative_marks()` filters `WHERE is_representative` (seq-scan + hash-agg, NO
+sort — ~1 s → ~70 ms/facet, semantically identical to the unfiltered DISTINCT ON);
+a non-empty `where` keeps the DISTINCT ON over the small filtered set. The flag is
+maintained by `_dedup.recompute_is_representative_sql` (the SQL twin of
+`dedup_key_expr()` / `_dedup_pref` — **keep in sync**): the ingest worker
+recomputes the touched groups after every ingest, and
+`scripts/backfill_is_representative.py` (idempotent) does the initial/whole-table
+population. **Re-run the backfill after a bulk `backfill_vn_grant` (a tiebreaker in
+the ordering).** Guarded by `tests/test_is_representative.py`.
 
 The same `_dedup.py` view also backs the **mark-detail applicant portfolio**
 surfaces (`routes/marks.py`): `/api/v1/marks/{id}/applicant-stats` counts

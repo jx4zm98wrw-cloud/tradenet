@@ -55,10 +55,16 @@ def representative_marks(where: Sequence[Any] = ()) -> Any:
     max-wins tuple ``(certificate_number is not None, vn_grant_date is not None,
     str(id))`` as DESC so the same physical row survives as in the Python paths.
     """
+    if not where:
+        # Unfiltered: the maintained `is_representative` flag already marks exactly
+        # one row per dedup group (the SQL twin of the DISTINCT ON below), so filter
+        # the indexed boolean instead of sorting the WHOLE table — the DISTINCT ON
+        # seq-scanned 238k rows and spilled a ~19 MB external-merge sort to disk on
+        # every facet / default-search call. Semantically identical to the
+        # unfiltered DISTINCT ON (both yield the representative row of every group).
+        return aliased(Trademark, select(Trademark).where(Trademark.is_representative).subquery())
     key = dedup_key_expr()
-    sub = select(Trademark)
-    if where:
-        sub = sub.where(and_(*where))
+    sub = select(Trademark).where(and_(*where))
     sub = sub.distinct(key).order_by(
         key,
         Trademark.certificate_number.is_not(None).desc(),
@@ -66,3 +72,40 @@ def representative_marks(where: Sequence[Any] = ()) -> Any:
         cast(Trademark.id, Text).desc(),
     )
     return aliased(Trademark, sub.subquery())
+
+
+# --- Maintenance of trademarks.is_representative -----------------------------
+# Raw-SQL twins of dedup_key_expr() and the representative_marks ORDER BY, used
+# by the ingest worker (sync session) and scripts/backfill_is_representative.py
+# to MAINTAIN the flag. They MUST mirror the constructs above.
+_DEDUP_KEY_SQL = "coalesce(nullif(application_number, ''), nullif(lineage_key, ''), id::text)"
+_REP_ORDER_SQL = "(certificate_number IS NOT NULL) DESC, (vn_grant_date IS NOT NULL) DESC, id::text DESC"
+
+
+def recompute_is_representative_sql(*, scoped_to_gazette: bool) -> str:
+    """UPDATE setting `is_representative = (row is its dedup group's most-advanced
+    row)`.
+
+    ``scoped_to_gazette=True`` recomputes only the groups touched by ``:gid``
+    (post-ingest — keeps fresh rows correct without a full backfill); ``False``
+    recomputes the whole table (backfill). Writes only rows whose flag actually
+    changes, so it is idempotent and cheap to re-run.
+    """
+    scope = (
+        f"WHERE {_DEDUP_KEY_SQL} IN "
+        f"(SELECT DISTINCT {_DEDUP_KEY_SQL} FROM trademarks WHERE gazette_id = :gid)"
+        if scoped_to_gazette
+        else ""
+    )
+    return f"""
+        WITH ranked AS (
+            SELECT id, row_number() OVER (
+                PARTITION BY {_DEDUP_KEY_SQL} ORDER BY {_REP_ORDER_SQL}
+            ) AS rn
+            FROM trademarks {scope}
+        )
+        UPDATE trademarks t
+        SET is_representative = (r.rn = 1)
+        FROM ranked r
+        WHERE t.id = r.id AND t.is_representative IS DISTINCT FROM (r.rn = 1)
+    """

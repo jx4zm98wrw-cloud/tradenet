@@ -20,6 +20,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Computed,
     Date,
@@ -182,6 +183,15 @@ class Trademark(Base):
             postgresql_ops={"mark_sample": "gin_trgm_ops"},
             postgresql_where=text("mark_sample IS NOT NULL"),
         ),
+        # One-row-per-mark fast path: the unfiltered facet/search path filters
+        # `WHERE is_representative` instead of DISTINCT-ON-sorting the whole table.
+        # Partial (only the ~one-per-group representatives) keeps it small and lets
+        # the planner index-scan the representative set under selective filters.
+        Index(
+            "ix_trademarks_representative",
+            "is_representative",
+            postgresql_where=text("is_representative"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -272,6 +282,13 @@ class Trademark(Base):
     mark_embedding: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     """L2-normalised 768-float32 LaBSE embedding of mark_name, as bytea. Populated
     by scripts/backfill_mark_embedding.py (backfill-only; see Track 3b-1)."""
+    is_representative: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    """True for the ONE most-advanced row of each dedup group (the SQL twin of
+    `_dedup.representative_marks`' DISTINCT ON: certificate present > granted >
+    id desc). Lets the unfiltered facet/search path filter on an indexed boolean
+    instead of sorting the whole table. Maintained at ingest (worker recomputes
+    the touched groups) and by scripts/backfill_is_representative.py — MUST stay in
+    sync with `dedup_key_expr()` / `_dedup_pref`."""
 
     # Priority / related
     priority_300: Mapped[str | None] = mapped_column(Text, nullable=True)  # (300)
