@@ -62,3 +62,8 @@ Thumbs.db
 # Claude Code per-user runtime state (lock files, local-only settings)
 .claude/*.lock
 .claude/settings.local.json
+
+# CodeGraph index + its generated editor rule (per-user tooling, regenerable
+# via `codegraph init` / `codegraph index`) — never commit.
+.codegraph/
+.cursor/
