@@ -491,6 +491,14 @@ only on ingest). Per-worker, TTL-bounded (facets can be up to 120 s stale after 
 ingest; no cross-process invalidation). A conftest autouse fixture clears it
 between tests. Guarded by `tests/test_facet_cache.py`.
 
+The Search page fetches all six sidebar facets in ONE round-trip via
+`GET /api/v1/facets/all` (`facet_all` → `AllFacets`), which runs the six counts
+**sequentially** on the request session (an AsyncSession is not concurrency-safe)
+— also dodging the self-contention that inflated the old 6-parallel calls — with
+each sub-call hitting the TTL cache. Results still render independently of the
+facets (best-effort, abortable), so the list paints as soon as `/search` returns.
+The per-facet endpoints remain (the filter-rail "show all" modals still use them).
+
 The same `_dedup.py` view also backs the **mark-detail applicant portfolio**
 surfaces (`routes/marks.py`): `/api/v1/marks/{id}/applicant-stats` counts
 `totalMarks`/`activeMarks`/`pending` over `representative_marks` (each unique

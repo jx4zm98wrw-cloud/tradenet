@@ -210,3 +210,26 @@ async def test_facet_applicants_count_unique_marks(client: AsyncClient) -> None:
     assert _bucket(buckets, _APPLICANT) == _UNIQUE_MARKS, (
         f"applicant should have {_UNIQUE_MARKS} unique marks (raw rows={_RAW_ROWS})"
     )
+
+
+@pytest.mark.asyncio
+async def test_facet_all_matches_individual_endpoints(client: AsyncClient) -> None:
+    """`/facets/all` returns every sidebar facet in ONE payload, with the same
+    deduped counts as the individual endpoints."""
+    r = await client.get(
+        "/api/v1/facets/all",
+        params={"applicant": _APPLICANT, "gazette_id": str(_GZ)},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body) == {
+        "countries",
+        "nice_classes",
+        "applicants",
+        "ip_agencies",
+        "mark_categories",
+        "granted",
+    }
+    assert _bucket(body["mark_categories"], "domestic_registration") == 2
+    assert _bucket(body["granted"], "granted") == 2
+    assert _bucket(body["applicants"], _APPLICANT) == _UNIQUE_MARKS
