@@ -215,7 +215,12 @@ claude_csvbuilder/
 │   │   │                           fill_registration_date_from_enrichment.py fills
 │   │   │                           missing B-file (151) dates from domestic
 │   │   │                           grant_date / Madrid registration_date — re-run
-│   │   │                           after a B-file re-ingest, mixes provenance)
+│   │   │                           after a B-file re-ingest, mixes provenance;
+│   │   │                           repair_nice_classes.py recomputes
+│   │   │                           trademarks.nice_classes from the authoritative
+│   │   │                           nice_group_number (pure recompute, idempotent —
+│   │   │                           one-off historical fix for audit W1; new ingests
+│   │   │                           are already correct))
 │   │   ├── tests/                  pytest suite (httpx + ASGI)
 │   │   ├── pyproject.toml          Lint, type-check, package config
 │   │   ├── requirements.txt        Pinned runtime deps (includes pymupdf etc. for image_extractor)
@@ -672,12 +677,13 @@ re-audit (e.g., after extractor changes or a fresh ingest):
   above mapping the extractor's saver uses, and flags any section where the
   PDF has an image but the DB row has `logo_path = NULL`. Tunable threshold
   via `AUDIT_MIN_IMAGE_PX` env var (default 50 px; drop to 20 for stricter).
-- **`audit_fields.py`** — eight automated checks codifying the residual
+- **`audit_fields.py`** — nine automated checks codifying the residual
   patterns above (Madrid# in applicant, address fragment in applicant,
   VN missing city, NEITHER (540) nor logo, B-domestic missing (151),
-  invalid Nice classes, marker leakage in (540), year/month vs pub date).
-  Each check reports count vs documented baseline + delta — delta > 0
-  flags a regression.
+  invalid Nice classes, `nice_classes_vs_group` (nice_classes must equal the
+  validated split of nice_group_number — audit W1), marker leakage in (540),
+  year/month vs pub date). Each check reports count vs documented baseline +
+  delta — delta > 0 flags a regression.
 
 A full reset + re-audit ran 2026-05-27 — surfaced and fixed a real
 `MIN_SLICE_PX = 20` regression in the image extractor that was
