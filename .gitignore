@@ -67,3 +67,7 @@ Thumbs.db
 # via `codegraph init` / `codegraph index`) — never commit.
 .codegraph/
 .cursor/
+
+# Database backups (pg_dump output from scripts/backup_db.sh) — large, never commit.
+backups/
+*.dump
