@@ -40,6 +40,32 @@ def test_gazette_accepted_with_grant_event_keeps_grant_date():
     assert v == VnStatus(designated=True, status="granted", grant_date=date(2019, 5, 2), refusal_date=None)
 
 
+def test_gazette_accepted_rule_18ter_2_ii_grant_supplies_date():
+    # Rule 18ter(2)(ii) grant wording ("...protection of the mark is granted under
+    # Rule 18ter(2)(ii), VN") is a genuine grant. It used to be missed, leaving
+    # grant_date NULL even though the mark is granted with a known date. The earlier
+    # provisional refusal must NOT suppress this real grant date.
+    r = _rec(
+        transaction_history=[
+            {
+                "type": "Partial provisional refusal of protection, VN",
+                "date": "2009-02-19",
+                "parties": ["VN"],
+            },
+            {
+                "type": (
+                    "Statement indicating the goods and services for which protection "
+                    "of the mark is granted under Rule 18ter(2)(ii), VN"
+                ),
+                "date": "2014-06-12",
+                "parties": ["VN"],
+            },
+        ]
+    )
+    v = derive_vn(r, gazette_accepted=True)
+    assert v == VnStatus(designated=True, status="granted", grant_date=date(2014, 6, 12), refusal_date=None)
+
+
 def test_non_gazette_provisional_refusal_with_reg_exp_is_pending():
     # WIPO fallback path: a bare provisional refusal is NOT terminal, and an
     # active registration (reg + exp present) is never refused -> pending.
