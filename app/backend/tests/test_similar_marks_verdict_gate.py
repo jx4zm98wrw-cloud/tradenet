@@ -20,6 +20,7 @@ _SUBJECT = uuid.UUID("e2000000-0000-4000-8000-0000000000b2")  # "Gemy", class 11
 _CLASSMATE = uuid.UUID("e2000000-0000-4000-8000-0000000000b3")  # unrelated name, class 11
 _NEAR_SAME = uuid.UUID("e2000000-0000-4000-8000-0000000000b4")  # "Gemmy", class 11
 _NEAR_DIFF = uuid.UUID("e2000000-0000-4000-8000-0000000000b5")  # "Gemmy", class 42
+_NAMEONLY = uuid.UUID("e2000000-0000-4000-8000-0000000000b6")  # "Gemmy", class 11, NULL mark_sample
 
 
 def _tm(tid: uuid.UUID, appno: str, sample: str | None, name: str, classes: list[str]) -> Trademark:
@@ -60,6 +61,9 @@ async def seed() -> AsyncIterator[None]:
         s.add(_tm(_CLASSMATE, "VG-2", "KAVIN SAVING POWER", "KAVIN SAVING POWER", ["11"]))
         s.add(_tm(_NEAR_SAME, "VG-3", "Gemmy", "Gemmy", ["11"]))
         s.add(_tm(_NEAR_DIFF, "VG-4", "Gemmy", "Gemmy", ["42"]))
+        # Same as VG-3 but wordmark lives ONLY in mark_name (NULL mark_sample) —
+        # the ~172k domestic-mark shape the old mark_sample-gated recall ignored.
+        s.add(_tm(_NAMEONLY, "VG-5", None, "Gemmy", ["11"]))
         await s.commit()
     yield
     async with Session() as s:
@@ -93,3 +97,12 @@ async def test_real_name_match_same_class_included(client: AsyncClient) -> None:
 async def test_name_match_but_class_mismatch_excluded(client: AsyncClient) -> None:
     # Same name "Gemmy" but a non-overlapping class → verdict "Low risk" → dropped.
     assert "VG-4" not in await _appnos(client)
+
+
+@pytest.mark.asyncio
+async def test_mark_name_only_candidate_recalled(client: AsyncClient) -> None:
+    # B1 regression: a confusable candidate whose wordmark is ONLY in mark_name
+    # (NULL mark_sample) must be recalled + shown, exactly like its mark_sample
+    # twin VG-3. The old `mark_sample IS NOT NULL` recall gate excluded ~70% of
+    # the corpus (all mark_name-only domestic marks) — this would fail on it.
+    assert "VG-5" in await _appnos(client)

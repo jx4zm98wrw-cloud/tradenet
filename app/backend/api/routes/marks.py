@@ -362,21 +362,33 @@ async def similar_marks(
     if anchor_word:
         # Stage 1: similarity recall on the wordmark — trigram `%` OR same
         # Double-Metaphone code, ordered by trigram similarity (index-backed).
+        # Recall on BOTH mark_sample AND the resolved mark_name: ~172k domestic
+        # marks have NULL mark_sample and carry their wordmark only in mark_name,
+        # so a mark_sample-only recall (with a `mark_sample IS NOT NULL` gate)
+        # silently ignored ~70% of the corpus — a phonetically identical prior
+        # mark would never surface. NULL columns can't match the `%` / dmetaphone
+        # arms, so no explicit not-null gate is needed. All four arms are
+        # index-backed (lower(mark_sample)/lower(mark_name) GIN-trgm + dmetaphone
+        # btrees).
         ql = anchor_word.lower()
-        recall = (
-            select(Trademark)
-            .where(Trademark.id != m.id, Trademark.mark_sample.is_not(None))
-            .where(
-                or_(
-                    func.lower(Trademark.mark_sample).op("%")(ql),
-                    func.dmetaphone(func.lower(Trademark.mark_sample)) == func.dmetaphone(ql),
-                )
-            )
+        dmeta_q = func.dmetaphone(ql)
+        recall = select(Trademark).where(
+            Trademark.id != m.id,
+            or_(
+                func.lower(Trademark.mark_sample).op("%")(ql),
+                func.lower(Trademark.mark_name).op("%")(ql),
+                func.dmetaphone(func.lower(Trademark.mark_sample)) == dmeta_q,
+                func.dmetaphone(func.lower(Trademark.mark_name)) == dmeta_q,
+            ),
         )
         if pub_range:
             recall = recall.where(and_(*pub_range))
         recall = recall.order_by(
-            func.similarity(func.lower(Trademark.mark_sample), ql).desc(), Trademark.id
+            func.greatest(
+                func.similarity(func.lower(Trademark.mark_sample), ql),
+                func.similarity(func.lower(Trademark.mark_name), ql),
+            ).desc(),
+            Trademark.id,
         ).limit(_SIMILAR_RECALL_CAP)
         await session.execute(text("SET LOCAL pg_trgm.similarity_threshold = 0.15"))
         candidates = list((await session.execute(recall)).scalars().all())
