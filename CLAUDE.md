@@ -220,7 +220,12 @@ claude_csvbuilder/
 │   │   │                           trademarks.nice_classes from the authoritative
 │   │   │                           nice_group_number (pure recompute, idempotent —
 │   │   │                           one-off historical fix for audit W1; new ingests
-│   │   │                           are already correct))
+│   │   │                           are already correct);
+│   │   │                           post_ingest_backfills.py orchestrates the ~10
+│   │   │                           interdependent backfills in dependency order
+│   │   │                           (fail-fast subprocess sequencer — the single
+│   │   │                           entrypoint to re-run after a fresh ingest /
+│   │   │                           enrichment; --list/--skip/--only))
 │   │   ├── tests/                  pytest suite (httpx + ASGI)
 │   │   ├── pyproject.toml          Lint, type-check, package config
 │   │   ├── requirements.txt        Pinned runtime deps (includes pymupdf etc. for image_extractor)
@@ -494,6 +499,17 @@ recomputes the touched groups after every ingest, and
 population. **Re-run the backfill after a bulk `backfill_vn_grant` (a tiebreaker in
 the ordering).** Guarded by `tests/test_is_representative.py`.
 
+**Purge repairs the flag too (audit W2).** `_purge_trademarks` (both the
+clean-slate re-ingest purge and the failure-rollback purge) snapshots the dedup
+keys of the rows it deletes *before* deleting, then recomputes `is_representative`
+for those keys via `recompute_is_representative_for_keys_sql` — so if a purged
+row was its group's representative and the group has a surviving row in another
+gazette (a domestic appno present as both an A application and a B registration),
+the survivor is promoted instead of leaving the mark with zero representatives
+(invisible to search/browse/facets). The `dedup_group_without_representative`
+audit check (baseline 0) guards this invariant corpus-wide; guarded by
+`tests/test_purge_recompute.py`.
+
 On top of that, `routes/facets.py` wraps each of its 7 count endpoints in an
 in-process TTL cache (`_facet_cached`, `_FACET_TTL_S = 120s`, keyed by endpoint +
 `limit` + non-null filter signature) so the ~7 near-static default-facet queries
@@ -677,13 +693,15 @@ re-audit (e.g., after extractor changes or a fresh ingest):
   above mapping the extractor's saver uses, and flags any section where the
   PDF has an image but the DB row has `logo_path = NULL`. Tunable threshold
   via `AUDIT_MIN_IMAGE_PX` env var (default 50 px; drop to 20 for stricter).
-- **`audit_fields.py`** — nine automated checks codifying the residual
+- **`audit_fields.py`** — ten automated checks codifying the residual
   patterns above (Madrid# in applicant, address fragment in applicant,
   VN missing city, NEITHER (540) nor logo, B-domestic missing (151),
   invalid Nice classes, `nice_classes_vs_group` (nice_classes must equal the
-  validated split of nice_group_number — audit W1), marker leakage in (540),
-  year/month vs pub date). Each check reports count vs documented baseline +
-  delta — delta > 0 flags a regression.
+  validated split of nice_group_number — audit W1), `dedup_group_without_
+  representative` (every dedup group must have exactly one is_representative
+  row — the audit W2 purge symptom), marker leakage in (540), year/month vs
+  pub date). Each check reports count vs documented baseline + delta — delta >
+  0 flags a regression.
 
 A full reset + re-audit ran 2026-05-27 — surfaced and fixed a real
 `MIN_SLICE_PX = 20` regression in the image extractor that was
