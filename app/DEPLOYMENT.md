@@ -116,11 +116,41 @@ readiness probe. Both return JSON — Kubernetes pattern.
 
 ## Backup
 
-**Not implemented.** When the product needs it:
+The database is the sole copy of the enriched corpus (238k+ marks + months of
+enrichment/backfills + users) living in one Docker volume (`tm_pgdata`) — a
+`docker compose down -v` or disk failure is unrecoverable without a backup.
 
-- Postgres: `pg_dump` to S3 nightly; PITR via WAL archiving for tighter RPO.
-- Uploaded PDFs: mirror `TM_UPLOAD_DIR` to S3 (or skip — they're re-uploadable
-  from source).
+**Script:** [`backend/scripts/backup_db.sh`](backend/scripts/backup_db.sh) runs
+`pg_dump -Fc` inside the postgres container (no host psql needed), streams a
+compressed custom-format dump to `$BACKUP_DIR`, verifies it is non-empty, and
+prunes to the newest `$RETENTION` (default 14) dumps.
+
+```bash
+# Manual (from repo root)
+app/backend/scripts/backup_db.sh
+BACKUP_DIR=/mnt/backups RETENTION=30 app/backend/scripts/backup_db.sh
+
+# Scheduled (self-host cron, nightly 03:15, logged)
+15 3 * * *  cd /path/to/Tradenet && BACKUP_DIR=/mnt/backups app/backend/scripts/backup_db.sh >> /var/log/tradenet-backup.log 2>&1
+```
+
+**Restore drill** (DESTRUCTIVE — overwrites the target DB; practice on a scratch
+DB first):
+
+```bash
+docker compose -f app/docker-compose.yml exec -T postgres \
+    pg_restore -U tm -d tm --clean --if-exists < /mnt/backups/tradenet_tm_<ts>.dump
+# then: alembic upgrade head  &&  verify /health/ready
+```
+
+**RPO/RTO:** nightly dumps ⇒ worst-case ~24 h data loss (RPO); restore of a
+~1 GB dump is minutes (RTO). Store `$BACKUP_DIR` on a volume **outside** the
+Docker host (or sync to S3) so host loss doesn't take the backups with it.
+
+**Managed prod:** prefer the provider's automated snapshots + PITR (WAL
+archiving) for tighter RPO; then this script is a portable secondary. Uploaded
+PDFs are dedup'd by `sha256` and re-uploadable from source, so they need no
+separate backup.
 
 ## Disaster recovery
 
