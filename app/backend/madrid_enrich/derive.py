@@ -60,7 +60,16 @@ def _vn_events(rec: MadridRecord) -> list[tuple[str, date | None]]:
 
 
 def _is_grant(t: str) -> bool:
-    return "grant of protection" in t or "statement of grant" in t or "the mark is protected" in t
+    return (
+        "grant of protection" in t
+        or "statement of grant" in t
+        or "the mark is protected" in t
+        # Rule 18ter(2)(ii): "Statement indicating the goods and services for which
+        # protection of the mark IS GRANTED under Rule 18ter(2)(ii)" — a genuine
+        # grant whose wording contains none of the phrases above, so it was
+        # silently missed (dropping the grant date for these records).
+        or "the mark is granted" in t
+    )
 
 
 def _is_designation(t: str) -> bool:
