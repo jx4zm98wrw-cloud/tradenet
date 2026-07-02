@@ -55,7 +55,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tm}
       POSTGRES_DB: ${POSTGRES_DB:-tm}
     ports:
-      - "${POSTGRES_PORT:-5435}:5432"
+      # Bind to loopback only — never publish the DB on all host interfaces
+      # (dev stack has weak creds; loopback removes the remote-SQL attack surface).
+      - "127.0.0.1:${POSTGRES_PORT:-5435}:5432"
     volumes:
       - tm_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -68,7 +70,9 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "${REDIS_PORT:-6380}:6379"
+      # Loopback only — an unauthenticated Redis reachable from the LAN + RQ's
+      # pickle jobs would be a remote-code-exec path into the workers.
+      - "127.0.0.1:${REDIS_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
