@@ -243,6 +243,59 @@ def check_invalid_nice_classes() -> list[dict]:
     return bad
 
 
+def _classes_from_group(raw: str | None) -> list[str] | None:
+    """Range-validated (1-45), zero-padded, deduped split of nice_group_number
+    (mirror of worker.mapper._classes_from_group_number)."""
+    if not raw:
+        return None
+    seen: set[str] = set()
+    out: list[str] = []
+    for tok in str(raw).split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        try:
+            n = int(tok)
+        except ValueError:
+            continue
+        if not (1 <= n <= 45):
+            continue
+        c = f"{n:02d}"
+        if c not in seen:
+            seen.add(c)
+            out.append(c)
+    return out or None
+
+
+def check_nice_classes_vs_group() -> list[dict]:
+    """nice_classes must equal the deduped split of the authoritative
+    nice_group_number (audit W1). Any mismatch means phantom incidental-digit
+    classes were harvested from the (511) goods prose or padding drifted — run
+    `python -m scripts.repair_nice_classes`.
+    """
+    with _conn() as conn:
+        rows = conn.execute(
+            select(
+                Trademark.id,
+                Trademark.application_number,
+                Trademark.nice_classes,
+                Trademark.nice_group_number,
+            )
+        ).all()
+    bad = []
+    for r in rows:
+        if r.nice_classes != _classes_from_group(r.nice_group_number):
+            bad.append(
+                {
+                    "id": str(r.id),
+                    "app_no": r.application_number,
+                    "nice_classes": r.nice_classes,
+                    "nice_group_number": r.nice_group_number,
+                }
+            )
+    return bad
+
+
 _INID_MARKER_IN_TEXT = re.compile(r"\((\d{3})\)")
 
 
@@ -310,6 +363,7 @@ CHECKS = {
     "neither_540_nor_logo": check_neither_540_nor_logo,
     "b_missing_registration_date": check_b_missing_registration_date,
     "invalid_nice_classes": check_invalid_nice_classes,
+    "nice_classes_vs_group": check_nice_classes_vs_group,
     "marker_leakage_in_mark_sample": check_marker_leakage_in_mark_sample,
     "year_month_vs_pub_date": check_year_month_vs_pub_date,
 }
@@ -324,6 +378,7 @@ BASELINES = {
     "neither_540_nor_logo": 7,
     "b_missing_registration_date": None,
     "invalid_nice_classes": 0,
+    "nice_classes_vs_group": 0,
     "marker_leakage_in_mark_sample": 0,
     "year_month_vs_pub_date": 0,
 }

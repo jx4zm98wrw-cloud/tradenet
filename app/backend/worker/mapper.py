@@ -79,22 +79,41 @@ def _int(value: Any) -> int | None:
         return None
 
 
-def _classes_to_array(raw: Any) -> list[str] | None:
-    """Parse the (511) raw text into a Nice-class array. Handles both
-    "Nhóm 35: ...; Nhóm 41: ..." and bare "05, 12, 41" forms.
+def _classes_from_group_number(raw: Any) -> list[str] | None:
+    """Nice-class array from the extractor's already-parsed ``Group Number``.
+
+    ``Group Number`` (from ``compute_511_fields``) is the source of truth for a
+    section's Nice classes: comma-joined, grammar-scoped (only "Nhóm N" digits,
+    or a strict all-numeric list). We split, range-validate to 1-45, zero-pad,
+    and dedup (preserving order) — so the queryable array holds only real Nice
+    classes in the canonical 2-digit form used across domestic/madrid
+    enrichment. (The raw ``Group Number`` string is kept verbatim in
+    ``nice_group_number`` and may still contain e.g. an out-of-range "Nhóm 99"
+    the gazette printed; the ``Nhóm N`` grammar is not range-validated upstream.)
+
+    Do NOT re-harvest classes from the raw (511) goods text — that prose carries
+    incidental digits (quantities like "10 kg", "3 chiều", page refs) that a
+    blind ``\\d{1,2}`` scan turns into phantom classes. That older approach
+    corrupted ~1.4k rows before this fix (audit W1).
     """
     if not raw:
         return None
-    s = str(raw)
-    # Capture all numeric class tokens regardless of grammar.
-    nums = re.findall(r"(?<!\d)(\d{1,2})(?!\d)", s)
-    if not nums:
-        return None
-    seen, out = set(), []
-    for n in nums:
-        if 1 <= int(n) <= 45 and n not in seen:
-            seen.add(n)
-            out.append(n)
+    seen: set[str] = set()
+    out: list[str] = []
+    for tok in str(raw).split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        try:
+            n = int(tok)
+        except ValueError:
+            continue
+        if not (1 <= n <= 45):
+            continue
+        c = f"{n:02d}"
+        if c not in seen:
+            seen.add(c)
+            out.append(c)
     return out or None
 
 
@@ -139,7 +158,7 @@ def section_to_trademark(
         validity_176=_str(s.get("(176)")),
         month=_int(s.get("Month")),
         year=_int(s.get("Year")),
-        nice_classes=_classes_to_array(s.get("(511)")),
+        nice_classes=_classes_from_group_number(s.get("Group Number")),
         nice_total=_int(s.get("Total Group")),
         nice_group_number=_str(s.get("Group Number")),
         raw_511_text=_str(s.get("(511)")),
