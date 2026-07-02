@@ -71,21 +71,10 @@ _DEDUP_KEY_SQL = "coalesce(nullif(application_number, ''), nullif(lineage_key, '
 _REP_ORDER_SQL = "(certificate_number IS NOT NULL) DESC, (vn_grant_date IS NOT NULL) DESC, id::text DESC"
 
 
-def recompute_is_representative_sql(*, scoped_to_gazette: bool) -> str:
-    """UPDATE setting `is_representative = (row is its dedup group's most-advanced
-    row)`.
-
-    ``scoped_to_gazette=True`` recomputes only the groups touched by ``:gid``
-    (post-ingest — keeps fresh rows correct without a full backfill); ``False``
-    recomputes the whole table (backfill). Writes only rows whose flag actually
-    changes, so it is idempotent and cheap to re-run.
-    """
-    scope = (
-        f"WHERE {_DEDUP_KEY_SQL} IN "
-        f"(SELECT DISTINCT {_DEDUP_KEY_SQL} FROM trademarks WHERE gazette_id = :gid)"
-        if scoped_to_gazette
-        else ""
-    )
+def _recompute_is_representative_sql(scope: str) -> str:
+    """Shared UPDATE body: within each dedup group (optionally narrowed by
+    ``scope``), flag the single most-advanced row and clear the rest. Writes only
+    rows whose flag actually changes, so it is idempotent and cheap to re-run."""
     return f"""
         WITH ranked AS (
             SELECT id, row_number() OVER (
@@ -98,3 +87,34 @@ def recompute_is_representative_sql(*, scoped_to_gazette: bool) -> str:
         FROM ranked r
         WHERE t.id = r.id AND t.is_representative IS DISTINCT FROM (r.rn = 1)
     """
+
+
+def recompute_is_representative_sql(*, scoped_to_gazette: bool) -> str:
+    """UPDATE setting `is_representative = (row is its dedup group's most-advanced
+    row)`.
+
+    ``scoped_to_gazette=True`` recomputes only the groups touched by ``:gid``
+    (post-ingest — keeps fresh rows correct without a full backfill); ``False``
+    recomputes the whole table (backfill).
+    """
+    scope = (
+        f"WHERE {_DEDUP_KEY_SQL} IN "
+        f"(SELECT DISTINCT {_DEDUP_KEY_SQL} FROM trademarks WHERE gazette_id = :gid)"
+        if scoped_to_gazette
+        else ""
+    )
+    return _recompute_is_representative_sql(scope)
+
+
+def recompute_is_representative_for_keys_sql() -> str:
+    """UPDATE recomputing `is_representative` for the dedup groups whose key is in
+    the ``:keys`` bind (a Postgres array).
+
+    Used after a PURGE: the deleted rows may have been their group's
+    representative while the group ALSO has surviving rows in other gazettes.
+    Scoping by the purged rows' keys (snapshotted BEFORE the delete) lets a
+    survivor be promoted so the mark never falls out of the representative set —
+    ``scoped_to_gazette`` alone can't see it, since the key is no longer present
+    in the purged gazette. (audit W2)
+    """
+    return _recompute_is_representative_sql(f"WHERE {_DEDUP_KEY_SQL} = ANY(:keys)")

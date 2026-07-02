@@ -12,10 +12,14 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 
-from sqlalchemy import create_engine, delete, text
+from sqlalchemy import create_engine, delete, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from api._dedup import recompute_is_representative_sql
+from api._dedup import (
+    dedup_key_expr,
+    recompute_is_representative_for_keys_sql,
+    recompute_is_representative_sql,
+)
 from api.db.models import Gazette, GazetteStatus, GazetteType, Trademark
 from api.settings import get_settings
 from tm_extractor import ExtractorConfig, PDFProcessor
@@ -277,6 +281,19 @@ def _purge_trademarks(session: Session, gazette_id: uuid.UUID) -> int:
 
     Returns the row count purged (informational; safe-to-ignore).
     """
+    # Snapshot the dedup keys of the rows we're about to delete BEFORE deleting.
+    # A deleted row may be its dedup group's representative while the group also
+    # has SURVIVING rows in other gazettes (e.g. an appno present as an A row in
+    # gazette G1 and a B row in the gazette being purged). Without repair those
+    # survivors keep is_representative=false and the mark vanishes from
+    # search/facets. scoped_to_gazette can't fix it — the key is gone from this
+    # gazette — so we recompute over the purged keys afterward. (audit W2)
+    keys = [
+        k
+        for (k,) in session.execute(
+            select(dedup_key_expr()).where(Trademark.gazette_id == gazette_id).distinct()
+        ).all()
+    ]
     result = session.execute(delete(Trademark).where(Trademark.gazette_id == gazette_id))
     # `session.execute(delete(...))` returns a CursorResult at runtime, which
     # has `.rowcount` — but newer SQLAlchemy stubs annotate the return as
@@ -284,6 +301,8 @@ def _purge_trademarks(session: Session, gazette_id: uuid.UUID) -> int:
     # works cleanly under both stub generations without tripping
     # warn_unused_ignores or warn_redundant_casts.
     purged: int = getattr(result, "rowcount", 0) or 0
+    if keys:
+        session.execute(text(recompute_is_representative_for_keys_sql()), {"keys": keys})
     session.commit()
     return purged
 

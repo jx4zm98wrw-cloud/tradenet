@@ -40,6 +40,7 @@ import sys
 
 from sqlalchemy import and_, create_engine, func, or_, select
 
+from api._dedup import dedup_key_expr
 from api.db.models import RecordType, Trademark
 from api.settings import get_settings
 
@@ -296,6 +297,23 @@ def check_nice_classes_vs_group() -> list[dict]:
     return bad
 
 
+def check_dedup_group_without_representative() -> list[dict]:
+    """Every dedup group must have exactly one is_representative row. A group with
+    ZERO (bool_or(is_representative) IS NOT TRUE) is invisible to
+    search/browse/facets — the audit W2 symptom (a purge that removed a group's
+    representative without promoting a surviving cross-gazette row). Fix: run
+    `python -m scripts.backfill_is_representative`.
+    """
+    key = dedup_key_expr()
+    with _conn() as conn:
+        rows = conn.execute(
+            select(key.label("k"), func.count().label("n"))
+            .group_by(key)
+            .having(func.bool_or(Trademark.is_representative).is_not(True))
+        ).all()
+    return [{"dedup_key": r.k, "rows_in_group": r.n} for r in rows]
+
+
 _INID_MARKER_IN_TEXT = re.compile(r"\((\d{3})\)")
 
 
@@ -364,6 +382,7 @@ CHECKS = {
     "b_missing_registration_date": check_b_missing_registration_date,
     "invalid_nice_classes": check_invalid_nice_classes,
     "nice_classes_vs_group": check_nice_classes_vs_group,
+    "dedup_group_without_representative": check_dedup_group_without_representative,
     "marker_leakage_in_mark_sample": check_marker_leakage_in_mark_sample,
     "year_month_vs_pub_date": check_year_month_vs_pub_date,
 }
@@ -379,6 +398,7 @@ BASELINES = {
     "b_missing_registration_date": None,
     "invalid_nice_classes": 0,
     "nice_classes_vs_group": 0,
+    "dedup_group_without_representative": 0,
     "marker_leakage_in_mark_sample": 0,
     "year_month_vs_pub_date": 0,
 }
