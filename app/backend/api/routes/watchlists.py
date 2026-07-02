@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tm_similarity import DEFAULT_WEIGHTS
 
-from ..auth import User, optional_user, require_user
+from ..auth import User, require_user
 from ..db import RecordType, Trademark, Watchlist, get_session
 from ..schemas import TrademarkOut
 from ._filters import build_trademark_where
@@ -87,13 +87,14 @@ class WatchlistUpdate(BaseModel):
 @router.get("", response_model=list[WatchlistOut])
 async def list_watchlists(
     session: AsyncSession = Depends(get_session),
-    user: User | None = Depends(optional_user),
+    user: User = Depends(require_user),
 ) -> list[WatchlistOut]:
-    # Scope to the caller's watchlists when authenticated. Pre-auth callers see
-    # all (legacy behaviour); once auth is real, drop the `if` branch.
+    # Auth required and scoped to the caller's OWN watchlists (admins see all).
+    # NULL-owner (legacy) rows are admin-only — they must never leak across
+    # tenants, so a non-admin sees only rows they own.
     stmt = select(Watchlist).order_by(desc(Watchlist.new_count), desc(Watchlist.updated_at))
-    if user is not None:
-        stmt = stmt.where((Watchlist.owner_id == user.id) | (Watchlist.owner_id.is_(None)))
+    if not user.is_admin:
+        stmt = stmt.where(Watchlist.owner_id == user.id)
     rows = (await session.execute(stmt)).scalars().all()
     return [_to_out(w) for w in rows]
 
@@ -172,10 +173,15 @@ async def delete_watchlist(
 
 
 def _assert_owned(w: Watchlist, user: User) -> None:
-    """403 if `user` doesn't own the watchlist (admins bypass)."""
+    """403 unless `user` owns the watchlist (admins bypass).
+
+    A NULL-owner (legacy) row is NOT owned by any non-admin — treat it as
+    inaccessible rather than a free-for-all, so a logged-in user can't
+    read/mutate someone else's un-migrated watchlist.
+    """
     if user.is_admin:
         return
-    if w.owner_id and w.owner_id != user.id:
+    if w.owner_id != user.id:
         raise HTTPException(403, "You don't own this watchlist")
 
 
@@ -184,10 +190,12 @@ async def watchlist_findings(
     id: uuid.UUID,
     limit: int = 12,
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(require_user),
 ) -> list[TrademarkOut]:
     w = await session.get(Watchlist, id)
     if w is None:
         raise HTTPException(404, "Watchlist not found")
+    _assert_owned(w, user)
     where = _query_where(WatchQuery(**w.query))
     stmt = select(Trademark).order_by(desc(Trademark.publication_date_441), Trademark.id).limit(limit)
     if where:

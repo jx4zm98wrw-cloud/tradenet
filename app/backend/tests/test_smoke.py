@@ -99,8 +99,10 @@ async def test_facets_cross_react(client: AsyncClient) -> None:
 # ---------- today ----------
 
 
-async def test_today_digest_shape(client: AsyncClient) -> None:
-    r = await client.get("/api/v1/today/digest")
+async def test_today_digest_shape(authed_client: AsyncClient, client: AsyncClient) -> None:
+    # The digest is per-tenant private data → anonymous callers are rejected.
+    assert (await client.get("/api/v1/today/digest")).status_code == 401
+    r = await authed_client.get("/api/v1/today/digest")
     assert r.status_code == 200
     body = r.json()
     for k in (
@@ -113,6 +115,18 @@ async def test_today_digest_shape(client: AsyncClient) -> None:
         "lastSyncAt",
     ):
         assert k in body
+
+
+async def test_private_endpoints_require_auth(client: AsyncClient) -> None:
+    # A1/A2: watchlist listing, per-watchlist findings, and today findings are
+    # per-tenant private — anonymous callers must be rejected (401), never served
+    # every tenant's data.
+    import uuid as _uuid
+
+    fake = _uuid.uuid4()
+    assert (await client.get("/api/v1/watchlists")).status_code == 401
+    assert (await client.get(f"/api/v1/watchlists/{fake}/findings")).status_code == 401
+    assert (await client.get("/api/v1/findings")).status_code == 401
 
 
 async def test_opposition_windows_returns_dates(client: AsyncClient) -> None:

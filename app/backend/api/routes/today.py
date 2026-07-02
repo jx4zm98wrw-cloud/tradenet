@@ -16,8 +16,19 @@ from pydantic import BaseModel
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..auth import User, require_user
 from ..db import Gazette, GazetteStatus, RecordType, Trademark, Watchlist, get_session
 from ..schemas import TrademarkOut
+
+
+def _owned_watchlists(user: User):
+    """Watchlist select scoped to the caller (admins see all) — the dashboard is
+    per-tenant; anonymous/other-tenant callers must never see these rows."""
+    stmt = select(Watchlist)
+    if not user.is_admin:
+        stmt = stmt.where(Watchlist.owner_id == user.id)
+    return stmt
+
 
 router = APIRouter(prefix="/api/v1", tags=["today"])
 
@@ -55,9 +66,12 @@ class DigestOut(BaseModel):
 
 
 @router.get("/today/digest", response_model=DigestOut)
-async def today_digest(session: AsyncSession = Depends(get_session)) -> DigestOut:
+async def today_digest(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(require_user),
+) -> DigestOut:
     today = DEMO_TODAY
-    findings_total, watch_with_findings, n_watch = await _findings_summary(session)
+    findings_total, watch_with_findings, n_watch = await _findings_summary(session, user)
     # Real opposition counts
     threshold = today - timedelta(days=OPPOSITION_WINDOW_DAYS)
     base = (
@@ -141,9 +155,9 @@ async def _findings_for_watchlist(
     return [(m, w) for m in rows]
 
 
-async def _findings_summary(session: AsyncSession) -> tuple[int, int, int]:
+async def _findings_summary(session: AsyncSession, user: User) -> tuple[int, int, int]:
     """Returns (total_findings, watchlists_with_findings, total_watchlists)."""
-    watchlists = list((await session.execute(select(Watchlist))).scalars().all())
+    watchlists = list((await session.execute(_owned_watchlists(user))).scalars().all())
     found = 0
     with_findings = 0
     for w in watchlists:
@@ -155,9 +169,12 @@ async def _findings_summary(session: AsyncSession) -> tuple[int, int, int]:
 
 
 @router.get("/findings", response_model=list[FindingOut])
-async def findings(session: AsyncSession = Depends(get_session)) -> list[FindingOut]:
+async def findings(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(require_user),
+) -> list[FindingOut]:
     """Findings = marks that match any watchlist's saved query, ranked by score."""
-    watchlists = list((await session.execute(select(Watchlist))).scalars().all())
+    watchlists = list((await session.execute(_owned_watchlists(user))).scalars().all())
     out: list[FindingOut] = []
     seen_marks: set = set()
     for w in watchlists:
