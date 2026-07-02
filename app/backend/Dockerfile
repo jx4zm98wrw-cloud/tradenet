@@ -61,4 +61,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl --fail --silent http://localhost:8000/health || exit 1
 
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]
+# Shell form so FORWARDED_ALLOW_IPS is expanded at runtime; `exec` keeps uvicorn
+# as PID 1 for proper signal handling. Default trusts ONLY the loopback proxy —
+# `--forwarded-allow-ips=*` let any client spoof X-Forwarded-For past the per-IP
+# rate limiter. Set FORWARDED_ALLOW_IPS to your real proxy's IP in production.
+CMD exec uvicorn api.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips="${FORWARDED_ALLOW_IPS:-127.0.0.1}"
